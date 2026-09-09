@@ -1,0 +1,28 @@
+{
+  "name": "samuel",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "docker:up": "docker compose up -d --wait",
+    "docker:down": "docker compose down",
+    "wait:deps": "node scripts/wait-deps.mjs",
+    "predev": "docker compose up -d --wait && node scripts/wait-deps.mjs && node scripts/check-ports.mjs",
+    "dev": "concurrently -n api,web -c cyan,magenta --restart-tries 3 --restart-after 2000 \"npm run api:dev\" \"npm run web:dev\"",
+    "start": "npm run dev",
+    "api:dev": "npm run start:dev --workspace=apps/api",
+    "api:build": "npm run build --workspace=apps/api",
+    "web:dev": "npm run dev --workspace=apps/web",
+    "web:build": "npm run build --workspace=apps/web",
+    "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:seed": "npm run prisma:seed --workspace=apps/api",
+    "db:generate": "npm run prisma:generate --workspace=apps/api"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "concurrently": "^10.0.5"
+  }
+}

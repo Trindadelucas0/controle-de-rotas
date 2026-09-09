@@ -1,0 +1,14 @@
+node_modules/
+dist/
+.next/
+.env
+.env.local
+apps/*/.env
+apps/*/.env.local
+*.log
+coverage/
+.turbo/
+cookies.txt
+apps/api/storage/
+
+certificates

@@ -1,0 +1,608 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum CompanyStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  SUPERVISOR
+  EMPLOYEE
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+  SUSPENDED
+}
+
+enum VehicleStatus {
+  AVAILABLE
+  IN_USE
+  MAINTENANCE
+  INACTIVE
+}
+
+enum CustomerStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum LocationStatus {
+  OK
+  PENDING
+  FAILED
+}
+
+enum ServiceOrderPriority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
+}
+
+enum ServiceOrderStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum VisitStatus {
+  SCHEDULED
+  ASSIGNED
+  CANCELLED
+  RESCHEDULED
+  IN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+enum RouteStatus {
+  DRAFT
+  PLANNED
+  ASSIGNED
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum RouteStopStatus {
+  PENDING
+  SKIPPED
+  COMPLETED
+  FAILED
+}
+
+enum VisitEventType {
+  CHECK_IN
+  NOTE
+  EVIDENCE
+  CHECK_OUT
+  STATUS_CHANGE
+}
+
+enum VisitOutcome {
+  DONE
+  NO_CONTACT
+  REFUSED
+  FOLLOW_UP
+}
+
+enum VisitEvidenceType {
+  PHOTO
+}
+
+enum CustomerAccessPathStatus {
+  ACTIVE
+  SUPERSEDED
+}
+
+enum CustomerLandmarkType {
+  PORTEIRA
+  PONTE
+  BIFURCACAO
+  ESTRADA_RUIM
+}
+
+model Company {
+  id              String         @id @default(uuid()) @db.Uuid
+  name            String         @db.VarChar(200)
+  tradeName       String?        @map("trade_name") @db.VarChar(200)
+  document        String?        @db.VarChar(32)
+  phone           String?        @db.VarChar(40)
+  email           String?        @db.VarChar(255)
+  address         String?        @db.VarChar(500)
+  latitude        Float?
+  longitude       Float?
+  /// PostGIS Point SRID 4326 — mantido por trigger a partir de lat/lng
+  location        Unsupported("geometry(Point,4326)")?
+  locationStatus  LocationStatus @default(PENDING) @map("location_status")
+  serviceOrderSeq Int            @default(1000) @map("service_order_seq")
+  status          CompanyStatus  @default(ACTIVE)
+  createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  users         User[]
+  employees     Employee[]
+  customers     Customer[]
+  vehicles      Vehicle[]
+  auditLogs     AuditLog[]
+  serviceOrders   ServiceOrder[]
+  visits          Visit[]
+  routes               Route[]
+  trackingPoints       TrackingPoint[]
+  visitEvents          VisitEvent[]
+  visitEvidence        VisitEvidence[]
+  customerAccessPaths  CustomerAccessPath[]
+  customerLandmarks    CustomerLandmark[]
+
+  @@map("companies")
+}
+
+model User {
+  id           String     @id @default(uuid()) @db.Uuid
+  companyId    String     @map("company_id") @db.Uuid
+  name         String     @db.VarChar(200)
+  email        String     @unique @db.VarChar(255)
+  passwordHash String     @map("password_hash")
+  role         UserRole
+  status       UserStatus @default(ACTIVE)
+  lastLoginAt  DateTime?  @map("last_login_at") @db.Timestamptz(6)
+  createdAt    DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime   @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company             Company              @relation(fields: [companyId], references: [id])
+  employee            Employee?
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+  auditLogs           AuditLog[]
+  createdServiceOrders ServiceOrder[]      @relation("ServiceOrderCreatedBy")
+  visitEvents          VisitEvent[]        @relation("VisitEventActor")
+  visitEvidence        VisitEvidence[]     @relation("VisitEvidenceActor")
+
+  @@index([companyId])
+  @@map("users")
+}
+
+model Employee {
+  id           String         @id @default(uuid()) @db.Uuid
+  companyId    String         @map("company_id") @db.Uuid
+  userId       String?        @unique @map("user_id") @db.Uuid
+  name         String         @db.VarChar(200)
+  phone        String?        @db.VarChar(40)
+  email        String?        @db.VarChar(255)
+  jobTitle     String?        @map("job_title") @db.VarChar(120)
+  registration String?        @db.VarChar(80)
+  specialties  String[]       @default([])
+  region       String?        @db.VarChar(120)
+  status       EmployeeStatus @default(ACTIVE)
+  createdAt    DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company        Company         @relation(fields: [companyId], references: [id])
+  user           User?           @relation(fields: [userId], references: [id])
+  visits                Visit[]
+  routes                Route[]
+  trackingPoints        TrackingPoint[]
+  recordedAccessPaths   CustomerAccessPath[] @relation("AccessPathRecordedBy")
+  createdLandmarks      CustomerLandmark[]   @relation("LandmarkCreatedBy")
+
+  @@index([companyId])
+  @@index([status])
+  @@map("employees")
+}
+
+model Customer {
+  id             String         @id @default(uuid()) @db.Uuid
+  companyId      String         @map("company_id") @db.Uuid
+  name           String         @db.VarChar(200)
+  tradeName      String?        @map("trade_name") @db.VarChar(200)
+  document       String?        @db.VarChar(32)
+  phone          String?        @db.VarChar(40)
+  whatsapp       String?        @db.VarChar(40)
+  email          String?        @db.VarChar(255)
+  street         String?        @db.VarChar(200)
+  number         String?        @db.VarChar(40)
+  complement     String?        @db.VarChar(120)
+  district       String?        @db.VarChar(120)
+  city           String?        @db.VarChar(120)
+  state          String?        @db.VarChar(2)
+  zipCode        String?        @map("zip_code") @db.VarChar(16)
+  latitude       Float?
+  longitude      Float?
+  /// PostGIS Point SRID 4326 — mantido por trigger a partir de lat/lng
+  location       Unsupported("geometry(Point,4326)")?
+  locationStatus LocationStatus @default(PENDING) @map("location_status")
+  category       String?        @db.VarChar(80)
+  priority       String?        @db.VarChar(40)
+  notes          String?
+  status         CustomerStatus @default(ACTIVE)
+  createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company       Company        @relation(fields: [companyId], references: [id])
+  serviceOrders ServiceOrder[]
+  visits        Visit[]
+  accessPaths   CustomerAccessPath[]
+  landmarks     CustomerLandmark[]
+
+  @@index([companyId])
+  @@index([name])
+  @@index([document])
+  @@index([status])
+  @@map("customers")
+}
+
+model Vehicle {
+  id              String        @id @default(uuid()) @db.Uuid
+  companyId       String        @map("company_id") @db.Uuid
+  plate           String        @db.VarChar(16)
+  brand           String?       @db.VarChar(80)
+  model           String?       @db.VarChar(80)
+  year            Int?
+  fuelType        String?       @map("fuel_type") @db.VarChar(40)
+  avgConsumption  Float?        @map("avg_consumption")
+  capacity        Float?
+  odometerKm      Float?        @map("odometer_km")
+  status          VehicleStatus @default(AVAILABLE)
+  createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company        Company         @relation(fields: [companyId], references: [id])
+  routes         Route[]
+  trackingPoints TrackingPoint[]
+
+  @@unique([companyId, plate])
+  @@index([companyId])
+  @@index([status])
+  @@map("vehicles")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  userAgent String?   @map("user_agent")
+  ip        String?   @db.VarChar(64)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @map("token_hash")
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  usedAt    DateTime? @map("used_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([tokenHash])
+  @@map("password_reset_tokens")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  companyId String?  @map("company_id") @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String   @db.VarChar(100)
+  entity    String   @db.VarChar(100)
+  entityId  String?  @map("entity_id") @db.Uuid
+  metadata  Json?
+  ip        String?  @db.VarChar(64)
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company? @relation(fields: [companyId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+
+  @@index([companyId])
+  @@index([userId])
+  @@index([action])
+  @@map("audit_logs")
+}
+
+model ServiceOrder {
+  id              String               @id @default(uuid()) @db.Uuid
+  companyId       String               @map("company_id") @db.Uuid
+  customerId      String               @map("customer_id") @db.Uuid
+  number          Int
+  title           String               @db.VarChar(200)
+  description     String?
+  priority        ServiceOrderPriority @default(NORMAL)
+  status          ServiceOrderStatus   @default(OPEN)
+  dueAt           DateTime?            @map("due_at") @db.Timestamptz(6)
+  createdByUserId String?              @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company   Company  @relation(fields: [companyId], references: [id])
+  customer  Customer @relation(fields: [customerId], references: [id])
+  createdBy User?    @relation("ServiceOrderCreatedBy", fields: [createdByUserId], references: [id])
+  visits    Visit[]
+
+  @@unique([companyId, number])
+  @@index([companyId])
+  @@index([customerId])
+  @@index([status])
+  @@index([priority])
+  @@map("service_orders")
+}
+
+model Visit {
+  id             String      @id @default(uuid()) @db.Uuid
+  companyId      String      @map("company_id") @db.Uuid
+  serviceOrderId String      @map("service_order_id") @db.Uuid
+  customerId     String      @map("customer_id") @db.Uuid
+  employeeId     String?     @map("employee_id") @db.Uuid
+  scheduledStart DateTime    @map("scheduled_start") @db.Timestamptz(6)
+  scheduledEnd   DateTime?   @map("scheduled_end") @db.Timestamptz(6)
+  status         VisitStatus @default(SCHEDULED)
+  street         String?     @db.VarChar(200)
+  number         String?     @db.VarChar(40)
+  complement     String?     @db.VarChar(120)
+  district       String?     @db.VarChar(120)
+  city           String?     @db.VarChar(120)
+  state          String?     @db.VarChar(2)
+  zipCode        String?     @map("zip_code") @db.VarChar(16)
+  latitude       Float
+  longitude      Float
+  notes              String?
+  checkedInAt        DateTime? @map("checked_in_at") @db.Timestamptz(6)
+  checkedInLat       Float?    @map("checked_in_lat")
+  checkedInLng       Float?    @map("checked_in_lng")
+  checkedInAccuracy  Float?    @map("checked_in_accuracy")
+  checkedOutAt       DateTime? @map("checked_out_at") @db.Timestamptz(6)
+  checkedOutLat      Float?    @map("checked_out_lat")
+  checkedOutLng      Float?    @map("checked_out_lng")
+  checkedOutAccuracy Float?    @map("checked_out_accuracy")
+  outcome            VisitOutcome?
+  executionNotes     String?   @map("execution_notes")
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company      Company      @relation(fields: [companyId], references: [id])
+  serviceOrder ServiceOrder @relation(fields: [serviceOrderId], references: [id])
+  customer     Customer     @relation(fields: [customerId], references: [id])
+  employee     Employee?    @relation(fields: [employeeId], references: [id])
+  routeStop    RouteStop?
+  events       VisitEvent[]
+  evidence     VisitEvidence[]
+
+  @@index([companyId])
+  @@index([serviceOrderId])
+  @@index([customerId])
+  @@index([employeeId])
+  @@index([scheduledStart])
+  @@index([status])
+  @@map("visits")
+}
+
+model Route {
+  id                     String                      @id @default(uuid()) @db.Uuid
+  companyId              String                      @map("company_id") @db.Uuid
+  employeeId             String?                     @map("employee_id") @db.Uuid
+  vehicleId              String?                     @map("vehicle_id") @db.Uuid
+  date                   DateTime                    @db.Date
+  status                 RouteStatus                 @default(DRAFT)
+  roundtrip              Boolean                     @default(true)
+  originName             String?                     @map("origin_name") @db.VarChar(200)
+  originAddress          String?                     @map("origin_address") @db.VarChar(500)
+  originLatitude         Float                       @map("origin_latitude")
+  originLongitude        Float                       @map("origin_longitude")
+  plannedDistanceMeters  Int?                        @map("planned_distance_meters")
+  plannedDurationSeconds Int?                        @map("planned_duration_seconds")
+  actualDistanceMeters   Int?                        @map("actual_distance_meters")
+  actualDurationSeconds  Int?                        @map("actual_duration_seconds")
+  /// PostGIS LineString SRID 4326 — geometria planejada
+  plannedGeometry        Unsupported("geometry(LineString,4326)")? @map("planned_geometry")
+  plannedGeometryJson    Json?                       @map("planned_geometry_json")
+  /// Manobras OSRM (steps=true) para navegação no Play, sem depender do OSRM em tempo real
+  plannedStepsJson       Json?                       @map("planned_steps_json")
+  /// Quando true, densifica GPS e consolida trilha em CustomerAccessPath no check-in
+  recordTrip             Boolean                     @default(false) @map("record_trip")
+  quality                String?                     @db.VarChar(32)
+  publishedAt            DateTime?                   @map("published_at") @db.Timestamptz(6)
+  startedAt              DateTime?                   @map("started_at") @db.Timestamptz(6)
+  startOdometerKm        Float?                      @map("start_odometer_km")
+  startFuelLevel         String?                     @map("start_fuel_level") @db.VarChar(32)
+  startNotes             String?                     @map("start_notes") @db.VarChar(500)
+  startLatitude          Float?                      @map("start_latitude")
+  startLongitude         Float?                      @map("start_longitude")
+  createdAt              DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company         Company              @relation(fields: [companyId], references: [id])
+  employee        Employee?            @relation(fields: [employeeId], references: [id])
+  vehicle         Vehicle?             @relation(fields: [vehicleId], references: [id])
+  stops           RouteStop[]
+  trackingPoints  TrackingPoint[]
+  accessPaths     CustomerAccessPath[]
+
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([vehicleId])
+  @@index([date])
+  @@index([status])
+  @@map("routes")
+}
+
+/// Histórico GPS (PostGIS Point). Posição “agora” fica no Redis.
+model TrackingPoint {
+  id         String   @id @default(uuid()) @db.Uuid
+  companyId  String   @map("company_id") @db.Uuid
+  routeId    String   @map("route_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  vehicleId  String?  @map("vehicle_id") @db.Uuid
+  latitude   Float
+  longitude  Float
+  accuracy   Float?
+  recordedAt DateTime @map("recorded_at") @db.Timestamptz(6)
+  /// PostGIS Point SRID 4326
+  location   Unsupported("geometry(Point,4326)")?
+  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  route    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  employee Employee @relation(fields: [employeeId], references: [id])
+  vehicle  Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@index([companyId])
+  @@index([routeId])
+  @@index([employeeId])
+  @@index([recordedAt])
+  @@map("tracking_points")
+}
+
+model RouteStop {
+  id                     String          @id @default(uuid()) @db.Uuid
+  companyId              String          @map("company_id") @db.Uuid
+  routeId                String          @map("route_id") @db.Uuid
+  visitId                String          @unique @map("visit_id") @db.Uuid
+  sequence               Int
+  status                 RouteStopStatus @default(PENDING)
+  plannedDistanceMeters  Int?            @map("planned_distance_meters")
+  plannedDurationSeconds Int?            @map("planned_duration_seconds")
+  latitude               Float
+  longitude              Float
+  createdAt              DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt              DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  route Route @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  visit Visit @relation(fields: [visitId], references: [id])
+
+  @@unique([routeId, sequence])
+  @@index([companyId])
+  @@index([routeId])
+  @@map("route_stops")
+}
+
+model VisitEvent {
+  id          String         @id @default(uuid()) @db.Uuid
+  companyId   String         @map("company_id") @db.Uuid
+  visitId     String         @map("visit_id") @db.Uuid
+  type        VisitEventType
+  actorUserId String?        @map("actor_user_id") @db.Uuid
+  latitude    Float?
+  longitude   Float?
+  accuracy    Float?
+  payload     Json?
+  createdAt   DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+  visit   Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("VisitEventActor", fields: [actorUserId], references: [id])
+
+  @@index([companyId])
+  @@index([visitId])
+  @@index([type])
+  @@map("visit_events")
+}
+
+model VisitEvidence {
+  id           String            @id @default(uuid()) @db.Uuid
+  companyId    String            @map("company_id") @db.Uuid
+  visitId      String            @map("visit_id") @db.Uuid
+  type         VisitEvidenceType @default(PHOTO)
+  storageKey   String            @map("storage_key") @db.VarChar(500)
+  mimeType     String            @map("mime_type") @db.VarChar(100)
+  sizeBytes    Int               @map("size_bytes")
+  originalName String?           @map("original_name") @db.VarChar(255)
+  caption      String?           @db.VarChar(500)
+  latitude     Float?
+  longitude    Float?
+  accuracy     Float?
+  actorUserId  String?           @map("actor_user_id") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+  visit   Visit   @relation(fields: [visitId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("VisitEvidenceActor", fields: [actorUserId], references: [id])
+
+  @@index([companyId])
+  @@index([visitId])
+  @@map("visit_evidence")
+}
+
+/// Trilha real origem → cliente (fazenda sem CEP). Um ACTIVE por cliente
+/// (unique parcial SQL: company_id + customer_id WHERE status = ACTIVE).
+model CustomerAccessPath {
+  id                    String                   @id @default(uuid()) @db.Uuid
+  companyId             String                   @map("company_id") @db.Uuid
+  customerId            String                   @map("customer_id") @db.Uuid
+  routeId               String?                  @map("route_id") @db.Uuid
+  /// PostGIS LineString SRID 4326
+  geometry              Unsupported("geometry(LineString,4326)")?
+  geometryJson          Json                     @map("geometry_json")
+  distanceMeters        Int?                     @map("distance_meters")
+  recordedByEmployeeId  String?                  @map("recorded_by_employee_id") @db.Uuid
+  status                CustomerAccessPathStatus @default(ACTIVE)
+  createdAt             DateTime                 @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt             DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company            Company   @relation(fields: [companyId], references: [id])
+  customer           Customer  @relation(fields: [customerId], references: [id])
+  route              Route?    @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  recordedByEmployee Employee? @relation("AccessPathRecordedBy", fields: [recordedByEmployeeId], references: [id])
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([routeId])
+  @@index([status])
+  @@index([companyId, customerId, status])
+  @@map("customer_access_paths")
+}
+
+/// Marcos de acesso no caminho até a fazenda (porteira, ponte, etc.).
+model CustomerLandmark {
+  id                  String               @id @default(uuid()) @db.Uuid
+  companyId           String               @map("company_id") @db.Uuid
+  customerId          String               @map("customer_id") @db.Uuid
+  type                CustomerLandmarkType
+  latitude            Float
+  longitude           Float
+  note                String?              @db.VarChar(300)
+  createdByEmployeeId String?              @map("created_by_employee_id") @db.Uuid
+  /// PostGIS Point SRID 4326 — trigger a partir de lat/lng
+  location            Unsupported("geometry(Point,4326)")?
+  createdAt           DateTime             @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime             @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company           Company   @relation(fields: [companyId], references: [id])
+  customer          Customer  @relation(fields: [customerId], references: [id])
+  createdByEmployee Employee? @relation("LandmarkCreatedBy", fields: [createdByEmployeeId], references: [id])
+
+  @@index([companyId])
+  @@index([customerId])
+  @@index([type])
+  @@map("customer_landmarks")
+}

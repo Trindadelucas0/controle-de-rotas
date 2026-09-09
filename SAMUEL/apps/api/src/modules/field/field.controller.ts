@@ -1,0 +1,31 @@
+import { Controller, Get, Query, UseGuards } from '@nestjs/common';
+import { UserRole } from '@prisma/client';
+import { FieldService } from './field.service';
+import { MyRouteQueryDto, FieldVehiclesQueryDto } from './dto/field.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { CurrentUser, Roles, AuthUser } from '../auth/decorators/auth.decorators';
+
+@Controller('field')
+@UseGuards(JwtAuthGuard, RolesGuard)
+export class FieldController {
+  constructor(private readonly fieldService: FieldService) {}
+
+  @Get('my-route')
+  @Roles(UserRole.EMPLOYEE)
+  myRoute(@CurrentUser() user: AuthUser, @Query() query: MyRouteQueryDto) {
+    return this.fieldService.myRoute(user, query.date);
+  }
+
+  @Get('vehicles')
+  @Roles(UserRole.EMPLOYEE)
+  vehicles(@CurrentUser() user: AuthUser, @Query() query: FieldVehiclesQueryDto) {
+    return this.fieldService.listVehicles(user, query.routeId);
+  }
+
+  @Get('tracking-status')
+  @Roles(UserRole.EMPLOYEE)
+  trackingStatus(@CurrentUser() user: AuthUser) {
+    return this.fieldService.trackingStatus(user);
+  }
+}

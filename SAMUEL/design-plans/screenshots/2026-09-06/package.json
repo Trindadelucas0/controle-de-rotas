@@ -1,0 +1,9 @@
+{
+  "name": "samuel-screen-catalog",
+  "private": true,
+  "type": "module",
+  "description": "One-off Playwright capture for SAMUEL UI catalog. Not part of the product.",
+  "dependencies": {
+    "playwright": "^1.55.0"
+  }
+}

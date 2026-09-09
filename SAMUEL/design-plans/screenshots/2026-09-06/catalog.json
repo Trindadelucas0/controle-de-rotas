@@ -1,0 +1,578 @@
+[
+  {
+    "id": "01",
+    "file": "01-auth-login-desktop.png",
+    "role": "auth",
+    "viewport": "desktop",
+    "route": "/login",
+    "title": "Login",
+    "note": ""
+  },
+  {
+    "id": "02",
+    "file": "02-auth-forgot-password-desktop.png",
+    "role": "auth",
+    "viewport": "desktop",
+    "route": "/forgot-password",
+    "title": "Esqueci a senha",
+    "note": ""
+  },
+  {
+    "id": "03",
+    "file": "03-auth-reset-password-desktop.png",
+    "role": "auth",
+    "viewport": "desktop",
+    "route": "/reset-password",
+    "title": "Redefinir senha (sem token válido)",
+    "note": "Estado sem token / token inválido"
+  },
+  {
+    "id": "04",
+    "file": "04-auth-login-mobile.png",
+    "role": "auth",
+    "viewport": "mobile",
+    "route": "/login",
+    "title": "Login",
+    "note": ""
+  },
+  {
+    "id": "05",
+    "file": "05-auth-forgot-password-mobile.png",
+    "role": "auth",
+    "viewport": "mobile",
+    "route": "/forgot-password",
+    "title": "Esqueci a senha",
+    "note": ""
+  },
+  {
+    "id": "06",
+    "file": "06-auth-reset-password-mobile.png",
+    "role": "auth",
+    "viewport": "mobile",
+    "route": "/reset-password",
+    "title": "Redefinir senha (sem token válido)",
+    "note": "Estado sem token / token inválido"
+  },
+  {
+    "id": "07",
+    "file": "07-admin-home-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/",
+    "title": "Centro de Operações",
+    "note": ""
+  },
+  {
+    "id": "08",
+    "file": "08-admin-map-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/map",
+    "title": "Mapa operacional",
+    "note": ""
+  },
+  {
+    "id": "09",
+    "file": "09-admin-agenda-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/agenda",
+    "title": "Agenda",
+    "note": ""
+  },
+  {
+    "id": "10",
+    "file": "10-admin-services-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/services",
+    "title": "Serviços",
+    "note": ""
+  },
+  {
+    "id": "11",
+    "file": "11-admin-services-new-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/services/new",
+    "title": "Novo serviço",
+    "note": ""
+  },
+  {
+    "id": "12",
+    "file": "12-admin-services-detail-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/services/c9af9f5b-7084-4bc7-b563-3c95652e426b",
+    "title": "Detalhe do serviço",
+    "note": ""
+  },
+  {
+    "id": "13",
+    "file": "13-admin-routes-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/routes",
+    "title": "Rotas",
+    "note": ""
+  },
+  {
+    "id": "14",
+    "file": "14-admin-customers-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/customers",
+    "title": "Clientes",
+    "note": ""
+  },
+  {
+    "id": "15",
+    "file": "15-admin-customers-new-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/customers/new",
+    "title": "Novo cliente",
+    "note": ""
+  },
+  {
+    "id": "16",
+    "file": "16-admin-customers-detail-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/customers/28b3f1de-314f-4cef-8ee8-c61d6b4f9bb6",
+    "title": "Detalhe do cliente",
+    "note": ""
+  },
+  {
+    "id": "17",
+    "file": "17-admin-employees-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/employees",
+    "title": "Funcionários",
+    "note": ""
+  },
+  {
+    "id": "18",
+    "file": "18-admin-employees-new-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/employees/new",
+    "title": "Novo funcionário",
+    "note": ""
+  },
+  {
+    "id": "19",
+    "file": "19-admin-employees-detail-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/employees/788302aa-20e4-4057-928d-aae3dd2e975e",
+    "title": "Detalhe do funcionário",
+    "note": ""
+  },
+  {
+    "id": "20",
+    "file": "20-admin-vehicles-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/vehicles",
+    "title": "Veículos",
+    "note": ""
+  },
+  {
+    "id": "21",
+    "file": "21-admin-vehicles-new-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/vehicles/new",
+    "title": "Novo veículo",
+    "note": ""
+  },
+  {
+    "id": "22",
+    "file": "22-admin-vehicles-detail-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/vehicles/7b9d49a7-cb7f-446a-96b5-e16805cbca4c",
+    "title": "Detalhe do veículo",
+    "note": ""
+  },
+  {
+    "id": "23",
+    "file": "23-admin-settings-company-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/settings/company",
+    "title": "Empresa",
+    "note": ""
+  },
+  {
+    "id": "24",
+    "file": "24-admin-settings-users-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/settings/users",
+    "title": "Usuários",
+    "note": ""
+  },
+  {
+    "id": "25",
+    "file": "25-admin-settings-users-new-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/settings/users/new",
+    "title": "Novo usuário",
+    "note": ""
+  },
+  {
+    "id": "26",
+    "file": "26-admin-settings-users-detail-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/settings/users/8f0225c1-e0b6-407f-937d-a3875a3bf8ad",
+    "title": "Detalhe do usuário",
+    "note": ""
+  },
+  {
+    "id": "27",
+    "file": "27-admin-change-password-desktop.png",
+    "role": "admin",
+    "viewport": "desktop",
+    "route": "/account/change-password",
+    "title": "Alterar senha",
+    "note": ""
+  },
+  {
+    "id": "28",
+    "file": "28-overlay-user-chrome-desktop.png",
+    "role": "overlay",
+    "viewport": "desktop",
+    "route": "/",
+    "title": "Chrome do usuário (Alterar senha / Sair)",
+    "note": "Não há dropdown: o menu é o bloco do header"
+  },
+  {
+    "id": "29",
+    "file": "29-admin-home-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/",
+    "title": "Centro de Operações",
+    "note": ""
+  },
+  {
+    "id": "30",
+    "file": "30-admin-map-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/map",
+    "title": "Mapa operacional",
+    "note": ""
+  },
+  {
+    "id": "31",
+    "file": "31-admin-agenda-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/agenda",
+    "title": "Agenda",
+    "note": ""
+  },
+  {
+    "id": "32",
+    "file": "32-admin-services-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/services",
+    "title": "Serviços",
+    "note": ""
+  },
+  {
+    "id": "33",
+    "file": "33-admin-services-new-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/services/new",
+    "title": "Novo serviço",
+    "note": ""
+  },
+  {
+    "id": "34",
+    "file": "34-admin-services-detail-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/services/c9af9f5b-7084-4bc7-b563-3c95652e426b",
+    "title": "Detalhe do serviço",
+    "note": ""
+  },
+  {
+    "id": "35",
+    "file": "35-admin-routes-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/routes",
+    "title": "Rotas",
+    "note": ""
+  },
+  {
+    "id": "36",
+    "file": "36-admin-customers-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/customers",
+    "title": "Clientes",
+    "note": ""
+  },
+  {
+    "id": "37",
+    "file": "37-admin-customers-new-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/customers/new",
+    "title": "Novo cliente",
+    "note": ""
+  },
+  {
+    "id": "38",
+    "file": "38-admin-customers-detail-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/customers/28b3f1de-314f-4cef-8ee8-c61d6b4f9bb6",
+    "title": "Detalhe do cliente",
+    "note": ""
+  },
+  {
+    "id": "39",
+    "file": "39-admin-employees-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/employees",
+    "title": "Funcionários",
+    "note": ""
+  },
+  {
+    "id": "40",
+    "file": "40-admin-employees-new-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/employees/new",
+    "title": "Novo funcionário",
+    "note": ""
+  },
+  {
+    "id": "41",
+    "file": "41-admin-employees-detail-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/employees/788302aa-20e4-4057-928d-aae3dd2e975e",
+    "title": "Detalhe do funcionário",
+    "note": ""
+  },
+  {
+    "id": "42",
+    "file": "42-admin-vehicles-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/vehicles",
+    "title": "Veículos",
+    "note": ""
+  },
+  {
+    "id": "43",
+    "file": "43-admin-vehicles-new-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/vehicles/new",
+    "title": "Novo veículo",
+    "note": ""
+  },
+  {
+    "id": "44",
+    "file": "44-admin-vehicles-detail-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/vehicles/7b9d49a7-cb7f-446a-96b5-e16805cbca4c",
+    "title": "Detalhe do veículo",
+    "note": ""
+  },
+  {
+    "id": "45",
+    "file": "45-admin-settings-company-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/settings/company",
+    "title": "Empresa",
+    "note": ""
+  },
+  {
+    "id": "46",
+    "file": "46-admin-settings-users-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/settings/users",
+    "title": "Usuários",
+    "note": ""
+  },
+  {
+    "id": "47",
+    "file": "47-admin-settings-users-new-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/settings/users/new",
+    "title": "Novo usuário",
+    "note": ""
+  },
+  {
+    "id": "48",
+    "file": "48-admin-settings-users-detail-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/settings/users/8f0225c1-e0b6-407f-937d-a3875a3bf8ad",
+    "title": "Detalhe do usuário",
+    "note": ""
+  },
+  {
+    "id": "49",
+    "file": "49-admin-change-password-mobile.png",
+    "role": "admin",
+    "viewport": "mobile",
+    "route": "/account/change-password",
+    "title": "Alterar senha",
+    "note": ""
+  },
+  {
+    "id": "50",
+    "file": "50-overlay-mobile-nav-mobile.png",
+    "role": "overlay",
+    "viewport": "mobile",
+    "route": "/",
+    "title": "Menu mobile aberto",
+    "note": "Drawer da sidebar"
+  },
+  {
+    "id": "51",
+    "file": "51-overlay-map-team-drawer-mobile.png",
+    "role": "overlay",
+    "viewport": "mobile",
+    "route": "/map",
+    "title": "Drawer Equipe no mapa",
+    "note": ""
+  },
+  {
+    "id": "52",
+    "file": "52-employee-home-desktop.png",
+    "role": "employee",
+    "viewport": "desktop",
+    "route": "/",
+    "title": "Início (campo — sem KPI empresa)",
+    "note": ""
+  },
+  {
+    "id": "53",
+    "file": "53-employee-agenda-desktop.png",
+    "role": "employee",
+    "viewport": "desktop",
+    "route": "/agenda",
+    "title": "Agenda (próprias)",
+    "note": ""
+  },
+  {
+    "id": "54",
+    "file": "54-employee-customers-desktop.png",
+    "role": "employee",
+    "viewport": "desktop",
+    "route": "/customers",
+    "title": "Clientes",
+    "note": ""
+  },
+  {
+    "id": "55",
+    "file": "55-employee-field-my-route-desktop.png",
+    "role": "employee",
+    "viewport": "desktop",
+    "route": "/field/my-route",
+    "title": "Minha rota",
+    "note": ""
+  },
+  {
+    "id": "56",
+    "file": "56-employee-field-navigate-desktop.png",
+    "role": "employee",
+    "viewport": "desktop",
+    "route": "/field/navigate",
+    "title": "Navegação GPS",
+    "note": ""
+  },
+  {
+    "id": "57",
+    "file": "57-employee-field-tracking-status-desktop.png",
+    "role": "employee",
+    "viewport": "desktop",
+    "route": "/field/tracking-status",
+    "title": "Status GPS",
+    "note": ""
+  },
+  {
+    "id": "58",
+    "file": "58-employee-home-mobile.png",
+    "role": "employee",
+    "viewport": "mobile",
+    "route": "/",
+    "title": "Início (campo — sem KPI empresa)",
+    "note": ""
+  },
+  {
+    "id": "59",
+    "file": "59-employee-agenda-mobile.png",
+    "role": "employee",
+    "viewport": "mobile",
+    "route": "/agenda",
+    "title": "Agenda (próprias)",
+    "note": ""
+  },
+  {
+    "id": "60",
+    "file": "60-employee-customers-mobile.png",
+    "role": "employee",
+    "viewport": "mobile",
+    "route": "/customers",
+    "title": "Clientes",
+    "note": ""
+  },
+  {
+    "id": "61",
+    "file": "61-employee-field-my-route-mobile.png",
+    "role": "employee",
+    "viewport": "mobile",
+    "route": "/field/my-route",
+    "title": "Minha rota",
+    "note": ""
+  },
+  {
+    "id": "62",
+    "file": "62-employee-field-navigate-mobile.png",
+    "role": "employee",
+    "viewport": "mobile",
+    "route": "/field/navigate",
+    "title": "Navegação GPS",
+    "note": ""
+  },
+  {
+    "id": "63",
+    "file": "63-employee-field-tracking-status-mobile.png",
+    "role": "employee",
+    "viewport": "mobile",
+    "route": "/field/tracking-status",
+    "title": "Status GPS",
+    "note": ""
+  },
+  {
+    "id": "64",
+    "file": "64-overlay-employee-mobile-nav-mobile.png",
+    "role": "overlay",
+    "viewport": "mobile",
+    "route": "/field/my-route",
+    "title": "Menu mobile do campo",
+    "note": ""
+  }
+]

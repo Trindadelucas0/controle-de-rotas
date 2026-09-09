@@ -1,0 +1,39 @@
+﻿node.exe : npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm 
+help npmrc` for supported config options.
+No linha:1 caractere:1
++ & "C:\Program Files\nodejs/node.exe" "C:\Users\trind\AppData\Roaming\ ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (npm warn Unknow...config options.:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+Entrypoint [1mmain[39m[22m =
+
+[1m[31mERROR[39m[22m in [1m[32mmain[39m[22m
+[1mModule [1m[31mnot found[39m[22m[1m: [1m[31mError[39m[22m[1m: Can't resolve 'ts-loader' in 'C:\Users\trind\Desktop\SAMUEL\apps\api'[39m[22m
+resolve 'ts-loader' in 'C:\Users\trind\Desktop\SAMUEL\apps\api'
+  Parsed request is a module
+  using description file: C:\Users\trind\Desktop\SAMUEL\apps\api\package.json (relative path: .)
+    resolve as module
+      looking for modules in C:\Users\trind\Desktop\SAMUEL\apps\api\node_modules
+        single file module
+          using description file: C:\Users\trind\Desktop\SAMUEL\apps\api\package.json (relative path: ./node_modules/ts-loader)
+            no extension
+[1m[31m              C:\Users\trind\Desktop\SAMUEL\apps\api\node_modules\ts-loader doesn't exist[39m[22m
+            .js
+[1m[31m              C:\Users\trind\Desktop\SAMUEL\apps\api\node_modules\ts-loader.js doesn't exist[39m[22m
+[1m[31m        C:\Users\trind\Desktop\SAMUEL\apps\api\node_modules\ts-loader doesn't exist[39m[22m
+[1m[31m      C:\Users\trind\Desktop\SAMUEL\apps\node_modules doesn't exist[39m[22m or is not a directory
+      looking for modules in C:\Users\trind\Desktop\SAMUEL\node_modules
+        single file module
+          using description file: C:\Users\trind\Desktop\SAMUEL\package.json (relative path: ./node_modules/ts-loader)
+            no extension
+[1m[31m              C:\Users\trind\Desktop\SAMUEL\node_modules\ts-loader doesn't exist[39m[22m
+            .js
+[1m[31m              C:\Users\trind\Desktop\SAMUEL\node_modules\ts-loader.js doesn't exist[39m[22m
+[1m[31m        C:\Users\trind\Desktop\SAMUEL\node_modules\ts-loader doesn't exist[39m[22m
+[1m[31m      C:\Users\trind\Desktop\node_modules doesn't exist[39m[22m or is not a directory
+[1m[31m      C:\Users\trind\node_modules doesn't exist[39m[22m or is not a directory
+[1m[31m      C:\Users\node_modules doesn't exist[39m[22m or is not a directory
+[1m[31m      C:\node_modules doesn't exist[39m[22m or is not a directory
+
+webpack 5.106.2 compiled with [1m[31m1 error[39m[22m in 2770 ms

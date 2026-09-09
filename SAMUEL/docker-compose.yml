@@ -1,0 +1,37 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    container_name: samuel-postgres
+    restart: unless-stopped
+    # Host 5433 evita conflito com outro Postgres na 5432 neste ambiente Windows
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: samuel
+      POSTGRES_PASSWORD: samuel
+      POSTGRES_DB: samuel
+    volumes:
+      - samuel_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U samuel -d samuel"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: samuel-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - samuel_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  samuel_pg:
+  samuel_redis:
