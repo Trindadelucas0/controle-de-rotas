@@ -102,6 +102,9 @@ export class ListRoutesQueryDto {
   employeeId?: string;
 }
 
+export const ROUTE_ORIGIN_MODES = ['EMPLOYEE_LAST', 'COMPANY'] as const;
+export type RouteOriginMode = (typeof ROUTE_ORIGIN_MODES)[number];
+
 export class PreviewCustomersRouteDto {
   @IsArray()
   @ArrayMinSize(1)
@@ -127,6 +130,11 @@ export class PreviewCustomersRouteDto {
   @IsOptional()
   @IsBoolean()
   recordTrip?: boolean;
+
+  /** Início do km/tempo: última localização do funcionário (padrão) ou pin da empresa. */
+  @IsOptional()
+  @IsIn([...ROUTE_ORIGIN_MODES])
+  originMode?: RouteOriginMode;
 }
 
 export class DispatchCustomersRouteDto extends PreviewCustomersRouteDto {}

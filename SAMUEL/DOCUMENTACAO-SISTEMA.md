@@ -2,8 +2,8 @@
 
 | Item | Valor |
 |------|--------|
-| Versão do sistema | 0.16.2 — Deploy VPS analise |
-| Última atualização | 09/09/2026 — build + PM2 na VPS em 127.0.0.1:3468 |
+| Versão do sistema | 0.16.4 — Origem do cálculo (funcionário vs empresa) |
+| Última atualização | 09/09/2026 — planejador escolhe última loc. do funcionário ou pin da empresa |
 | Fonte oficial de comportamento | Este hub aponta as fontes; **não** duplica regras inventadas |
 
 ## 1. Como usar este documento
@@ -26,7 +26,7 @@ Ver `PRD.md` §11 e `docs/ARCHITECTURE.md`. Resumo: Next.js 15 (web/PWA) → Nes
 
 ### 2.1 Histórico de versões
 
-Ver `docs/CHANGELOG.md` (atual: **v0.16.2**).
+Ver `docs/CHANGELOG.md` (atual: **v0.16.4**).
 
 ## 3. Mapa de telas / conexões
 
@@ -76,10 +76,10 @@ Consolidadas no `PRD.md`. Ops: não inventar métrica; Presence (Redis) ≠ Oper
 ## 8. Como usar o sistema (guia do dia a dia)
 
 1. Subir: `npm run dev` (ver `docs/DEV.md` — seed `admin@demo.local` / `ChangeMe123!`).
-2. **Gestor:** Início (Centro de Operações) — faixa EQUIPE / VISITAS / ROTAS / AO VIVO em ~3 segundos; execução + alertas; equipe ao vivo + próximas visitas + rotas do dia. Mapa: camadas Clientes/Equipe/Rotas/Todos + trilho direito (detalhe operacional). Rotas: RESUMO do planejador + ROTA NN — nome com E → 1 → 2 → E. No `/map`, ponto verde = online, cinza = offline; Status operacional ≠ Presença. Em Funcionários, **Ver no mapa** abre `/map?employeeId=` já focado. Ao abrir um cliente no mapa, o bloco **Acesso à fazenda** aparece sempre: trilha gravada (linha menta tracejada) ou **Sem trilha de acesso**, mais a contagem de marcos.
+2. **Gestor:** Início (Centro de Operações) — faixa EQUIPE / VISITAS / ROTAS / AO VIVO em ~3 segundos; execução + alertas; equipe ao vivo + próximas visitas + rotas do dia. Mapa: camadas Clientes/Equipe/Rotas/Todos + trilho direito (detalhe operacional). Rotas: RESUMO do planejador + ROTA NN — nome com F/E → 1 → 2 → E (F = última loc. do funcionário, se essa origem estiver selecionada). No `/map`, ponto verde = online, cinza = offline; Status operacional ≠ Presença. Em Funcionários, **Novo** pede e-mail + senha e cria o usuário de campo na hora (não há funcionário sem acesso). **Ver no mapa** abre `/map?employeeId=` já focado. Ao abrir um cliente no mapa, o bloco **Acesso à fazenda** aparece sempre: trilha gravada (linha menta tracejada) ou **Sem trilha de acesso**, mais a contagem de marcos.
 3. **Campo:** no celular, o ideal é HTTPS + app na tela inicial e **Permitir** no aviso de localização. Em `http://IP` a tela abre com **NÃO ESTÁ EM HTTPS**; o GPS do navegador continua bloqueado, mas dá para **Iniciar rota** (ordem planejada, origem = 1ª parada). Login EMPLOYEE → Minha rota (card com **mini-mapa** da linha planejada) → Iniciar → Resumo → veículo → checklist → Play → Navegar → perto da parada o banner **Chegando** ganha **Cheguei** → `/field/visits/[id]` → **Cheguei — chegada verificada** (GPS) → preencher **resultado**, **observações**, **fotos** (obrigatória se “Realizada”) → opcional **remarcar próxima** → **Finalizar visita** (GPS). Volta à navegação na próxima parada pendente. **Concluir rota** em Minha rota (Encerrar no mapa **não** conclui). Com GPS ativo o celular envia posição a cada **5 s** (mesmo parado); se a rota tiver **Gravar viagem**, a amostragem fica ~**2 s** e o badge mostra **Gravando · N pts** (âmbar se houver pontos na fila de rede). Os pontos ficam numa fila local se a internet falhar e vão no **Cheguei** (e de novo no **Finalizar** se a trilha ainda não salvou). Na navegação dá para marcar **Porteira / Ponte / Bifurcação / Estrada ruim** no GPS atual (se a rede falhar, o toque fica guardado e reenvia); perto de um marco (~120 m) aparece banner com **OK** (não repete o mesmo marco por ~5 min). **Concluir rota** em Minha rota. Se o GPS fino demorar, o app usa primeiro a posição de rede/Wi‑Fi e segue refinando — o overlay “GPS demorou demais” só aparece se as duas tentativas falharem (não por timeout curto sozinho). Se aparecer “rota em andamento”, o card com **Concluir** está no topo de Minha rota — inclusive se a rota for de outro dia. No PC, `http://localhost` libera GPS de verdade (o browser trata localhost como seguro): a navegação **sempre recalcula no 1º GPS** a partir da sua posição (1ª parada = mais perto) e, se você sair da rua planejada (~50 m por ~2–3 s), redesenha o traçado sem embaralhar as paradas. No mapa, a **linha menta nasce no carro e vai só até a próxima parada** (os pinos seguintes continuam visíveis, sem traçado depois do destino atual); Tempo / Restante / ETA no HUD seguem o GPS e a velocidade (não as horas da viagem gravada). O banner mostra a **próxima virada** (rua) e a **faixa** (ícones ou texto), não só “Saia em direção a…” do trecho atual. Sem GPS (HTTP no celular) o recálculo, check-in e finalizar **não** rodam. GPS com a tela bloqueada / app em segundo plano o navegador pode pausar — mantenha o app aberto na viagem.
 4. **Gestor:** em `/services/[id]` cada visita finalizada mostra **Relatório de campo** (resultado, chegada/saída, observações, fotos). Nova visita remarcada aparece na **Agenda** no dia escolhido (não entra na rota de hoje).
-4. Pin no mapa → Adicionar à rota → `/routes?customerId=` pré-seleciona o cliente. No planejador, **E** (verde) é a origem da empresa; **1, 2…** são as paradas **mais perto → mais longe** da posição do funcionário (GPS live se online, senão o E). Para mudar o **E**, vá em Configurações → Empresa. Em **Clientes**, CEP é opcional (fazendas): use Lat/Lng ou o pin. No planejador, marque **Gravar viagem** só com **1 cliente** — o check-in grava a trilha real (e o finalizar tenta de novo se o Cheguei falhou); na próxima rota de 1 cliente com trilha ACTIVE, o sistema usa essa geometria **recortada a partir do GPS do funcionário** (não as horas da viagem gravada); na navegação Tempo/Restante/ETA acompanham a posição e a velocidade ao vivo.
+5. Pin no mapa → Adicionar à rota → `/routes?customerId=` pré-seleciona o cliente. No planejador **Por clientes**, escolha **Origem do cálculo**: **Última localização** (padrão — GPS ao vivo ou último ponto gravado do funcionário) ou **Empresa** (pin E). Km, estimativa e ordem das paradas saem dessa origem; **Voltar para a empresa no fim** continua no E. Sem GPS, o cálculo usa o E e avisa. Para mudar o pin E, vá em Configurações → Empresa. Em **Clientes**, CEP é opcional (fazendas): use Lat/Lng ou o pin. No planejador, marque **Gravar viagem** só com **1 cliente** — o check-in grava a trilha real (e o finalizar tenta de novo se o Cheguei falhou); na próxima rota de 1 cliente com trilha ACTIVE, o sistema usa essa geometria **recortada a partir do GPS do funcionário** (não as horas da viagem gravada); na navegação Tempo/Restante/ETA acompanham a posição e a velocidade ao vivo.
 
 ## 9. Checklist de validação
 
@@ -106,7 +106,7 @@ Pasta: `/opt/analise/SAMUEL`. Docker `docker-compose.prod.yml` + PM2 `ecosystem.
 | PostGIS | 127.0.0.1:5434 |
 | Redis | 127.0.0.1:6381 |
 
-No Cloudflare: Path `*`, Service `http://127.0.0.1:3468`. Depois do hostname HTTPS, gravar `CORS_ORIGIN=https://SEU-HOSTNAME` no `.env` da API e `pm2 restart analise-api`. Sem secrets neste documento.
+Público: `https://rotas.avadesk.com.br` (Cloudflare Tunnel → HTTP `localhost:3468`). Código na VPS: `/opt/analise/SAMUEL` (não está em `/root`). Path vazio; Type HTTP. `CORS_ORIGIN` no `.env` do servidor = `https://rotas.avadesk.com.br`. `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` em `apps/web/.env.local` no servidor e **rebuild** do Next (a chave entra no JS). Middleware usa `x-forwarded-host` (`rotas.avadesk.com.br`) para não redirecionar para `localhost:3468`. Atualização manual: [`docs/vps-atualizar.txt`](docs/vps-atualizar.txt) (git pull + Docker + Prisma + build + PM2). Sem secrets neste documento.
 
 ## 12. Ao atualizar este documento
 

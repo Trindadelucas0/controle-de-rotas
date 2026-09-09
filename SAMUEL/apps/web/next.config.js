@@ -19,6 +19,11 @@ const nextConfig = {
   // Localhost + 127.0.0.1 + LAN: sem isso o Next 15 bloqueia /_next/* e o browser
   // cai em "Application error: a client-side exception has occurred".
   allowedDevOrigins: ['localhost', '127.0.0.1', '[::1]', ...lanHosts()],
+  experimental: {
+    serverActions: {
+      allowedOrigins: ['rotas.avadesk.com.br'],
+    },
+  },
   // Proxy da API na mesma origem → celular na LAN não chama localhost do telefone.
   // beforeFiles: o POST (preview/login) não pode cair no Next e devolver HTML "Cannot POST".
   // API_PROXY_TARGET é lido no `next build` (produção) e no `next dev`.

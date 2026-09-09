@@ -2,11 +2,58 @@ import { GeoStop, LatLng, bearingRadians, haversineMeters } from './routes-geo';
 
 const AT_COMPANY_M = 80;
 
+export type DispatchOriginMode = 'EMPLOYEE_LAST' | 'COMPANY';
+
+export type EmployeePositionSource =
+  | 'live'
+  | 'tracking_history'
+  | 'company'
+  | 'company_fallback';
+
+export type LastKnownEmployeePosition = {
+  latitude: number;
+  longitude: number;
+  recordedAt: string | null;
+  source: 'live' | 'tracking_history';
+};
+
 export type EmployeeSlot = {
   id: string;
   name: string;
   position: LatLng;
+  positionSource: EmployeePositionSource;
+  recordedAt: string | null;
 };
+
+export function pickEmployeeDispatchPosition(
+  originMode: DispatchOriginMode,
+  lastKnown: LastKnownEmployeePosition | null,
+  company: LatLng,
+): { position: LatLng; source: EmployeePositionSource; recordedAt: string | null } {
+  if (originMode === 'COMPANY') {
+    return {
+      position: { latitude: company.latitude, longitude: company.longitude },
+      source: 'company',
+      recordedAt: null,
+    };
+  }
+  if (
+    lastKnown &&
+    Number.isFinite(lastKnown.latitude) &&
+    Number.isFinite(lastKnown.longitude)
+  ) {
+    return {
+      position: { latitude: lastKnown.latitude, longitude: lastKnown.longitude },
+      source: lastKnown.source,
+      recordedAt: lastKnown.recordedAt,
+    };
+  }
+  return {
+    position: { latitude: company.latitude, longitude: company.longitude },
+    source: 'company_fallback',
+    recordedAt: null,
+  };
+}
 
 export function balancedCapacities(stopCount: number, employeeCount: number): number[] {
   const base = Math.floor(stopCount / employeeCount);

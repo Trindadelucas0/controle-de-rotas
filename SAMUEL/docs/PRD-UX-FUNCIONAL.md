@@ -408,10 +408,10 @@ H1 Rotas
 ├── tabs: Rotas de hoje | Planejador
 ├── Hoje: Rota NN — Nome · status · N paradas · Concluídas — · km
 └── Planejador Clientes:
-    PLANEJADOR (data, roundtrip, funcs, busca)
+    PLANEJADOR (data, roundtrip, origem F|E, funcs, busca)
     RESUMO (funcs, paradas, km, duração, rotas)
-    ROTA 01 — NOME · E → 1 → 2 → E
-    [Publicar] + mapa (azul road / âmbar reta / E verde)
+    ROTA 01 — NOME · F/E → 1 → 2 → E
+    [Publicar] + mapa (azul road / âmbar reta / F funcionário / E empresa)
 ```
 
 Modo Visitas agendadas: inalterado nesta entrega.
@@ -486,7 +486,7 @@ Cria Employee + User EMPLOYEE na mesma transação. Campos: Nome * · e-mail * �
 
 #### Editar — `/employees/[id]`
 
-Perfil + bloco Acesso: com login → e-mail readonly + link “Redefinir senha em Usuários” (ADMIN → `/settings/users/:userId`; MANAGER vê texto pedindo admin). Sem login → checkbox “Criar acesso ao Rotas”.
+Perfil + bloco Acesso: com login → e-mail readonly + link “Redefinir senha em Usuários” (ADMIN → `/settings/users/:userId`; MANAGER vê texto pedindo admin). Sem login → e-mail + senha obrigatórios (não dá para salvar sem criar o usuário).
 
 **KPI painel:** Operacional, Paradas hoje, Km plan. hoje. Relacionamentos: Rota hoje, Veículo, Login. Ações: Editar funcionário, Ver agenda, Ver no mapa (`/map?employeeId=`).
 

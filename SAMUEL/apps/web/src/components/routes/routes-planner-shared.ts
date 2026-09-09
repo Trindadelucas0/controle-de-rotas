@@ -37,3 +37,32 @@ export function formatMeters(m: number) {
 export function routeColorAt(index: number): string {
   return ROUTE_LINE_COLORS[index % ROUTE_LINE_COLORS.length]!;
 }
+
+export type RouteOriginMode = 'EMPLOYEE_LAST' | 'COMPANY';
+
+export type AssignmentStartSource =
+  | 'live'
+  | 'tracking_history'
+  | 'company'
+  | 'company_fallback';
+
+const STALE_MS = 24 * 60 * 60 * 1000;
+
+export function formatGpsAge(iso: string | null): { label: string; stale: boolean } {
+  if (!iso) return { label: '', stale: false };
+  const t = new Date(iso).getTime();
+  if (!Number.isFinite(t)) return { label: '', stale: false };
+  const delta = Date.now() - t;
+  const stale = delta > STALE_MS;
+  if (delta < 60_000) return { label: 'agora', stale };
+  const minutes = Math.round(delta / 60_000);
+  if (minutes < 60) return { label: `há ${minutes} min`, stale };
+  const hours = Math.round(minutes / 60);
+  if (hours < 24) return { label: `há ${hours} h`, stale };
+  const days = Math.max(1, Math.round(hours / 24));
+  return { label: `há ${days} dia${days === 1 ? '' : 's'}`, stale };
+}
+
+export function isEmployeeGpsStart(source: AssignmentStartSource) {
+  return source === 'live' || source === 'tracking_history';
+}

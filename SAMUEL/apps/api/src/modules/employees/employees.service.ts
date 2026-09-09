@@ -89,7 +89,14 @@ export class EmployeesService {
       ...(dto.status !== undefined ? { status: dto.status } : {}),
     };
 
-    if (!dto.password) {
+    if (existing.userId) {
+      if (dto.password) {
+        throw httpError(
+          HttpStatus.BAD_REQUEST,
+          'EMPLOYEE_ALREADY_HAS_LOGIN',
+          'Este funcionário já tem acesso. Redefina a senha em Usuários.',
+        );
+      }
       try {
         const employee = await this.employeesRepository.update(id, user.companyId, profileData);
         if (!employee) {
@@ -101,15 +108,14 @@ export class EmployeesService {
       }
     }
 
-    if (existing.userId) {
+    const loginEmail = (dto.email ?? existing.email)?.trim().toLowerCase();
+    if (!dto.password) {
       throw httpError(
         HttpStatus.BAD_REQUEST,
-        'EMPLOYEE_ALREADY_HAS_LOGIN',
-        'Este funcionário já tem acesso. Redefina a senha em Usuários.',
+        'EMPLOYEE_LOGIN_REQUIRED',
+        'Informe e-mail e senha. Não há funcionário sem usuário de acesso.',
       );
     }
-
-    const loginEmail = (dto.email ?? existing.email)?.trim().toLowerCase();
     if (!loginEmail) {
       throw httpError(
         HttpStatus.BAD_REQUEST,

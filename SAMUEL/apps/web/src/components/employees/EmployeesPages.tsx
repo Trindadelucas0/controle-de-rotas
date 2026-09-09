@@ -192,15 +192,15 @@ function EmployeeForm({
     status: initial?.status || 'ACTIVE',
     password: '',
   });
-  const [createAccess, setCreateAccess] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const needsLogin = !hasLogin;
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     const name = form.name.trim();
     const email = form.email.trim().toLowerCase();
-    const wantsLogin = mode === 'create' || createAccess;
+    const wantsLogin = needsLogin;
 
     if (!name) {
       setError('Informe o nome.');
@@ -292,15 +292,15 @@ function EmployeeForm({
           <TextField
             field={{
               name: 'email',
-              label: mode === 'create' ? 'E-mail (login)' : 'E-mail',
+              label: 'E-mail (login)',
               type: 'email',
-              required: mode === 'create' || createAccess,
+              required: needsLogin,
               value: form.email,
               onChange: (v) => setForm({ ...form, email: v }),
             }}
           />
         )}
-        {mode === 'create' ? (
+        {needsLogin ? (
           <>
             <PasswordField
               id="employee-password"
@@ -312,38 +312,10 @@ function EmployeeForm({
               autoComplete="new-password"
             />
             <p className="text-sm text-[var(--muted)]">
-              Mínimo de 8 caracteres. O funcionário entra no Rotas com este e-mail e senha.
+              Mínimo de 8 caracteres. Todo funcionário recebe um usuário EMPLOYEE neste e-mail e senha —
+              é o login do celular.
             </p>
           </>
-        ) : null}
-        {!hasLogin && mode === 'edit' ? (
-          <fieldset className="space-y-3 rounded-[8px] border border-[var(--border)] p-4">
-            <legend className="px-1 text-sm font-medium text-brand-900">Criar acesso</legend>
-            <label className="flex items-center gap-2 text-sm text-brand-900">
-              <input
-                type="checkbox"
-                checked={createAccess}
-                onChange={(e) => setCreateAccess(e.target.checked)}
-              />
-              Criar acesso ao Rotas (e-mail + senha)
-            </label>
-            {createAccess ? (
-              <PasswordField
-                id="employee-create-access-password"
-                name="password"
-                label="Senha de acesso"
-                required
-                value={form.password}
-                onChange={(v) => setForm({ ...form, password: v })}
-                autoComplete="new-password"
-              />
-            ) : (
-              <p className="text-sm text-[var(--muted)]">
-                Sem login este funcionário não recebe rota de campo. Você pode criar o acesso agora ou
-                depois.
-              </p>
-            )}
-          </fieldset>
         ) : null}
       </FormSection>
       <FormSection title="Função">

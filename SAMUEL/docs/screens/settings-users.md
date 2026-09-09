@@ -9,7 +9,7 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §6.
 - Rota: `/settings/users`
 - Papéis: ADMIN
 - Objetivo: listar contas de acesso da empresa
-- Arquivo: `CompanyAndUsers.tsx` → `UsersListPage`
+- Arquivo: `UsersListPage.tsx`
 
 ### 2. Componentes
 

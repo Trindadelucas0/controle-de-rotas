@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.16.4 — 2026-09-09
+
+### Planejador — origem do cálculo (funcionário vs empresa)
+
+- Sintoma: km/tempo no planejador por clientes caíam no pin da empresa assim que o GPS Redis (120 s) expirava; a lista sempre mostrava E mesmo quando o OSRM partia do funcionário
+- Correção: seletor **Última localização** (padrão) | **Empresa**; Redis live → último `tracking_points` da empresa → fallback E com aviso; roundtrip continua no E; publish grava `origin*` = início do traçado
+- Como validar: `/routes` modo Clientes → selecionar func + cliente → alternar origem e ver km/estimativa mudarem; sem GPS, aviso âmbar e cálculo pelo E; com GPS, pin F e lista começa no funcionário
+
+## v0.16.3 — 2026-09-09
+
+### Funcionário sempre com usuário de acesso
+
+- Novo funcionário já criava User EMPLOYEE (e-mail + senha)
+- Edição de quem ainda não tem login **não** pode mais salvar só o cadastro: e-mail + senha obrigatórios; API `EMPLOYEE_LOGIN_REQUIRED`
+- Como validar: `/employees/new` → entrar no `/login` com esse e-mail; legado “Sem login” → salvar sem senha falha; com senha vira “Com login”
+
 ## v0.16.2 — 2026-09-09
 
 ### Deploy — VPS analise (PM2 + Docker, porta livre)
@@ -7,7 +23,10 @@
 - Subida em `/opt/analise/SAMUEL`: PostGIS/Redis via `docker-compose.prod.yml`, web/API via PM2
 - Portas loopback: web **3468** (Cloudflare), API 3469, PostGIS 5434, Redis 6381 — fora das rotas já ocupadas no túnel
 - `LISTEN_HOST` na API; rewrite Next `API_PROXY_TARGET` precisa estar no **build**
-- Como validar: `curl http://127.0.0.1:3468/login` e `curl http://127.0.0.1:3468/api/v1/health`
+- Túnel: `https://rotas.avadesk.com.br` → `http://localhost:3468` (conector `cloudflared` nesta VPS; pasta `/opt/analise/SAMUEL`)
+- Mapa: mesma `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` do `.env.local` local, gravada só na VPS e embutida no `next build` (sem watermark CARTO)
+- Fix Usuários: middleware usa `x-forwarded-host` (não redireciona para `localhost:3468`); lista em `UsersListPage.tsx` sem puxar o mapa
+- Como validar: `https://rotas.avadesk.com.br/settings/users` (ADMIN) e `curl -sI https://rotas.avadesk.com.br/settings/users` → Location em `rotas.avadesk.com.br`, não localhost
 
 ## v0.16.1 — 2026-09-07
 

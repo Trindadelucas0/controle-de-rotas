@@ -2,7 +2,7 @@
 
 CRUD de funcionários (Tema 03) + **login de campo** (Tema 17). Isolamento por `companyId` do JWT.
 
-`Employee.userId` continua **nullable** no banco: legado sem login existe, mas **não** entra no despacho por clientes (`EMPLOYEE_LOGIN_REQUIRED`).
+`Employee.userId` continua **nullable** no banco (legado). Cadastro novo e edição de quem ainda não tem login **exigem** e-mail + senha: cria `User` EMPLOYEE. Sem usuário de acesso o PATCH falha (`EMPLOYEE_LOGIN_REQUIRED`). Sem login **não** entra no despacho por clientes.
 
 ## Telas
 
@@ -58,17 +58,17 @@ CRUD de funcionários (Tema 03) + **login de campo** (Tema 17). Isolamento por `
 ## Endpoint PATCH /api/v1/employees/:id
 
 - Auth: ADMIN, MANAGER
-- Body (parcial): campos de perfil; opcionalmente `email` + `password` para **criar acesso** se ainda não houver `userId`
+- Body (parcial): campos de perfil. Se ainda **não** houver `userId`, `email` + `password` são **obrigatórios** (cria User EMPLOYEE). Já com login, senha não vai neste PATCH.
 
 ### Respostas
 
 **200:** `{ employee }`
 
-**400:** `EMPLOYEE_ALREADY_HAS_LOGIN` — já tem usuário (reset em Usuários); `EMPLOYEE_LOGIN_EMAIL_REQUIRED` — pediu senha sem e-mail
+**400:** `EMPLOYEE_ALREADY_HAS_LOGIN` — já tem usuário (reset em Usuários); `EMPLOYEE_LOGIN_REQUIRED` — sem `userId` e sem senha; `EMPLOYEE_LOGIN_EMAIL_REQUIRED` — senha sem e-mail
 
 **404:** `EMPLOYEE_NOT_FOUND`
 
 **409:** `USER_EMAIL_EXISTS`
 
-- Side effects: se `password` e sem `userId`, cria User EMPLOYEE e vincula; senão só atualiza perfil
-- Como testar: editar funcionário “Sem login” → Criar acesso → aparece no planner de rotas
+- Side effects: se ainda sem `userId`, cria User EMPLOYEE e vincula; senão só atualiza perfil
+- Como testar: editar funcionário “Sem login” → e-mail + senha → aparece no planner; salvar sem senha → `EMPLOYEE_LOGIN_REQUIRED`

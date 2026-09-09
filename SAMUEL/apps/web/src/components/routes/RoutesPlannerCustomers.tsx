@@ -11,13 +11,18 @@ import { osmRasterStyle } from '@/lib/map-style';
 import { toDateInputValue } from '@/lib/ops-labels';
 import {
   type CompanyOrigin,
+  type RouteOriginMode,
   formatDuration,
   formatMeters,
+  formatGpsAge,
+  isEmployeeGpsStart,
   routeColorAt,
 } from './routes-planner-shared';
 import {
   companyDisplayName,
   CompanyOriginMarker,
+  EmployeeStartMarker,
+  RouteEmployeeStartRow,
   RouteMapLegend,
   RouteOriginReturnRow,
   RouteOriginStartRow,
@@ -63,6 +68,14 @@ type DayLoad = {
   dayDistanceKm: number;
 };
 
+type AssignmentStartOrigin = {
+  source: 'live' | 'tracking_history' | 'company' | 'company_fallback';
+  name: string;
+  latitude: number;
+  longitude: number;
+  recordedAt: string | null;
+};
+
 type CustomerAssignment = {
   employeeId: string;
   employeeName: string;
@@ -79,6 +92,7 @@ type CustomerAssignment = {
     coordinates: [number, number][];
   };
   quality: 'road' | 'straight_line';
+  startOrigin: AssignmentStartOrigin;
 };
 
 type CustomersPreview = {
@@ -88,6 +102,7 @@ type CustomersPreview = {
     longitude: number;
     address: string | null;
   };
+  originMode?: RouteOriginMode;
   date: string;
   roundtrip: boolean;
   assignments: CustomerAssignment[];
@@ -113,6 +128,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
   const [selectedEmployeeIds, setSelectedEmployeeIds] = useState<string[]>([]);
   const [roundtrip, setRoundtrip] = useState(true);
   const [recordTrip, setRecordTrip] = useState(false);
+  const [originMode, setOriginMode] = useState<RouteOriginMode>('EMPLOYEE_LAST');
   const [routeDate, setRouteDate] = useState(toDateInputValue());
   const [q, setQ] = useState('');
   const [preview, setPreview] = useState<CustomersPreview | null>(null);
@@ -207,6 +223,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
             employeeIds: selectedEmployeeIds,
             roundtrip,
             recordTrip,
+            originMode,
             date: routeDate,
           }),
           signal: controller.signal,
@@ -225,7 +242,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
       clearTimeout(timer);
       previewAbort.current?.abort();
     };
-  }, [selectedCustomerIds, selectedEmployeeIds, roundtrip, recordTrip, routeDate, hasOrigin]);
+  }, [selectedCustomerIds, selectedEmployeeIds, roundtrip, recordTrip, originMode, routeDate, hasOrigin]);
 
   const customersById = useMemo(
     () => new Map(customers.map((c) => [c.id, c])),
@@ -342,6 +359,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
     }
     if (preview?.assignments.length) {
       for (const a of preview.assignments) {
+        coords.push([a.startOrigin.longitude, a.startOrigin.latitude]);
         for (const c of a.geometry.coordinates) coords.push(c);
         for (const s of a.stops) coords.push([s.longitude, s.latitude]);
       }
@@ -399,6 +417,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
           employeeIds: selectedEmployeeIds,
           roundtrip,
           recordTrip,
+          originMode,
           date: routeDate,
         }),
       });
@@ -430,6 +449,25 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
   const canRequestPreview =
     selectedCustomerIds.length > 0 && selectedEmployeeIds.length > 0;
   const anyStraight = preview?.assignments.some((a) => a.quality === 'straight_line');
+  const employeeGpsStarts = (preview?.assignments ?? []).filter((a) =>
+    isEmployeeGpsStart(a.startOrigin?.source ?? 'company'),
+  );
+  const allGpsFallback =
+    originMode === 'EMPLOYEE_LAST' &&
+    Boolean(preview?.assignments.length) &&
+    employeeGpsStarts.length === 0;
+  const showCompanyMarker =
+    hasOrigin &&
+    (originMode === 'COMPANY' ||
+      roundtrip ||
+      !preview ||
+      (preview.assignments ?? []).some(
+        (a) =>
+          a.startOrigin?.source === 'company' ||
+          a.startOrigin?.source === 'company_fallback',
+      ));
+  const startSequenceLabel =
+    originMode === 'EMPLOYEE_LAST' ? 'F' : 'E';
 
   return (
     <div className="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col gap-3 lg:flex-row">
@@ -440,9 +478,10 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
           </p>
           <h2 className="text-lg font-semibold text-brand-900">Por clientes</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
-            Origem (marcador <strong className="text-accent">E</strong> no mapa):{' '}
+            Pin da empresa (marcador <strong className="text-accent">E</strong>):{' '}
             <strong className="text-brand-800">{companyDisplayName(company)}</strong>
-            {company.address ? ` · ${company.address}` : ''}
+            {company.address ? ` · ${company.address}` : ''}. Km e tempo saem da origem
+            escolhida abaixo.
           </p>
         </div>
 
@@ -488,6 +527,76 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
             </span>
           </span>
         </label>
+
+        <fieldset className="space-y-2">
+          <legend className="text-sm font-medium text-brand-900">Origem do cálculo</legend>
+          <p className="text-xs text-[var(--muted)]">
+            Define ordem das paradas, km e estimativa até o primeiro cliente. Voltar no fim
+            continua no pin da empresa.
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="Origem do cálculo"
+            className="grid grid-cols-1 gap-2 sm:grid-cols-2"
+          >
+            {(
+              [
+                {
+                  id: 'EMPLOYEE_LAST' as const,
+                  label: 'Última localização',
+                  hint: 'GPS do funcionário',
+                },
+                {
+                  id: 'COMPANY' as const,
+                  label: 'Empresa (pin E)',
+                  hint: 'Sai do escritório',
+                },
+              ] as const
+            ).map((opt) => {
+              const selected = originMode === opt.id;
+              return (
+                <button
+                  key={opt.id}
+                  type="button"
+                  role="radio"
+                  aria-checked={selected}
+                  onClick={() => setOriginMode(opt.id)}
+                  className={`min-h-11 rounded-xl border px-3 py-2 text-left text-sm ${
+                    selected
+                      ? 'border-accent bg-accent/10 font-semibold text-brand-900'
+                      : 'border-brand-100 font-medium text-brand-800 hover:bg-brand-50'
+                  }`}
+                >
+                  {opt.label}
+                  <span className="mt-0.5 block text-[11px] font-normal text-[var(--muted)]">
+                    {opt.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+          {preview?.assignments.length ? (
+            <ul className="space-y-1 text-[11px] text-[var(--muted)]">
+              {preview.assignments.map((a) => {
+                const src = a.startOrigin?.source ?? 'company';
+                const age = formatGpsAge(a.startOrigin?.recordedAt ?? null);
+                let detail = 'pin da empresa';
+                if (src === 'live') detail = `GPS ao vivo${age.label ? ` · ${age.label}` : ''}`;
+                else if (src === 'tracking_history') {
+                  detail = `última loc. ${age.label || ''}`.trim();
+                  if (age.stale) detail += ' · desatualizada';
+                } else if (src === 'company_fallback') {
+                  detail = 'sem GPS — usando empresa';
+                }
+                return (
+                  <li key={`origin-${a.employeeId}`}>
+                    {a.employeeName} · {detail}
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </fieldset>
 
         <div>
           <h3 className="text-sm font-semibold text-brand-900">Funcionários com login</h3>
@@ -544,6 +653,13 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
 
         {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
         {msg ? <p className="text-sm text-[var(--ok)]">{msg}</p> : null}
+
+        {allGpsFallback ? (
+          <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
+            Nenhum funcionário tem localização gravada. O cálculo usa o pin da empresa até
+            haver GPS (Play na rota).
+          </p>
+        ) : null}
 
         {anyStraight ? (
           <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -612,7 +728,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
 
         <div>
           <h3 className="ops-label mb-0">
-            Rotas · E → 1 → 2 → … {roundtrip ? '→ E' : ''}
+            Rotas · {startSequenceLabel} → 1 → 2 → … {roundtrip ? '→ E' : ''}
           </h3>
           {preview?.assignments.length ? (
             <div className="mt-2 space-y-3">
@@ -642,7 +758,22 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
                       </p>
                     ) : null}
                     <div className="mt-3 space-y-1.5">
-                      <RouteOriginStartRow company={company} />
+                      {isEmployeeGpsStart(a.startOrigin?.source ?? 'company') ? (
+                        <RouteEmployeeStartRow
+                          employeeName={a.employeeName}
+                          source={a.startOrigin.source}
+                          recordedAt={a.startOrigin.recordedAt}
+                        />
+                      ) : (
+                        <RouteOriginStartRow
+                          company={company}
+                          fallbackNote={
+                            a.startOrigin?.source === 'company_fallback'
+                              ? 'Sem última localização — cálculo pelo pin da empresa.'
+                              : undefined
+                          }
+                        />
+                      )}
                       <ol className="space-y-1.5">
                         {a.stops.map((s) => (
                           <li
@@ -684,7 +815,8 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
             </div>
           ) : selectedCustomerIds.length === 0 ? (
             <p className="mt-2 text-xs text-[var(--muted)]">
-              A ordem exibida será a do servidor (E → mais perto → mais longe), não a do clique.
+              A ordem exibida será a do servidor ({startSequenceLabel} → mais perto → mais longe),
+              não a do clique.
             </p>
           ) : (
             <ul className="mt-2 space-y-1.5">
@@ -771,7 +903,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
       </aside>
 
       <div className="relative min-h-[320px] flex-1 overflow-hidden rounded-2xl border border-brand-100 bg-brand-50">
-        <RouteMapLegend />
+        <RouteMapLegend showEmployeeStart={originMode === 'EMPLOYEE_LAST'} />
         <MapLibreMap
           ref={mapRef}
           initialViewState={initialView}
@@ -803,11 +935,21 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
                 </Source>
               ))
             : null}
-          <CompanyOriginMarker
-            latitude={company.latitude!}
-            longitude={company.longitude!}
-            companyName={companyDisplayName(company)}
-          />
+          {showCompanyMarker ? (
+            <CompanyOriginMarker
+              latitude={company.latitude!}
+              longitude={company.longitude!}
+              companyName={companyDisplayName(company)}
+            />
+          ) : null}
+          {employeeGpsStarts.map((a) => (
+            <EmployeeStartMarker
+              key={`start-${a.employeeId}`}
+              latitude={a.startOrigin.latitude}
+              longitude={a.startOrigin.longitude}
+              employeeName={a.employeeName}
+            />
+          ))}
           {[...pinByCustomerId.entries()].map(([id, pin]) => (
             <Marker key={id} latitude={pin.lat} longitude={pin.lng} anchor="bottom">
               <div

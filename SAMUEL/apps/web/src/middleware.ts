@@ -14,6 +14,34 @@ const PUBLIC_PREFIXES = [
   '/api',
 ];
 
+/** Hosts que o túnel/proxy pode mandar em x-forwarded-host (anti host-header injection). */
+function allowedForwardedHost(host: string): boolean {
+  const h = host.toLowerCase().split(':')[0];
+  if (h === 'rotas.avadesk.com.br') return true;
+  if (h === 'localhost') return true;
+  if (h === '127.0.0.1') return true;
+  return false;
+}
+
+function redirectUrl(request: NextRequest, pathname: string, search = ''): URL {
+  const url = request.nextUrl.clone();
+  url.pathname = pathname;
+  url.search = search;
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
+  const hostOnly = forwardedHost?.split(':')[0];
+  if (hostOnly && allowedForwardedHost(hostOnly)) {
+    url.hostname = hostOnly;
+  }
+  if (forwardedProto === 'https') {
+    url.protocol = 'https:';
+    url.port = '';
+  } else if (forwardedProto === 'http') {
+    url.protocol = 'http:';
+  }
+  return url;
+}
+
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const isPublic = PUBLIC_PREFIXES.some(
@@ -26,8 +54,7 @@ export function middleware(request: NextRequest) {
 
   // Rotas protegidas: precisa de algum cookie
   if (!isPublic && !hasSession) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/login';
+    const url = redirectUrl(request, '/login');
     url.searchParams.set('next', `${pathname}${request.nextUrl.search}`);
     return NextResponse.redirect(url);
   }
@@ -36,10 +63,7 @@ export function middleware(request: NextRequest) {
   // Cookie refresh órfão (ex.: após wipe do banco) NÃO deve bloquear a tela de login
   // (senão: / ↔ /login em loop infinito).
   if (hasAccess && (pathname === '/login' || pathname === '/forgot-password')) {
-    const url = request.nextUrl.clone();
-    url.pathname = '/';
-    url.search = '';
-    return NextResponse.redirect(url);
+    return NextResponse.redirect(redirectUrl(request, '/', ''));
   }
 
   return NextResponse.next();

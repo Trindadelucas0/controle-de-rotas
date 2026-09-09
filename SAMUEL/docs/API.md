@@ -30,9 +30,9 @@ Ver m?dulos CRM. Empresa e clientes com lat/lng e `locationStatus` (OK quando pi
 
 Detalhes: [modules/employees.md](modules/employees.md). UI: `/employees`.
 
-- `POST /employees` ? body inclui `email` + `password` (m?n. 8); cria User `EMPLOYEE` + v?nculo
-- `PATCH /employees/:id` ? `password` opcional cria acesso se ainda sem `userId`
-- Erros: `USER_EMAIL_EXISTS` (409), `EMPLOYEE_ALREADY_HAS_LOGIN`, `EMPLOYEE_LOGIN_EMAIL_REQUIRED`
+- `POST /employees` — body inclui `email` + `password` (mín. 8); cria User `EMPLOYEE` + vínculo
+- `PATCH /employees/:id` — sem `userId` exige `email` + `password` (cria acesso); já com login, senha só em Usuários
+- Erros: `USER_EMAIL_EXISTS` (409), `EMPLOYEE_ALREADY_HAS_LOGIN`, `EMPLOYEE_LOGIN_EMAIL_REQUIRED`, `EMPLOYEE_LOGIN_REQUIRED`
 
 ## Lookups (ADMIN, MANAGER, SUPERVISOR, EMPLOYEE)
 
@@ -81,8 +81,8 @@ Detalhes: [modules/visits.md](modules/visits.md). UI: `/agenda`.
 Detalhes: [modules/routes.md](modules/routes.md). UI: `/routes` (modos Clientes + Visitas).
 
 - `POST /routes/preview` ? `{ visitIds, roundtrip? }`
-- `POST /routes/preview-customers` — `{ customerIds, employeeIds, roundtrip?, date?, recordTrip? }` (1–25 clientes, 1–8 funcionários com login; sem persistir; inclui `dayLoad`); ordem das paradas = **mais perto → mais longe** da posição do funcionário; `recordTrip: true` exige exatamente 1 cliente
-- `POST /routes/dispatch-customers` — mesmo body; cria OS+visitas+rotas `PUBLISHED` + `plannedStepsJson` + `recordTrip` (ADMIN/MANAGER); **permite várias rotas no dia**; reusa veículo do dia; mesma ordem de proximidade; roundtrip volta ao E; se cliente tem `CustomerAccessPath` ACTIVE e a rota tem 1 parada, usa geometria gravada **recortada a partir da origem** (não a trilha inteira)
+- `POST /routes/preview-customers` — `{ customerIds, employeeIds, roundtrip?, date?, recordTrip?, originMode? }` (`originMode`: `EMPLOYEE_LAST` padrão ou `COMPANY`; 1–25 clientes, 1–8 funcionários com login; sem persistir; inclui `dayLoad` + `startOrigin`); ordem das paradas = **mais perto → mais longe** da origem escolhida; `recordTrip: true` exige exatamente 1 cliente
+- `POST /routes/dispatch-customers` — mesmo body; cria OS+visitas+rotas `PUBLISHED` + `plannedStepsJson` + `recordTrip` (ADMIN/MANAGER); **permite várias rotas no dia**; reusa veículo do dia; `origin*` = início do traçado (funcionário ou E); roundtrip volta ao E; se cliente tem `CustomerAccessPath` ACTIVE e a rota tem 1 parada, usa geometria gravada **recortada a partir da origem** (não a trilha inteira)
 - `GET /routes`, `POST /routes` (`recordTrip?`), `GET /routes/:id`, `POST /routes/:id/publish`
 - `POST /routes/:id/start` — EMPLOYEE atribuído → `IN_PROGRESS`; body wizard: `vehicleId`, `startOdometerKm`, `startFuelLevel`, `latitude`, `longitude`, `startNotes?`; grava checklist + GPS inicial; **reordena paradas da mais perto para a mais longe** (GPS do celular) e recalcula geometria/manobras (trilha ACTIVE recortada no GPS); roundtrip volta ao E; erro `ROUTE_ALREADY_ACTIVE` se já houver outra
 - `POST /routes/:id/reroute` — EMPLOYEE atribuído + rota `IN_PROGRESS`; body `{ latitude, longitude, reorderRemaining }`; recalcula geometry/steps a partir do GPS (mesmo recorte de trilha); `reorderRemaining: true` = pendentes mais perto→mais longe; rate limit Redis 30/min (mesmo preview)

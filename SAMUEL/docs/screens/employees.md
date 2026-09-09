@@ -143,7 +143,7 @@ Reset de senha inline (vai em Usuários).
 Form perfil + bloco Acesso:
 
 - Com login: e-mail somente leitura; link “Redefinir senha em Usuários” (ADMIN → `/settings/users/:userId`); MANAGER vê texto pedindo admin
-- Sem login: checkbox “Criar acesso ao Rotas” → e-mail + senha
+- Sem login: e-mail + senha obrigatórios (cria User EMPLOYEE; não dá para deixar “depois”)
 
 ### 3. Informação
 
@@ -159,7 +159,7 @@ N/A.
 
 ### 6. Ações
 
-Salvar → `PATCH /employees/:id` (com `password` cria acesso se sem `userId`).
+Salvar → `PATCH /employees/:id` (sem `userId` exige `password`).
 
 ### 7. Estados
 
@@ -175,7 +175,7 @@ Para Usuários se já tem login (ADMIN).
 
 ### 10. Mobile / PWA
 
-Fieldset Criar acesso empilhado.
+Fieldset de acesso empilhado; e-mail e senha sempre visíveis se ainda não houver login.
 
 ### 11. Fora de escopo
 
@@ -183,5 +183,6 @@ Tornar `userId` NOT NULL no banco.
 
 ### 12. Como testar
 
-1. Legado sem login → Criar acesso → aparece no planner.
+1. Legado sem login → e-mail + senha → aparece no planner.
 2. Já com login + password no PATCH → `EMPLOYEE_ALREADY_HAS_LOGIN`.
+3. Sem login + salvar sem senha → `EMPLOYEE_LOGIN_REQUIRED`.

@@ -163,7 +163,7 @@ export function DataTable({
   rows: Record<string, React.ReactNode>[];
   empty: string;
 }) {
-  if (rows.length === 0) {
+  if (!rows || rows.length === 0) {
     return (
       <p className="ops-surface rounded-[10px] border-dashed px-5 py-10 text-center text-sm text-[var(--muted)]">
         {empty}

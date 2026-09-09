@@ -20,7 +20,7 @@ Telas: `/settings/users`, `/settings/users/new`, `/settings/users/[id]`
 ## Employees
 
 - CRUD `/api/v1/employees` — ADMIN, MANAGER
-- Create: `email` + `password` obrigatórios (User EMPLOYEE + vínculo); edit pode “Criar acesso”
+- Create: `email` + `password` obrigatórios (User EMPLOYEE + vínculo); edição sem login também exige e-mail + senha
 - Detalhes: [employees.md](employees.md) · [screens/employees.md](../screens/employees.md)
 
 Telas: `/employees`, `/employees/new`, `/employees/[id]`

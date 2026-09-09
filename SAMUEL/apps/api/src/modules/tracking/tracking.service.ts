@@ -231,4 +231,40 @@ export class TrackingService {
   async getLivePosition(companyId: string, employeeId: string): Promise<LiveVehiclePosition | null> {
     return this.redis.getJson<LiveVehiclePosition>(this.currentKey(companyId, employeeId));
   }
+
+  /** Redis ao vivo (TTL 120s) ou último ponto persistido da mesma empresa. */
+  async getLastKnownPosition(
+    companyId: string,
+    employeeId: string,
+  ): Promise<{
+    latitude: number;
+    longitude: number;
+    recordedAt: string;
+    source: 'live' | 'tracking_history';
+  } | null> {
+    const live = await this.getLivePosition(companyId, employeeId);
+    if (live && Number.isFinite(live.latitude) && Number.isFinite(live.longitude)) {
+      return {
+        latitude: live.latitude,
+        longitude: live.longitude,
+        recordedAt: live.recordedAt,
+        source: 'live',
+      };
+    }
+
+    const row = await this.prisma.trackingPoint.findFirst({
+      where: { companyId, employeeId },
+      orderBy: { recordedAt: 'desc' },
+      select: { latitude: true, longitude: true, recordedAt: true },
+    });
+    if (!row || !Number.isFinite(row.latitude) || !Number.isFinite(row.longitude)) {
+      return null;
+    }
+    return {
+      latitude: row.latitude,
+      longitude: row.longitude,
+      recordedAt: row.recordedAt.toISOString(),
+      source: 'tracking_history',
+    };
+  }
 }

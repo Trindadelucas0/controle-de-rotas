@@ -121,6 +121,10 @@ Get-NetTCPConnection -LocalPort 3000,3001 -ErrorAction SilentlyContinue |
 
 Não usa as portas de dev (3000/3001). Build + Docker + PM2 em `/opt/analise/SAMUEL`.
 
+**Atualizar o que já está no ar:** colar o bloco de [`vps-atualizar.txt`](vps-atualizar.txt) no SSH (git pull + Docker + Prisma + build + PM2). Não rode seed de novo.
+
+Primeira subida:
+
 | Serviço | Endereço |
 | --- | --- |
 | Web (cadastrar no Cloudflare) | `http://127.0.0.1:3468` |
@@ -142,4 +146,8 @@ pm2 start ecosystem.config.cjs
 pm2 save
 ```
 
-Cloudflare: Path `*`, Service **`http://127.0.0.1:3468`**. Login seed: `admin@demo.local` / `ChangeMe123!`. Após o hostname HTTPS, `COOKIE_SECURE` já é `true`; ajuste `CORS_ORIGIN` se o login falhar por origem.
+Público: `https://rotas.avadesk.com.br` (túnel → `http://localhost:3468`). Login seed: `admin@demo.local` / `ChangeMe123!`. `COOKIE_SECURE=true`; `CORS_ORIGIN` no servidor aponta para esse hostname.
+
+Mapa: `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` em `apps/web/.env.local` **no servidor**, depois `API_PROXY_TARGET=http://127.0.0.1:3469 npm run web:build` e `pm2 restart analise-web`. Sem a chave no build, as tiles CARTO mostram “API KEY REQUIRED”.
+
+Túnel: o Cloudflare manda `Host: localhost:3468`. O middleware lê `x-forwarded-host` para redirects HTTPS em `rotas.avadesk.com.br` (não `https://localhost:3468/login`).

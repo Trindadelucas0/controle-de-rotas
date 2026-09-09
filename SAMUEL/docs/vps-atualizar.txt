@@ -1,0 +1,43 @@
+Rotas — atualizar a VPS (colar no SSH como root)
+
+ANTES no Windows: git add / commit / git push. O pull só traz o que já está no GitHub.
+
+Git: /opt/analise
+App: /opt/analise/SAMUEL
+Nao apaga .env nem apps/web/.env.local (ficam so no servidor).
+Nao rode seed neste script (so na primeira subida).
+Nao cole senha, token Cloudflare nem chave CARTO.
+
+--- cole daqui ---
+
+set -e
+cd /opt/analise
+git pull
+
+cd /opt/analise/SAMUEL
+docker compose -f docker-compose.prod.yml up -d --wait
+
+npm ci
+npx prisma generate --schema apps/api/prisma/schema.prisma
+npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+
+API_PROXY_TARGET=http://127.0.0.1:3469 NODE_OPTIONS=--max-old-space-size=1536 npm run web:build
+npm run api:build
+
+if pm2 restart analise-api analise-web --update-env; then
+  true
+else
+  pm2 start ecosystem.config.cjs
+  pm2 save
+fi
+
+curl -sS http://127.0.0.1:3468/api/v1/health
+echo
+pm2 status
+
+--- ate aqui ---
+
+Depois: no navegador, hard refresh (Ctrl+Shift+R) em https://rotas.avadesk.com.br
+
+Se o git pull recusar (arquivos locais na VPS), nao use reset --hard sem backup do .env.
+Se o mapa mostrar API KEY REQUIRED, a chave CARTO precisa estar em apps/web/.env.local ANTES do web:build.

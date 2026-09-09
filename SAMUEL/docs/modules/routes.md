@@ -1,6 +1,6 @@
 # Módulo — Rotas
 
-Rotas por **visitas** (fluxo legado do planejador) e por **clientes** (dispatch que cria OS+visitas no servidor). Paradas sempre ancoradas em `visitId`. Origem no mapa = pin da empresa (marcador **E**); números = paradas.
+Rotas por **visitas** (fluxo legado do planejador) e por **clientes** (dispatch que cria OS+visitas no servidor). Paradas sempre ancoradas em `visitId`. No planejador por clientes, o início do km/tempo é a origem escolhida (**F** última loc. ou **E** empresa); roundtrip volta ao pin da empresa. Números = paradas.
 
 Campo novo no modelo `routes`: `planned_steps_json` (`plannedStepsJson`) — manobras OSRM (`steps=true`) ou fallback linha reta, gravadas no publish por clientes para a PWA não depender do OSRM no Play.
 
@@ -122,16 +122,19 @@ Campo em navegação com GPS → botão Porteira; gestor em `/map` vê o marco.
   "employeeIds": ["uuid"],
   "roundtrip": true,
   "recordTrip": false,
+  "originMode": "EMPLOYEE_LAST",
   "date": "2026-08-25"
 }
 ```
 
 - `customerIds`: 1–25, únicos, ACTIVE, mesma empresa, **com pin**; se `recordTrip: true`, exatamente **1**
 - `employeeIds`: 1–8, ≤ clientes, ACTIVE, **com `userId`**
+- `originMode`: `EMPLOYEE_LAST` (padrão) ou `COMPANY`. Última loc. = Redis live (120 s) senão último `tracking_points` da **mesma empresa**; sem ponto → pin E (`company_fallback`)
 - `recordTrip`: default false; grava trilha no check-in
 - Não cria OS/visita/rota
-- Split: carga balanceada (±1), proximidade (GPS Redis se online senão origem), clusters por ângulo
-- Ordem das paradas: **mais perto → mais longe** a partir da posição do funcionário; traçado OSRM `/route` (ordem fixa), **CustomerAccessPath ACTIVE** (1 parada, geometria recortada a partir da origem GPS — não a trilha inteira da gravação) ou linha reta; roundtrip volta ao pin da empresa (**E**)
+- Split: carga balanceada (±1), proximidade a partir da origem escolhida, clusters por ângulo se todos no E
+- Ordem das paradas: **mais perto → mais longe** a partir da origem escolhida; traçado OSRM `/route` (ordem fixa), **CustomerAccessPath ACTIVE** (1 parada, geometria recortada a partir da origem GPS — não a trilha inteira da gravação) ou linha reta; roundtrip volta ao pin da empresa (**E**)
+- Cada assignment inclui `startOrigin`: `{ source: live|tracking_history|company|company_fallback, name, latitude, longitude, recordedAt }`
 - Play (`POST /routes/:id/start`) e `reroute`: mesma regra com o GPS real do celular; HUD de navegação calcula Tempo/ETA com a velocidade ao vivo
 - Erro: `ROUTE_RECORD_TRIP_SINGLE_CUSTOMER`
 
@@ -142,6 +145,7 @@ Campo em navegação com GPS → botão Porteira; gestor em `/map` vê o marco.
 ```json
 {
   "origin": { "name": "Demo", "latitude": -23.5, "longitude": -46.6, "address": "…" },
+  "originMode": "EMPLOYEE_LAST",
   "date": "2026-08-25",
   "roundtrip": true,
   "assignments": [
@@ -149,6 +153,13 @@ Campo em navegação com GPS → botão Porteira; gestor em `/map` vê o marco.
       "employeeId": "…",
       "employeeName": "Ana",
       "vehicleId": "…" ,
+      "startOrigin": {
+        "source": "live",
+        "name": "Ana",
+        "latitude": -23.4,
+        "longitude": -46.5,
+        "recordedAt": "2026-09-09T12:00:00.000Z"
+      },
       "stops": [
         {
           "sequence": 1,
@@ -193,12 +204,12 @@ Campo em navegação com GPS → botão Porteira; gestor em `/map` vê o marco.
 
 - Auth: ADMIN, MANAGER
 - Rate limit: mesmo preview (30/min)
-- Body: igual a `preview-customers`
+- Body: igual a `preview-customers` (inclui `originMode`)
 - Cookies: N/A
 
 ### Respostas
 
-**200** — `{ origin, date, roundtrip, routes: [...] }` (cada rota via `getOne`)
+**200** — `{ origin, originMode, date, roundtrip, routes: [...] }` (cada rota via `getOne`; `origin*` da rota = início do traçado)
 
 **422:** `ROUTE_NOT_ENOUGH_VEHICLES` (só se o funcionário ainda não tiver veículo no dia e faltar AVAILABLE), demais do preview
 

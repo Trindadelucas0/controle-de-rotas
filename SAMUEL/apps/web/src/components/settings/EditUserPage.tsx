@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
 import { PasswordField } from '@/components/auth/PasswordField';
-import type { UserDto } from './CompanyAndUsers';
+import type { UserDto } from './user-dto';
 
 export function EditUserPage({ id }: { id: string }) {
   const router = useRouter();

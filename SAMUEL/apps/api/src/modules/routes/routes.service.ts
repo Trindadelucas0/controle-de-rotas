@@ -27,6 +27,7 @@ import {
   PreviewRouteDto,
   RerouteRouteDto,
   StartRouteDto,
+  type RouteOriginMode,
 } from './dto/routes.dto';
 import {
   GeoStop,
@@ -44,10 +45,14 @@ import {
   tripFromOsrm,
 } from './routes-geo';
 import { validateRecordTripCustomers } from '../customers/access-path.util';
+import {
+  EmployeeSlot,
+  pickEmployeeDispatchPosition,
+  splitStopsAmongEmployees,
+} from './routes-split';
 
 /** Mesmo limiar de “Chegando” na PWA — paradas mais perto não entram no recálculo. */
 const REROUTE_NEAR_STOP_M = 80;
-import { EmployeeSlot, splitStopsAmongEmployees } from './routes-split';
 
 const MAX_STOPS = 25;
 const MAX_EMPLOYEES = 8;
@@ -127,6 +132,14 @@ export type DayLoadDto = {
   dayDistanceKm: number;
 };
 
+export type AssignmentStartOriginDto = {
+  source: EmployeeSlot['positionSource'];
+  name: string;
+  latitude: number;
+  longitude: number;
+  recordedAt: string | null;
+};
+
 export type CustomerAssignmentDto = {
   employeeId: string;
   employeeName: string;
@@ -143,10 +156,12 @@ export type CustomerAssignmentDto = {
     coordinates: [number, number][];
   };
   quality: 'road' | 'straight_line';
+  startOrigin: AssignmentStartOriginDto;
 };
 
 export type CustomerRoutesPreviewResult = {
   origin: RoutePreviewResult['origin'];
+  originMode: RouteOriginMode;
   date: string;
   roundtrip: boolean;
   recordTrip: boolean;
@@ -209,6 +224,7 @@ export class RoutesService {
     const prepared = await this.prepareCustomerAssignments(user, dto, false);
     return {
       origin: prepared.origin,
+      originMode: prepared.originMode,
       date: prepared.dateIso,
       roundtrip: prepared.roundtrip,
       recordTrip: prepared.recordTrip,
@@ -270,10 +286,10 @@ export class RoutesService {
               date: prepared.date,
               status: RouteStatus.PUBLISHED,
               roundtrip: prepared.roundtrip,
-              originName: prepared.origin.name,
-              originAddress: prepared.origin.address,
-              originLatitude: prepared.origin.latitude,
-              originLongitude: prepared.origin.longitude,
+              originName: assignment.trip.origin.name,
+              originAddress: assignment.trip.origin.address,
+              originLatitude: assignment.trip.origin.latitude,
+              originLongitude: assignment.trip.origin.longitude,
               plannedDistanceMeters: assignment.trip.totals.distanceMeters,
               plannedDurationSeconds: assignment.trip.totals.durationSeconds,
               plannedGeometryJson: assignment.trip.geometry as Prisma.InputJsonValue,
@@ -319,6 +335,7 @@ export class RoutesService {
 
     return {
       origin: prepared.origin,
+      originMode: prepared.originMode,
       date: prepared.dateIso,
       roundtrip: prepared.roundtrip,
       recordTrip: prepared.recordTrip,
@@ -971,6 +988,8 @@ export class RoutesService {
   ) {
     const roundtrip = dto.roundtrip !== false;
     const recordTrip = dto.recordTrip === true;
+    const originMode: RouteOriginMode =
+      dto.originMode === 'COMPANY' ? 'COMPANY' : 'EMPLOYEE_LAST';
     const dateIso = utcDateIso(dto.date);
     const date = new Date(`${dateIso}T00:00:00.000Z`);
 
@@ -1021,7 +1040,12 @@ export class RoutesService {
       user.companyId,
       customerIds,
     );
-    const employees = await this.loadDispatchEmployees(user.companyId, employeeIds, origin);
+    const employees = await this.loadDispatchEmployees(
+      user.companyId,
+      employeeIds,
+      origin,
+      originMode,
+    );
     const dayLoads = await this.loadEmployeeDayLoads(user.companyId, date, employeeIds);
 
     const reservedVehicleIds = new Set<string>();
@@ -1053,13 +1077,18 @@ export class RoutesService {
       const group = grouped.get(employee.id) ?? [];
       if (!group.length) continue;
 
-      // Parada 1 = mais perto do funcionário (GPS live ou empresa); roundtrip volta ao E.
-      const employeeOrigin: RouteOrigin = {
-        name: employee.name,
-        latitude: employee.position.latitude,
-        longitude: employee.position.longitude,
-        address: null,
-      };
+      // Início = última loc. do funcionário ou pin E; roundtrip volta ao E.
+      const useCompanyStart =
+        employee.positionSource === 'company' ||
+        employee.positionSource === 'company_fallback';
+      const employeeOrigin: RouteOrigin = useCompanyStart
+        ? origin
+        : {
+            name: employee.name,
+            latitude: employee.position.latitude,
+            longitude: employee.position.longitude,
+            address: null,
+          };
       const ordered = orderStopsNearestFirst(employee.position, group);
       const trip = await this.routeAlongFixedOrder(
         employeeOrigin,
@@ -1090,6 +1119,7 @@ export class RoutesService {
 
     return {
       origin,
+      originMode,
       date,
       dateIso,
       roundtrip,
@@ -1192,6 +1222,7 @@ export class RoutesService {
     companyId: string,
     employeeIds: string[],
     origin: RouteOrigin,
+    originMode: RouteOriginMode,
   ): Promise<EmployeeSlot[]> {
     const rows = await this.prisma.employee.findMany({
       where: { companyId, id: { in: employeeIds } },
@@ -1208,6 +1239,7 @@ export class RoutesService {
 
     const byId = new Map(rows.map((e) => [e.id, e]));
     const result: EmployeeSlot[] = [];
+    const companyLatLng = { latitude: origin.latitude, longitude: origin.longitude };
 
     for (const id of employeeIds) {
       const emp = byId.get(id)!;
@@ -1226,14 +1258,17 @@ export class RoutesService {
         );
       }
 
-      const live = await this.tracking.getLivePosition(companyId, emp.id);
+      const lastKnown =
+        originMode === 'EMPLOYEE_LAST'
+          ? await this.tracking.getLastKnownPosition(companyId, emp.id)
+          : null;
+      const picked = pickEmployeeDispatchPosition(originMode, lastKnown, companyLatLng);
       result.push({
         id: emp.id,
         name: emp.name,
-        position:
-          live && Number.isFinite(live.latitude) && Number.isFinite(live.longitude)
-            ? { latitude: live.latitude, longitude: live.longitude }
-            : { latitude: origin.latitude, longitude: origin.longitude },
+        position: picked.position,
+        positionSource: picked.source,
+        recordedAt: picked.recordedAt,
       });
     }
 
@@ -1335,6 +1370,13 @@ export class RoutesService {
       },
       geometry: assignment.trip.geometry,
       quality: assignment.trip.quality,
+      startOrigin: {
+        source: assignment.employee.positionSource,
+        name: assignment.trip.origin.name,
+        latitude: assignment.trip.origin.latitude,
+        longitude: assignment.trip.origin.longitude,
+        recordedAt: assignment.employee.recordedAt,
+      },
     };
   }
 
