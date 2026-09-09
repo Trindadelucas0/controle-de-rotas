@@ -16,6 +16,7 @@
     "web:dev": "npm run dev --workspace=apps/web",
     "web:build": "npm run build --workspace=apps/web",
     "db:migrate": "npm run prisma:migrate --workspace=apps/api",
+    "db:deploy": "npm run prisma:deploy --workspace=apps/api",
     "db:seed": "npm run prisma:seed --workspace=apps/api",
     "db:generate": "npm run prisma:generate --workspace=apps/api"
   },

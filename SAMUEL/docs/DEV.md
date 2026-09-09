@@ -116,3 +116,30 @@ Get-NetTCPConnection -LocalPort 3000,3001 -ErrorAction SilentlyContinue |
 
 3. Depois, na raiz: `npm run dev` e **deixe esse terminal aberto** (não rode outro `npm run dev` em paralelo).
 4. O Cursor às vezes encerra processos iniciados pelo agente; prefira subir o `npm run dev` no **seu** terminal integrado.
+
+## Produção VPS (analise)
+
+Não usa as portas de dev (3000/3001). Build + Docker + PM2 em `/opt/analise/SAMUEL`.
+
+| Serviço | Endereço |
+| --- | --- |
+| Web (cadastrar no Cloudflare) | `http://127.0.0.1:3468` |
+| API | `http://127.0.0.1:3469` |
+| PostGIS | `127.0.0.1:5434` |
+| Redis | `127.0.0.1:6381` |
+
+```bash
+cd /opt/analise/SAMUEL
+docker compose -f docker-compose.prod.yml up -d --wait
+# .env só no servidor (JWT e senha do banco gerados lá; não commitar)
+npm ci
+npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+# seed uma vez
+cd apps/api && npx tsx prisma/seed.ts && cd ../..
+API_PROXY_TARGET=http://127.0.0.1:3469 npm run web:build
+npm run api:build
+pm2 start ecosystem.config.cjs
+pm2 save
+```
+
+Cloudflare: Path `*`, Service **`http://127.0.0.1:3468`**. Login seed: `admin@demo.local` / `ChangeMe123!`. Após o hostname HTTPS, `COOKIE_SECURE` já é `true`; ajuste `CORS_ORIGIN` se o login falhar por origem.

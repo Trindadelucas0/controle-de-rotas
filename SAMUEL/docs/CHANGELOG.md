@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.16.2 — 2026-09-09
+
+### Deploy — VPS analise (PM2 + Docker, porta livre)
+
+- Subida em `/opt/analise/SAMUEL`: PostGIS/Redis via `docker-compose.prod.yml`, web/API via PM2
+- Portas loopback: web **3468** (Cloudflare), API 3469, PostGIS 5434, Redis 6381 — fora das rotas já ocupadas no túnel
+- `LISTEN_HOST` na API; rewrite Next `API_PROXY_TARGET` precisa estar no **build**
+- Como validar: `curl http://127.0.0.1:3468/login` e `curl http://127.0.0.1:3468/api/v1/health`
+
 ## v0.16.1 — 2026-09-07
 
 ### Fix — Mini-mapa em Minha rota + HUD ilegível no mapa

@@ -2,8 +2,8 @@
 
 | Item | Valor |
 |------|--------|
-| Versão do sistema | 0.16.1 — Identidade operacional |
-| Última atualização | 07/09/2026 — mini-mapa da rota em Minha rota + contraste do HUD de navegação |
+| Versão do sistema | 0.16.2 — Deploy VPS analise |
+| Última atualização | 09/09/2026 — build + PM2 na VPS em 127.0.0.1:3468 |
 | Fonte oficial de comportamento | Este hub aponta as fontes; **não** duplica regras inventadas |
 
 ## 1. Como usar este documento
@@ -26,7 +26,7 @@ Ver `PRD.md` §11 e `docs/ARCHITECTURE.md`. Resumo: Next.js 15 (web/PWA) → Nes
 
 ### 2.1 Histórico de versões
 
-Ver `docs/CHANGELOG.md` (atual: **v0.16.1**).
+Ver `docs/CHANGELOG.md` (atual: **v0.16.2**).
 
 ## 3. Mapa de telas / conexões
 
@@ -91,7 +91,22 @@ Só o implementado: `docs/SECURITY.md`. Secrets em `.env`; sem `NEXT_PUBLIC_` de
 
 ## 11. Deploy / ambiente
 
+### Dev local
+
 `docs/DEV.md`. Portas: Web 3000, API 3001, PostGIS 5433, Redis 6379.
+
+### Produção VPS (analise)
+
+Pasta: `/opt/analise/SAMUEL`. Docker `docker-compose.prod.yml` + PM2 `ecosystem.config.cjs`. Bind só em loopback.
+
+| Serviço | Porta |
+| --- | --- |
+| Web (Next) — Cloudflare aponta aqui | **127.0.0.1:3468** |
+| API (Nest) | 127.0.0.1:3469 |
+| PostGIS | 127.0.0.1:5434 |
+| Redis | 127.0.0.1:6381 |
+
+No Cloudflare: Path `*`, Service `http://127.0.0.1:3468`. Depois do hostname HTTPS, gravar `CORS_ORIGIN=https://SEU-HOSTNAME` no `.env` da API e `pm2 restart analise-api`. Sem secrets neste documento.
 
 ## 12. Ao atualizar este documento
 

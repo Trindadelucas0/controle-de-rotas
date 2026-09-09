@@ -21,6 +21,7 @@ const nextConfig = {
   allowedDevOrigins: ['localhost', '127.0.0.1', '[::1]', ...lanHosts()],
   // Proxy da API na mesma origem → celular na LAN não chama localhost do telefone.
   // beforeFiles: o POST (preview/login) não pode cair no Next e devolver HTML "Cannot POST".
+  // API_PROXY_TARGET é lido no `next build` (produção) e no `next dev`.
   async rewrites() {
     const target = process.env.API_PROXY_TARGET || 'http://127.0.0.1:3001';
     return {

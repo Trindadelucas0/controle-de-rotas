@@ -74,6 +74,7 @@ async function bootstrap() {
   });
 
   const port = Number(process.env.PORT || 3001);
+  const host = process.env.LISTEN_HOST?.trim() || '0.0.0.0';
   await app.init();
   // Se o Express cair num 404 cru (HTML "Cannot POST"), devolve o JSON do projeto.
   app.getHttpAdapter().getInstance().use((_req: Request, res: Response) => {
@@ -84,10 +85,12 @@ async function bootstrap() {
       message: 'Recurso não encontrado.',
     });
   });
-  await app.listen(port, '0.0.0.0');
-  console.log(`Rotas API listening on http://localhost:${port}/api/v1`);
-  for (const ip of lanIpv4s()) {
-    console.log(`Rotas API Network http://${ip}:${port}/api/v1`);
+  await app.listen(port, host);
+  console.log(`Rotas API listening on http://${host === '0.0.0.0' ? 'localhost' : host}:${port}/api/v1`);
+  if (host === '0.0.0.0') {
+    for (const ip of lanIpv4s()) {
+      console.log(`Rotas API Network http://${ip}:${port}/api/v1`);
+    }
   }
 }
 

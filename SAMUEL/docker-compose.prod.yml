@@ -1,0 +1,38 @@
+# Produção VPS (analise). Não usar no Windows local — o compose padrão
+# continua em 5433/6379. Bind só em loopback.
+services:
+  postgres:
+    image: postgis/postgis:16-3.5
+    container_name: analise-postgres
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5434:5432"
+    environment:
+      POSTGRES_USER: analise
+      POSTGRES_PASSWORD: ${ANALISE_PG_PASSWORD}
+      POSTGRES_DB: analise
+    volumes:
+      - analise_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U analise -d analise"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: analise-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6381:6379"
+    volumes:
+      - analise_redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  analise_pg:
+  analise_redis:
