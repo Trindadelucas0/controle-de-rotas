@@ -76,60 +76,89 @@ export function NewCompanyPage() {
       >
         <FormSection title="Dados da empresa">
           <FieldGrid>
-            <TextField name="name" label="Nome" required value={form.name} onChange={(v) => setField('name', v)} />
             <TextField
-              name="tradeName"
-              label="Nome fantasia"
-              value={form.tradeName}
-              onChange={(v) => setField('tradeName', v)}
+              field={{
+                name: 'name',
+                label: 'Nome',
+                required: true,
+                value: form.name,
+                onChange: (v) => setField('name', v),
+              }}
             />
             <TextField
-              name="document"
-              label="Documento"
-              value={form.document}
-              onChange={(v) => setField('document', v)}
-            />
-            <TextField name="phone" label="Telefone" value={form.phone} onChange={(v) => setField('phone', v)} />
-            <TextField
-              name="email"
-              label="E-mail da empresa"
-              type="email"
-              value={form.email}
-              onChange={(v) => setField('email', v)}
+              field={{
+                name: 'tradeName',
+                label: 'Nome fantasia',
+                value: form.tradeName,
+                onChange: (v) => setField('tradeName', v),
+              }}
             />
             <TextField
-              name="address"
-              label="Endereço"
-              value={form.address}
-              onChange={(v) => setField('address', v)}
+              field={{
+                name: 'document',
+                label: 'Documento',
+                value: form.document,
+                onChange: (v) => setField('document', v),
+              }}
+            />
+            <TextField
+              field={{
+                name: 'phone',
+                label: 'Telefone',
+                value: form.phone,
+                onChange: (v) => setField('phone', v),
+              }}
+            />
+            <TextField
+              field={{
+                name: 'email',
+                label: 'E-mail da empresa',
+                type: 'email',
+                value: form.email,
+                onChange: (v) => setField('email', v),
+              }}
+            />
+            <TextField
+              field={{
+                name: 'address',
+                label: 'Endereço',
+                value: form.address,
+                onChange: (v) => setField('address', v),
+              }}
             />
           </FieldGrid>
         </FormSection>
         <FormSection title="Administrador inicial" hint="Esse usuário faz login só nesta empresa (e-mail único na plataforma).">
           <FieldGrid>
             <TextField
-              name="adminName"
-              label="Nome"
-              required
-              value={form.adminName}
-              onChange={(v) => setField('adminName', v)}
+              field={{
+                name: 'adminName',
+                label: 'Nome',
+                required: true,
+                value: form.adminName,
+                onChange: (v) => setField('adminName', v),
+              }}
             />
             <TextField
-              name="adminEmail"
-              label="E-mail"
-              type="email"
-              required
-              value={form.adminEmail}
-              onChange={(v) => setField('adminEmail', v)}
+              field={{
+                name: 'adminEmail',
+                label: 'E-mail',
+                type: 'email',
+                required: true,
+                value: form.adminEmail,
+                onChange: (v) => setField('adminEmail', v),
+              }}
             />
             <TextField
-              name="adminPassword"
-              label="Senha"
-              type="password"
-              required
-              value={form.adminPassword}
-              onChange={(v) => setField('adminPassword', v)}
-              hint="Mínimo 8 caracteres"
+              field={{
+                name: 'adminPassword',
+                label: 'Senha',
+                type: 'password',
+                required: true,
+                value: form.adminPassword,
+                onChange: (v) => setField('adminPassword', v),
+                hint: 'Mínimo 8 caracteres',
+              }}
             />
           </FieldGrid>
         </FormSection>

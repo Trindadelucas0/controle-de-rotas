@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.16.19 — 2026-09-10
+
+### Fix — build web (`TextField` em empresas)
+
+- Sintoma: `next build` falhava em `EditCompanyPage.tsx` (`Property 'name' does not exist`)
+- Causa: `TextField` exige `{ field: Field }`; Nova/Editar empresa passavam props soltas
+- Arquivos: `EditCompanyPage.tsx`, `NewCompanyPage.tsx`
+- Como validar: `npm run build` em `apps/web`
+
 ## v0.16.18 — 2026-09-10
 
 ### Gravar viagem em todas as rotas do lote

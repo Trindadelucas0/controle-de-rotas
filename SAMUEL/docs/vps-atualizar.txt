@@ -1,3 +1,8 @@
+# SAMUEL — colar o arquivo INTEIRO no SSH (bash).
+# Git: /opt/analise
+# App: /opt/analise/SAMUEL
+# PM2: analise-api (3469) + analise-web (3468)
+
 set -e
 cd /opt/analise
 
@@ -20,11 +25,8 @@ cd /opt/analise/SAMUEL
 docker compose -f docker-compose.prod.yml up -d --wait
 
 npm ci
-npx prisma generate --schema apps/api/prisma/schema.prisma
-npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
-
-# Opcional: promover operador da plataforma (se o seed não atualizar o admin)
-# psql "$DATABASE_URL" -c "UPDATE users SET role = 'PLATFORM_ADMIN' WHERE email = 'admin@demo.local';"
+npm run db:generate
+npm run db:deploy
 
 API_PROXY_TARGET=http://127.0.0.1:3469 NODE_OPTIONS=--max-old-space-size=1536 npm run web:build
 npm run api:build

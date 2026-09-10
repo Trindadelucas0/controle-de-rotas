@@ -99,32 +99,55 @@ export function EditCompanyPage({ companyId }: { companyId: string }) {
       <FormCard error={error} onSubmit={onSubmit} loading={saving} submitLabel="Salvar">
         <FormSection title="Dados">
           <FieldGrid>
-            <TextField name="name" label="Nome" required value={form.name} onChange={(v) => setField('name', v)} />
             <TextField
-              name="tradeName"
-              label="Nome fantasia"
-              value={form.tradeName}
-              onChange={(v) => setField('tradeName', v)}
+              field={{
+                name: 'name',
+                label: 'Nome',
+                required: true,
+                value: form.name,
+                onChange: (v) => setField('name', v),
+              }}
             />
             <TextField
-              name="document"
-              label="Documento"
-              value={form.document}
-              onChange={(v) => setField('document', v)}
-            />
-            <TextField name="phone" label="Telefone" value={form.phone} onChange={(v) => setField('phone', v)} />
-            <TextField
-              name="email"
-              label="E-mail"
-              type="email"
-              value={form.email}
-              onChange={(v) => setField('email', v)}
+              field={{
+                name: 'tradeName',
+                label: 'Nome fantasia',
+                value: form.tradeName,
+                onChange: (v) => setField('tradeName', v),
+              }}
             />
             <TextField
-              name="address"
-              label="Endereço"
-              value={form.address}
-              onChange={(v) => setField('address', v)}
+              field={{
+                name: 'document',
+                label: 'Documento',
+                value: form.document,
+                onChange: (v) => setField('document', v),
+              }}
+            />
+            <TextField
+              field={{
+                name: 'phone',
+                label: 'Telefone',
+                value: form.phone,
+                onChange: (v) => setField('phone', v),
+              }}
+            />
+            <TextField
+              field={{
+                name: 'email',
+                label: 'E-mail',
+                type: 'email',
+                value: form.email,
+                onChange: (v) => setField('email', v),
+              }}
+            />
+            <TextField
+              field={{
+                name: 'address',
+                label: 'Endereço',
+                value: form.address,
+                onChange: (v) => setField('address', v),
+              }}
             />
             <SelectField
               name="status"

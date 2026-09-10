@@ -2,8 +2,8 @@
 
 | Item | Valor |
 |------|--------|
-| Versão do sistema | 0.16.18 — Gravar viagem em todas as rotas |
-| Última atualização | 10/09/2026 — recordTrip sem limite de 1 cliente |
+| Versão do sistema | 0.16.19 — Gravar viagem em todas as rotas |
+| Última atualização | 10/09/2026 — fix compile TextField empresas |
 | Fonte oficial de comportamento | Este hub aponta as fontes; **não** duplica regras inventadas |
 
 ## 1. Como usar este documento
@@ -26,7 +26,7 @@ Ver `PRD.md` §11 e `docs/ARCHITECTURE.md`. Resumo: Next.js 15 (web/PWA) → Nes
 
 ### 2.1 Histórico de versões
 
-Ver `docs/CHANGELOG.md` (atual: **v0.16.18**).
+Ver `docs/CHANGELOG.md` (atual: **v0.16.19**).
 
 ## 3. Mapa de telas / conexões
 
