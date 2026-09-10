@@ -27,7 +27,10 @@ type AgendaVisit = {
 export function AgendaPage() {
   const user = useSessionUser();
   const canOpenOs =
-    user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'SUPERVISOR';
+    user?.role === 'ADMIN' ||
+    user?.role === 'PLATFORM_ADMIN' ||
+    user?.role === 'MANAGER' ||
+    user?.role === 'SUPERVISOR';
   const [date, setDate] = useState(toDateInputValue());
   const [visits, setVisits] = useState<AgendaVisit[]>([]);
   const [summary, setSummary] = useState<AgendaSummary | null>(null);

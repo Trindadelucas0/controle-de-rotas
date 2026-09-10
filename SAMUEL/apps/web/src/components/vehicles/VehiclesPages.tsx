@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
-import { DataTable, FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
+import { DataTable, DetailItem, DetailSection, EditableRecordShell, FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
 import {
   OperationalSummaryStrip,
   summaryKm,
@@ -304,6 +304,8 @@ export function EditVehiclePage({ id }: { id: string }) {
   const [ctxError, setCtxError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
     apiFetch<{ vehicle: VehicleDto }>(`/api/v1/vehicles/${id}`)
@@ -330,10 +332,11 @@ export function EditVehiclePage({ id }: { id: string }) {
     routeToday?: { status: string } | null;
     driverToday?: { name: string } | null;
   };
+  const statusLabel = statusOpts.find((o) => o.value === data.status)?.label ?? data.status;
 
   return (
     <div>
-      <PageHeader title="Editar veículo" />
+      <PageHeader title="Veículo" />
       <EntityContextPanel
         title={data.plate}
         statusLabel={card?.statusAtual ?? data.status}
@@ -374,12 +377,65 @@ export function EditVehiclePage({ id }: { id: string }) {
         acoes={card?.acoes ?? []}
       />
       {msg ? <p className="mb-3 text-sm text-[var(--ok)]">{msg}</p> : null}
-      <VehicleForm
-        initial={data}
-        onSave={async (body) => {
-          await apiFetch(`/api/v1/vehicles/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-          setMsg('Salvo.');
+      <EditableRecordShell
+        mode={mode}
+        onEdit={() => {
+          setMsg(null);
+          setMode('edit');
         }}
+        onCancel={() => {
+          setFormKey((k) => k + 1);
+          setMode('view');
+        }}
+        view={
+          <>
+            <DetailSection title="Identificação">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Placa" value={data.plate} />
+                <DetailItem label="Ano" value={data.year != null ? String(data.year) : null} />
+                <DetailItem label="Marca" value={data.brand} />
+                <DetailItem label="Modelo" value={data.model} />
+              </dl>
+            </DetailSection>
+            <DetailSection title="Especificações">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Combustível" value={data.fuelType} />
+                <DetailItem
+                  label="Consumo médio (km/L)"
+                  value={data.avgConsumption != null ? String(data.avgConsumption) : null}
+                />
+                <DetailItem
+                  label="Capacidade"
+                  value={data.capacity != null ? String(data.capacity) : null}
+                />
+                <DetailItem
+                  label="Odômetro (km)"
+                  value={data.odometerKm != null ? String(data.odometerKm) : null}
+                />
+              </dl>
+            </DetailSection>
+            <DetailSection title="Situação">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Status" value={statusLabel} />
+              </dl>
+            </DetailSection>
+          </>
+        }
+        edit={
+          <VehicleForm
+            key={formKey}
+            initial={data}
+            onSave={async (body) => {
+              const r = await apiFetch<{ vehicle: VehicleDto }>(`/api/v1/vehicles/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+              });
+              setData(r.vehicle ?? { ...data, ...(body as Partial<VehicleDto>), plate: String(body.plate ?? data.plate) });
+              setMsg('Salvo.');
+              setMode('view');
+            }}
+          />
+        }
       />
     </div>
   );

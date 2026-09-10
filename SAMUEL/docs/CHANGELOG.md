@@ -1,5 +1,124 @@
 # Changelog
 
+## v0.16.18 — 2026-09-10
+
+### Gravar viagem em todas as rotas do lote
+
+- Antes: checkbox forçava só o 1º cliente (`ROUTE_RECORD_TRIP_SINGLE_CUSTOMER`)
+- Agora: `recordTrip` com 1+ clientes; cada rota do dispatch herda a flag; trilha no Cheguei por cliente
+- Reuso de geometria ACTIVE no planejamento continua só em rota de **1** parada
+- Docs: hub §8, `API.md`, `screens/routes.md`, `modules/routes.md`
+
+## v0.16.17 — 2026-09-10
+
+### Fix — Trilha GPS no mapa (“Não foi possível carregar”)
+
+- Sintoma: `/map?routeId=` mostrava “Não foi possível carregar a trilha GPS”
+- Causa: `apps/api/dist` tinha árvore velha `dist/src/` (sem `GET /tracking/history`); Nest registrava só `points`/`live` → 404 na UI
+- Correção: rebuild limpo do dist; `nest-cli.json` com `deleteOutDir: true`; banner da trilha mostra detalhe do `ApiError`
+- Como validar: reiniciar API → log com `Mapped {/api/v1/tracking/history, GET}` → `/map?routeId=` de rota incompleta/concluída com GPS
+
+## v0.16.16 — 2026-09-10
+
+### Fix — `/map` “default is not a constructor” + syntax `/routes`
+
+- Sintoma: `/map` com `TypeError: react_map_gl_maplibre.default is not a constructor`; `/routes` não compilava (`??` misturado com `||`)
+- Causa: `import Map` sombreava o `Map` nativo em `OperationalMap`; `STATUS_LABEL[status] ?? status || '—'` sem parênteses
+- Correção: import `MapGL` + `globalThis.Map`; `(STATUS_LABEL[status] ?? status) || '—'`
+- Arquivos: `OperationalMap.tsx`, `FieldNavigatePage.tsx`, `RouteManagePanel.tsx`
+- Como validar: `/map` e `/routes` abrem sem overlay/erro de build
+
+## v0.16.15 — 2026-09-10
+
+### Concluir rota — arrastar, incompleta, trilha congelada
+
+- Campo: `SlideToComplete` + modal em Minha rota e Navegação; `POST /routes/:id/complete` com `{ mode }`
+- Status `RouteStatus.INCOMPLETE`; tolerância **500 m** de restante planejado → ainda pode ser `COMPLETED`; pendentes → `SKIPPED`
+- Gestor: resumo **Incompletas**; link **Ver trilha no mapa**; `GET /tracking/history?routeId=` + linha âmbar no `/map`
+- Docs: hub §8, `API.md`, screens field-my-route/map, este changelog
+- Como validar: arrastar com paradas longe → incompleta; ≤500 m ou tudo feito → concluída; abrir trilha no mapa
+
+## v0.16.14 — 2026-09-10
+
+### Cadastros — modo leitura + Editar
+
+- Sintoma: detalhe de cliente/funcionário/veículo/usuário/empresa abria já com todos os inputs editáveis
+- Correção: `EditableRecordShell` + `DetailItem`/`DetailSection` em `crud.tsx`; detalhe abre em view; botão Editar (lápis) libera o form; Cancelar descarta; Salvar volta à view
+- Escopo: só detalhe/settings; `/new`, auth, rotas, mapa e campo inalterados
+- Mapa do cliente/empresa em view: `CustomerLocationMap` `readOnly`
+- Arquivos: `crud.tsx`, `CustomersPages.tsx`, `EmployeesPages.tsx`, `VehiclesPages.tsx`, `EditUserPage.tsx`, `CompanyAndUsers.tsx`, `CustomerLocationMap.tsx`
+- Docs: `DOCUMENTACAO-SISTEMA.md` §8, screens customers/employees/vehicles/settings-*, este changelog
+- Como validar: abrir qualquer `[id]` de cadastro → sem input até Editar; Cancelar; Salvar e conferir view
+
+## v0.16.13 — 2026-09-10
+
+### Multiempresa + tema claro/escuro + mapa stale
+
+- **Empresas:** papel `PLATFORM_ADMIN`; `GET/POST /companies`, `GET/PATCH /companies/:id`; telas `/settings/companies*`; seed promove admin demo; RolesGuard faz PLATFORM_ADMIN herdar ADMIN
+- **Tema:** toggle Claro/Escuro no menu da conta (`data-theme`, `localStorage` `samuel-theme`); padrão escuro; basemap Voyager no claro
+- **Mapa:** `GET /tracking/live` com `presence: stale` se última atualização > 30 s; poll 3 s + suavização inalterados
+- VPS: após migrate, promover operador se necessário (ver `docs/vps-atualizar.txt`)
+- Docs: hub §2–§4/§8, `modules/companies.md`, `screens/settings-companies.md`
+
+## v0.16.12 — 2026-09-10
+
+### Gestão admin de rotas (antes do Play)
+
+- ADMIN/MANAGER em **Rotas de hoje**: painel **Gerir** para cancelar, trocar funcionário/veículo/data e alterar paradas (ordem, incluir visitas livres, remover)
+- API: `PATCH /api/v1/routes/:id`, `POST /api/v1/routes/:id/cancel` — só `PLANNED`|`PUBLISHED`; libera visitas; apaga stops no cancel
+- SUPERVISOR: **Ver** (somente leitura)
+- Fora de escopo: editar/cancelar `IN_PROGRESS`; criar OS no PATCH
+- Docs: `docs/modules/routes.md`, `docs/screens/routes.md`, `docs/API.md`, hub §8
+
+## v0.16.11 — 2026-09-10
+
+### Marcos — marcar só com Gravar viagem; alerta em toda a rota
+
+- Sintoma: botões Porteira/Ponte/Bifurcação/Estrada ruim apareciam em qualquer navegação; alerta e ícones olhavam só a próxima parada; no `/map` a rota pintada não mostrava marcos sem clicar no pin
+- Correção: EMPLOYEE só cria marco se a rota `IN_PROGRESS` tem `recordTrip` (`LANDMARK_RECORD_TRIP_REQUIRED`); UI esconde botões sem Gravar viagem; proximidade/ícones usam marcos de **todas** as paradas; `/map` carrega marcos dos clientes ao pintar a rota
+- Persistência: `CustomerLandmark` por cliente continua valendo em rotas/mapas futuros
+- Arquivos: `access-path.util.ts`, `customers.service.ts`, `FieldNavigatePage.tsx`, `OperationalMap.tsx`, `access-path.spec.ts`
+- Docs: `DOCUMENTACAO-SISTEMA.md` §8, `field-navigate.md`, `map.md`, `modules/routes.md`, `API.md`, este changelog
+- Como validar: rota sem Gravar → sem botões, com banner se o cliente já tem marco; rota com Gravar → marcar Porteira → `/map` pin e rota pintada mostram ícone; rota futura do mesmo cliente alerta ≤120 m
+
+## v0.16.10 — 2026-09-10
+
+### EMPLOYEE sem catálogo Clientes
+
+- Regra: funcionário de campo **não** acessa /customers (listar/criar/prontuário)
+- API: GET/POST /customers, GET /customers/:id e ops customers/summary|list-enriched|:id sem EMPLOYEE (403); POST .../landmarks mantido (regras existentes)
+- UI: nav Clientes só ADMIN/MANAGER/SUPERVISOR; capa campo sem botão Clientes; URL /customers* redireciona para Minha rota; nome do cliente em Minha rota sem link ao prontuário
+- Como validar: login EMPLOYEE → sem Clientes na nav; /customers → Minha rota; gestor continua CRUD normal
+
+## v0.16.9 — 2026-09-10
+
+### UX — loading e anti-duplo-clique em mutações
+
+- Sintoma: toque/clique repetido em Publicar, Iniciar rota, Salvar, Cancelar OS e formulários podia disparar POST/PATCH duplicado; feedback inconsistente entre telas
+- Correção: primitives `useAsyncAction`, `ActionButton`, `LoadingOverlay`, `SubmitButton` em `components/ui`; `FormCard` desabilita campos enquanto salva; handlers com trava de reentrada; overlay em publicar rotas e iniciar rota (pending **antes** do GPS)
+- Arquivos: `hooks/useAsyncAction.ts`, `components/ui/*`, `RoutesPlanner*.tsx`, `FieldStartRoutePage.tsx`, `FieldMyRoutePage.tsx`, `ServicesPages.tsx`, auth forms, `UserMenu.tsx`, `crud.tsx`
+- Docs: PRD-UX §0.6, `routes.md`, `field-start-route.md`, `services.md`, este changelog
+- Como validar: double-tap em Publicar / Iniciar / Salvar cliente / Cancelar OS / Login — uma chamada de rede; botão fica disabled até concluir; overlay em publicar e iniciar
+
+## v0.16.6 — 2026-09-10
+
+### Navegação — auto-centralizar no start + botão alvo mais alto
+
+- Sintoma: ao iniciar a rota em `/field/navigate`, o mapa ficava em overview (carro + 1ª parada / geometria publicada) e não centralizava sozinho no GPS; botão Centralizar ficava baixo (`bottom-36`) e colidia com o HUD
+- Causa: `followCamera` inicial fazia `fitBounds` + `setTimeout(450)` em vez de ir direto ao carro; alvo com offset fixo
+- Correção: `jumpTo` imediato no carro no 1º GPS / `onLoad` se já houver fix; follow contínuo no ícone interpolado; botão ancorado acima do HUD (`-top-14` / `sm:-top-16`)
+- Arquivos: `FieldNavigatePage.tsx`
+- Docs: `field-navigate.md`, PRD-UX §5.3, este changelog
+- Como validar: Play com GPS → mapa abre no carro (zoom ~16) sem tocar no alvo; arrastar → alvo escuro; tocar alvo → recentraliza; mobile/desktop botão acima dos marcos/HUD
+
+## v0.16.5 — 2026-09-10
+
+### Marcos no mapa — ícones no lugar de abreviações
+
+- Sintoma: pins de porteira/bifurcação/etc. no `/map` e `/field/navigate` usavam texto (`Por`, `Bif`, …) e poluíam o mapa
+- Correção: componente compartilhado `LandmarkMapMarker` com SVG por tipo; `title`/`aria-label` em português; botões e banner de proximidade inalterados
+- Como validar: cliente com marcos em `/map` → ícones na trilha; navegação de campo → ícones na próxima parada; hover mostra Porteira/Bifurcação/…
+
 ## v0.16.4 — 2026-09-09
 
 ### Planejador — origem do cálculo (funcionário vs empresa)

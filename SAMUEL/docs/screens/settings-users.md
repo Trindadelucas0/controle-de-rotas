@@ -137,15 +137,15 @@ Criar EMPLOYEE → logar com senha inicial.
 
 - Rota: `/settings/users/[id]`
 - Papéis: ADMIN
-- Arquivo: `EditUserPage.tsx`
+- Arquivo: `EditUserPage.tsx` + `EditableRecordShell`
 
 ### 2. Componentes
 
 ```
-PageHeader “Editar usuário”
+PageHeader “Usuário” + e-mail
 ├── msg sucesso
-├── FormCard Salvar: Nome, Perfil, Status
-└── FormCard Redefinir senha: Nova senha
+├── EditableRecordShell (perfil: view → Editar → FormCard Nome/Perfil/Status)
+└── botão “Redefinir senha” → FormCard Nova senha (expansível)
 ```
 
 ### 3. Informação
@@ -166,12 +166,12 @@ N/A.
 
 | Ação | API |
 | --- | --- |
-| Salvar | `PATCH /users/:id` |
+| Editar / Cancelar / Salvar | `PATCH /users/:id` (Salvar) |
 | Redefinir senha | `POST /users/:id/reset-password` |
 
 ### 7. Estados
 
-loading skeleton | error load | saving | resetting | success msgs
+loading skeleton | view | edit | error load | saving | resetting | success msgs
 
 ### 8. Permissões
 
@@ -183,7 +183,7 @@ De: lista; link em `/employees/[id]` quando há `userId`.
 
 ### 10. Mobile / PWA
 
-Dois FormCards empilhados.
+Perfil + reset empilhados.
 
 ### 11. Fora de escopo
 

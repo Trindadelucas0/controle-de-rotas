@@ -12,6 +12,8 @@ import {
 
 const LIVE_TTL_SEC = 120;
 const LIVE_SET_TTL_SEC = 3600;
+/** Após este tempo sem atualização, o pin no mapa fica visualmente stale. */
+const LIVE_STALE_MS = 30_000;
 
 export type LiveVehiclePosition = {
   employeeId: string;
@@ -214,7 +216,10 @@ export class TrackingService {
         staleIds.push(employeeId);
         continue;
       }
-      positions.push({ ...pos, presence: 'online' });
+      const updatedMs = Date.parse(pos.updatedAt || pos.recordedAt);
+      const ageMs = Number.isFinite(updatedMs) ? Date.now() - updatedMs : LIVE_STALE_MS + 1;
+      const presence: 'online' | 'stale' = ageMs > LIVE_STALE_MS ? 'stale' : 'online';
+      positions.push({ ...pos, presence });
     }
 
     if (staleIds.length) {
@@ -265,6 +270,58 @@ export class TrackingService {
       longitude: row.longitude,
       recordedAt: row.recordedAt.toISOString(),
       source: 'tracking_history',
+    };
+  }
+
+  /**
+   * Trilha GPS congelada de uma rota (gestor). Isolada por companyId.
+   * Downsample se > 2000 pontos.
+   */
+  async routeHistory(user: AuthUser, routeId: string) {
+    if (user.role === UserRole.EMPLOYEE) {
+      throw httpError(
+        HttpStatus.FORBIDDEN,
+        'TRACKING_HISTORY_FORBIDDEN',
+        'Funcionário de campo não acessa o histórico de trilha.',
+      );
+    }
+
+    const route = await this.prisma.route.findFirst({
+      where: { id: routeId, companyId: user.companyId },
+      select: { id: true, status: true },
+    });
+    if (!route) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
+    }
+
+    const rows = await this.prisma.trackingPoint.findMany({
+      where: { companyId: user.companyId, routeId: route.id },
+      orderBy: { recordedAt: 'asc' },
+      select: { latitude: true, longitude: true, recordedAt: true },
+    });
+
+    const MAX = 2000;
+    const sampled =
+      rows.length <= MAX
+        ? rows
+        : rows.filter((_, i) => i === 0 || i === rows.length - 1 || i % Math.ceil(rows.length / MAX) === 0);
+
+    const points = sampled.map((p) => ({
+      lat: p.latitude,
+      lng: p.longitude,
+      recordedAt: p.recordedAt.toISOString(),
+    }));
+
+    const coordinates: [number, number][] = points.map((p) => [p.lng, p.lat]);
+
+    return {
+      routeId: route.id,
+      status: route.status,
+      points,
+      geometry:
+        coordinates.length >= 2
+          ? { type: 'LineString' as const, coordinates }
+          : null,
     };
   }
 }

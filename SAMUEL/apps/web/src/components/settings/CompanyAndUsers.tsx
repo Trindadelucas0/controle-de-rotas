@@ -2,7 +2,17 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-client';
-import { FieldGrid, FormCard, FormSection, PageHeader, TextField, SelectField } from '@/components/ui/crud';
+import {
+  DetailItem,
+  DetailSection,
+  EditableRecordShell,
+  FieldGrid,
+  FormCard,
+  FormSection,
+  PageHeader,
+  TextField,
+  SelectField,
+} from '@/components/ui/crud';
 import { CustomerLocationMap } from '@/components/customers/CustomerLocationMap';
 
 export type CompanyDto = {
@@ -33,6 +43,17 @@ type AddressSuggestion = {
 
 type LookupHint = 'idle' | 'loading' | 'ok' | 'not_found' | 'rate_limit' | 'error';
 
+type CompanyFormState = {
+  name: string;
+  tradeName: string;
+  document: string;
+  phone: string;
+  email: string;
+  address: string;
+  zipCode: string;
+  status: string;
+};
+
 function digitsOnly(v: string) {
   return v.replace(/\D/g, '');
 }
@@ -45,8 +66,8 @@ function hintMessage(kind: 'cep' | 'address', hint: LookupHint): string | null {
   return null;
 }
 
-export function CompanySettingsPage() {
-  const [form, setForm] = useState({
+function emptyForm(): CompanyFormState {
+  return {
     name: '',
     tradeName: '',
     document: '',
@@ -55,7 +76,25 @@ export function CompanySettingsPage() {
     address: '',
     zipCode: '',
     status: 'ACTIVE',
-  });
+  };
+}
+
+function formFromCompany(c: CompanyDto): CompanyFormState {
+  return {
+    name: c.name || '',
+    tradeName: c.tradeName || '',
+    document: c.document || '',
+    phone: c.phone || '',
+    email: c.email || '',
+    address: c.address || '',
+    zipCode: '',
+    status: c.status || 'ACTIVE',
+  };
+}
+
+export function CompanySettingsPage() {
+  const [saved, setSaved] = useState<CompanyDto | null>(null);
+  const [form, setForm] = useState<CompanyFormState>(emptyForm);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [addressQuery, setAddressQuery] = useState('');
@@ -66,6 +105,8 @@ export function CompanySettingsPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ok, setOk] = useState(false);
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [formKey, setFormKey] = useState(0);
 
   const appliedCep = useRef<string | null>(null);
   const cepAbort = useRef<AbortController | null>(null);
@@ -76,29 +117,27 @@ export function CompanySettingsPage() {
     setLongitude(lng);
   }, []);
 
+  function applyCompany(c: CompanyDto) {
+    setSaved(c);
+    setForm(formFromCompany(c));
+    setLatitude(c.latitude ?? null);
+    setLongitude(c.longitude ?? null);
+    setAddressQuery(c.address || '');
+    appliedCep.current = null;
+    setSuggestions([]);
+    setCepHint('idle');
+    setAddressHint('idle');
+  }
+
   useEffect(() => {
     apiFetch<{ company: CompanyDto }>('/api/v1/companies/me')
-      .then((r) => {
-        const c = r.company;
-        setForm({
-          name: c.name || '',
-          tradeName: c.tradeName || '',
-          document: c.document || '',
-          phone: c.phone || '',
-          email: c.email || '',
-          address: c.address || '',
-          zipCode: '',
-          status: c.status || 'ACTIVE',
-        });
-        setLatitude(c.latitude ?? null);
-        setLongitude(c.longitude ?? null);
-        if (c.address) setAddressQuery(c.address);
-      })
+      .then((r) => applyCompany(r.company))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Falha ao carregar'))
       .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
+    if (mode !== 'edit') return;
     const cep = digitsOnly(form.zipCode);
     if (cep.length !== 8) {
       if (cepHint === 'loading') setCepHint('idle');
@@ -164,9 +203,10 @@ export function CompanySettingsPage() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [form.zipCode, setPin]);
+  }, [form.zipCode, setPin, mode]);
 
   useEffect(() => {
+    if (mode !== 'edit') return;
     const q = addressQuery.trim();
     if (q.length < 3) {
       setSuggestions([]);
@@ -196,7 +236,7 @@ export function CompanySettingsPage() {
 
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [addressQuery]);
+  }, [addressQuery, mode]);
 
   function applySuggestion(s: AddressSuggestion) {
     setForm((prev) => ({
@@ -217,7 +257,7 @@ export function CompanySettingsPage() {
     setError(null);
     setOk(false);
     try {
-      await apiFetch('/api/v1/companies/me', {
+      const r = await apiFetch<{ company: CompanyDto }>('/api/v1/companies/me', {
         method: 'PATCH',
         body: JSON.stringify({
           name: form.name.trim(),
@@ -231,7 +271,9 @@ export function CompanySettingsPage() {
           status: form.status,
         }),
       });
+      applyCompany(r.company);
       setOk(true);
+      setMode('view');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha de rede');
     } finally {
@@ -240,9 +282,13 @@ export function CompanySettingsPage() {
   }
 
   if (loading) return <div className="h-40 animate-pulse rounded-2xl bg-surface" />;
+  if (!saved) {
+    return <p className="text-sm text-[var(--danger)]">{error ?? 'Empresa não encontrada'}</p>;
+  }
 
   const cepMsg = hintMessage('cep', cepHint);
   const addressMsg = hintMessage('address', addressHint);
+  const statusLabel = saved.status === 'ACTIVE' ? 'Ativa' : saved.status === 'INACTIVE' ? 'Inativa' : saved.status;
 
   return (
     <div>
@@ -251,128 +297,189 @@ export function CompanySettingsPage() {
         subtitle="Dados cadastrais e origem no mapa para cálculo de rotas"
       />
       {ok ? <p className="mb-4 text-sm text-[var(--ok)]">Salvo com sucesso.</p> : null}
-      <FormCard error={error} onSubmit={onSubmit} loading={saving} submitLabel="Salvar">
-        <FormSection title="Identificação">
-          <FieldGrid>
-            <TextField
-              field={{
-                name: 'name',
-                label: 'Razão social / Nome',
-                value: form.name,
-                required: true,
-                onChange: (v) => setForm({ ...form, name: v }),
-              }}
-            />
-            <TextField
-              field={{
-                name: 'tradeName',
-                label: 'Nome fantasia',
-                value: form.tradeName,
-                onChange: (v) => setForm({ ...form, tradeName: v }),
-              }}
-            />
-            <TextField
-              field={{
-                name: 'document',
-                label: 'CNPJ',
-                value: form.document,
-                onChange: (v) => setForm({ ...form, document: v }),
-              }}
-            />
-          </FieldGrid>
-        </FormSection>
-        <FormSection title="Contato">
-          <FieldGrid>
-            <TextField
-              field={{
-                name: 'phone',
-                label: 'Telefone',
-                value: form.phone,
-                onChange: (v) => setForm({ ...form, phone: v }),
-              }}
-            />
-            <TextField
-              field={{
-                name: 'email',
-                label: 'E-mail',
-                type: 'email',
-                value: form.email,
-                onChange: (v) => setForm({ ...form, email: v }),
-              }}
-            />
-          </FieldGrid>
-        </FormSection>
-        <FormSection title="Origem para rotas" hint="O pin da empresa é o ponto E das rotas.">
-          <TextField
-            field={{
-              name: 'zipCode',
-              label: 'CEP',
-              value: form.zipCode,
-              onChange: (v) => setForm({ ...form, zipCode: v }),
-            }}
-          />
-          {cepMsg && cepHint !== 'ok' ? <p className="text-xs text-[var(--warn)]">{cepMsg}</p> : null}
-          <div>
-            <label htmlFor="company-address-search" className="ops-label">
-              Buscar endereço
-            </label>
-            <input
-              id="company-address-search"
-              value={addressQuery}
-              onChange={(e) => setAddressQuery(e.target.value)}
-              placeholder="Rua, bairro, cidade…"
-              className="ops-input"
-              autoComplete="off"
-            />
-            {addressMsg && addressHint !== 'ok' ? (
-              <p className="mt-1 text-xs text-[var(--warn)]">{addressMsg}</p>
-            ) : null}
-            {suggestions.length > 0 ? (
-              <ul className="mt-1 max-h-40 overflow-auto rounded-[6px] border border-[var(--border)] bg-surface text-sm">
-                {suggestions.map((s) => (
-                  <li key={`${s.label}-${s.latitude}-${s.longitude}`}>
-                    <button
-                      type="button"
-                      className="w-full px-3 py-2 text-left hover:bg-white/[0.04]"
-                      onClick={() => applySuggestion(s)}
-                    >
-                      {s.label}
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
-          <TextField
-            field={{
-              name: 'address',
-              label: 'Endereço (texto)',
-              value: form.address,
-              onChange: (v) => setForm({ ...form, address: v }),
-            }}
-          />
-          <CustomerLocationMap
-            latitude={latitude}
-            longitude={longitude}
-            onPinChange={setPin}
-            required={false}
-            title="Origem no mapa (rotas)"
-            pinLabel="Pin da empresa"
-          />
-        </FormSection>
-        <FormSection title="Situação">
-          <SelectField
-            name="status"
-            label="Status"
-            value={form.status}
-            onChange={(v) => setForm({ ...form, status: v })}
-            options={[
-              { value: 'ACTIVE', label: 'Ativa' },
-              { value: 'INACTIVE', label: 'Inativa' },
-            ]}
-          />
-        </FormSection>
-      </FormCard>
+      <EditableRecordShell
+        mode={mode}
+        onEdit={() => {
+          setOk(false);
+          setError(null);
+          applyCompany(saved);
+          setMode('edit');
+        }}
+        onCancel={() => {
+          applyCompany(saved);
+          setFormKey((k) => k + 1);
+          setError(null);
+          setMode('view');
+        }}
+        view={
+          <>
+            <DetailSection title="Identificação">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Razão social / Nome" value={saved.name} />
+                <DetailItem label="Nome fantasia" value={saved.tradeName} />
+                <DetailItem label="CNPJ" value={saved.document} />
+              </dl>
+            </DetailSection>
+            <DetailSection title="Contato">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Telefone" value={saved.phone} />
+                <DetailItem label="E-mail" value={saved.email} />
+              </dl>
+            </DetailSection>
+            <DetailSection title="Origem para rotas" hint="O pin da empresa é o ponto E das rotas.">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Endereço" value={saved.address} className="sm:col-span-2" />
+                <DetailItem
+                  label="Latitude"
+                  value={saved.latitude != null ? String(saved.latitude) : null}
+                />
+                <DetailItem
+                  label="Longitude"
+                  value={saved.longitude != null ? String(saved.longitude) : null}
+                />
+                <DetailItem label="Situação do pin" value={saved.locationStatus} />
+              </dl>
+              <CustomerLocationMap
+                latitude={saved.latitude}
+                longitude={saved.longitude}
+                readOnly
+                required={false}
+                title="Origem no mapa (rotas)"
+                pinLabel="Pin da empresa"
+              />
+            </DetailSection>
+            <DetailSection title="Situação">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Status" value={statusLabel} />
+              </dl>
+            </DetailSection>
+          </>
+        }
+        edit={
+          <FormCard key={formKey} error={error} onSubmit={onSubmit} loading={saving} submitLabel="Salvar">
+            <FormSection title="Identificação">
+              <FieldGrid>
+                <TextField
+                  field={{
+                    name: 'name',
+                    label: 'Razão social / Nome',
+                    value: form.name,
+                    required: true,
+                    onChange: (v) => setForm({ ...form, name: v }),
+                  }}
+                />
+                <TextField
+                  field={{
+                    name: 'tradeName',
+                    label: 'Nome fantasia',
+                    value: form.tradeName,
+                    onChange: (v) => setForm({ ...form, tradeName: v }),
+                  }}
+                />
+                <TextField
+                  field={{
+                    name: 'document',
+                    label: 'CNPJ',
+                    value: form.document,
+                    onChange: (v) => setForm({ ...form, document: v }),
+                  }}
+                />
+              </FieldGrid>
+            </FormSection>
+            <FormSection title="Contato">
+              <FieldGrid>
+                <TextField
+                  field={{
+                    name: 'phone',
+                    label: 'Telefone',
+                    value: form.phone,
+                    onChange: (v) => setForm({ ...form, phone: v }),
+                  }}
+                />
+                <TextField
+                  field={{
+                    name: 'email',
+                    label: 'E-mail',
+                    type: 'email',
+                    value: form.email,
+                    onChange: (v) => setForm({ ...form, email: v }),
+                  }}
+                />
+              </FieldGrid>
+            </FormSection>
+            <FormSection title="Origem para rotas" hint="O pin da empresa é o ponto E das rotas.">
+              <TextField
+                field={{
+                  name: 'zipCode',
+                  label: 'CEP',
+                  value: form.zipCode,
+                  onChange: (v) => setForm({ ...form, zipCode: v }),
+                }}
+              />
+              {cepMsg && cepHint !== 'ok' ? <p className="text-xs text-[var(--warn)]">{cepMsg}</p> : null}
+              <div>
+                <label htmlFor="company-address-search" className="ops-label">
+                  Buscar endereço
+                </label>
+                <input
+                  id="company-address-search"
+                  value={addressQuery}
+                  onChange={(e) => setAddressQuery(e.target.value)}
+                  placeholder="Rua, bairro, cidade…"
+                  className="ops-input"
+                  autoComplete="off"
+                />
+                {addressMsg && addressHint !== 'ok' ? (
+                  <p className="mt-1 text-xs text-[var(--warn)]">{addressMsg}</p>
+                ) : null}
+                {suggestions.length > 0 ? (
+                  <ul className="mt-1 max-h-40 overflow-auto rounded-[6px] border border-[var(--border)] bg-surface text-sm">
+                    {suggestions.map((s) => (
+                      <li key={`${s.label}-${s.latitude}-${s.longitude}`}>
+                        <button
+                          type="button"
+                          className="w-full px-3 py-2 text-left hover:bg-white/[0.04]"
+                          onClick={() => applySuggestion(s)}
+                        >
+                          {s.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </div>
+              <TextField
+                field={{
+                  name: 'address',
+                  label: 'Endereço (texto)',
+                  value: form.address,
+                  onChange: (v) => setForm({ ...form, address: v }),
+                }}
+              />
+              <CustomerLocationMap
+                latitude={latitude}
+                longitude={longitude}
+                onPinChange={setPin}
+                required={false}
+                title="Origem no mapa (rotas)"
+                pinLabel="Pin da empresa"
+              />
+            </FormSection>
+            <FormSection title="Situação">
+              <SelectField
+                name="status"
+                label="Status"
+                value={form.status}
+                onChange={(v) => setForm({ ...form, status: v })}
+                options={[
+                  { value: 'ACTIVE', label: 'Ativa' },
+                  { value: 'INACTIVE', label: 'Inativa' },
+                ]}
+              />
+            </FormSection>
+          </FormCard>
+        }
+      />
     </div>
   );
 }

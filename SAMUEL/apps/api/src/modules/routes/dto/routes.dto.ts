@@ -17,6 +17,9 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 
+export const ROUTE_ORIGIN_MODES = ['EMPLOYEE_LAST', 'COMPANY'] as const;
+export type RouteOriginMode = (typeof ROUTE_ORIGIN_MODES)[number];
+
 export class PreviewRouteDto {
   @IsArray()
   @ArrayMinSize(1)
@@ -27,6 +30,11 @@ export class PreviewRouteDto {
   @IsOptional()
   @IsBoolean()
   roundtrip?: boolean;
+
+  /** Aceito e ignorado no preview por visitas (origem fixa = empresa). */
+  @IsOptional()
+  @IsIn([...ROUTE_ORIGIN_MODES])
+  originMode?: RouteOriginMode;
 }
 
 export class CreateRouteStopDto {
@@ -73,6 +81,11 @@ export class CreateRouteDto {
   @IsBoolean()
   recordTrip?: boolean;
 
+  /** Aceito e ignorado no create/update (origem calculada no servidor). */
+  @IsOptional()
+  @IsIn([...ROUTE_ORIGIN_MODES])
+  originMode?: RouteOriginMode;
+
   @IsOptional()
   @IsInt()
   @Min(0)
@@ -92,6 +105,9 @@ export class CreateRouteDto {
   quality?: string;
 }
 
+/** ADMIN/MANAGER: altera rota ainda não iniciada (PLANNED | PUBLISHED). */
+export class UpdateRouteDto extends CreateRouteDto {}
+
 export class ListRoutesQueryDto {
   @IsOptional()
   @IsDateString()
@@ -101,9 +117,6 @@ export class ListRoutesQueryDto {
   @IsUUID('4')
   employeeId?: string;
 }
-
-export const ROUTE_ORIGIN_MODES = ['EMPLOYEE_LAST', 'COMPANY'] as const;
-export type RouteOriginMode = (typeof ROUTE_ORIGIN_MODES)[number];
 
 export class PreviewCustomersRouteDto {
   @IsArray()
@@ -126,7 +139,7 @@ export class PreviewCustomersRouteDto {
   @IsDateString()
   date?: string;
 
-  /** Grava trilha real até o cliente; exige exatamente 1 cliente. */
+  /** Grava trilha real até cada cliente no Cheguei; aplica a todas as rotas do lote. */
   @IsOptional()
   @IsBoolean()
   recordTrip?: boolean;
@@ -137,8 +150,12 @@ export class PreviewCustomersRouteDto {
   originMode?: RouteOriginMode;
 }
 
-export class DispatchCustomersRouteDto extends PreviewCustomersRouteDto {}
-
+export class DispatchCustomersRouteDto extends PreviewCustomersRouteDto {
+  /** Redeclarado: Nest whitelist + extends vazio às vezes ignora o campo do pai. */
+  @IsOptional()
+  @IsIn([...ROUTE_ORIGIN_MODES])
+  declare originMode?: RouteOriginMode;
+}
 export const ROUTE_START_FUEL_LEVELS = [
   'EMPTY',
   'QUARTER',
@@ -184,4 +201,12 @@ export class RerouteRouteDto {
   /** Se true, reordena paradas pendentes mais perto → mais longe. */
   @IsBoolean()
   reorderRemaining!: boolean;
+}
+
+export const ROUTE_COMPLETE_MODES = ['COMPLETED', 'INCOMPLETE'] as const;
+export type RouteCompleteMode = (typeof ROUTE_COMPLETE_MODES)[number];
+
+export class CompleteRouteDto {
+  @IsIn([...ROUTE_COMPLETE_MODES])
+  mode!: RouteCompleteMode;
 }

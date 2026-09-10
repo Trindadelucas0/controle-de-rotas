@@ -1,7 +1,7 @@
-import { Body, Controller, Get, Post, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { TrackingService } from './tracking.service';
-import { PostTrackingPointsDto } from './dto/tracking.dto';
+import { PostTrackingPointsDto, TrackingHistoryQueryDto } from './dto/tracking.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser, Roles, AuthUser } from '../auth/decorators/auth.decorators';
@@ -21,5 +21,11 @@ export class TrackingController {
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
   live(@CurrentUser() user: AuthUser) {
     return this.trackingService.listLive(user);
+  }
+
+  @Get('history')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
+  history(@CurrentUser() user: AuthUser, @Query() query: TrackingHistoryQueryDto) {
+    return this.trackingService.routeHistory(user, query.routeId);
   }
 }

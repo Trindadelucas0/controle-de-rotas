@@ -97,6 +97,7 @@ export class OpsService {
                 RouteStatus.PUBLISHED,
                 RouteStatus.IN_PROGRESS,
                 RouteStatus.COMPLETED,
+                RouteStatus.INCOMPLETE,
                 RouteStatus.ASSIGNED,
               ],
             },

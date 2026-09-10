@@ -47,7 +47,7 @@ Proxy BrasilAPI + Nominatim ? detalhes em [modules/lookups.md](modules/lookups.m
 - `GET /map/customers?q&status` ? pins
 - `GET /map/customers/nearby?lat&lng&radiusMeters` ? PostGIS `ST_DWithin`
 - `POST /customers/:id/geocode` — Nominatim (ADMIN/MANAGER)
-- `POST /customers/:id/landmarks` — `{ type: PORTEIRA|PONTE|BIFURCACAO|ESTRADA_RUIM, latitude, longitude, note? }` (ADMIN/MANAGER; EMPLOYEE só se rota IN_PROGRESS desse cliente)
+- `POST /customers/:id/landmarks` — `{ type: PORTEIRA|PONTE|BIFURCACAO|ESTRADA_RUIM, latitude, longitude, note? }` (ADMIN/MANAGER; EMPLOYEE só se rota IN_PROGRESS desse cliente **com** `recordTrip`; senão 403 `LANDMARK_RECORD_TRIP_REQUIRED`)
 - `GET /customers/:id/access` — `{ accessPath, landmarks }` (ADMIN/MANAGER)
 - Check-in visita (`POST /visits/:id/check-in`): se a rota tem `recordTrip`, merge `trailPoints` (máx. 500, 24 h) + TrackingPoint → `CustomerAccessPath` ACTIVE; resposta `{ visit, accessPath: { saved, reason? } }`; check-out tenta de novo se ainda não houver path dessa rota
 
@@ -81,15 +81,15 @@ Detalhes: [modules/visits.md](modules/visits.md). UI: `/agenda`.
 Detalhes: [modules/routes.md](modules/routes.md). UI: `/routes` (modos Clientes + Visitas).
 
 - `POST /routes/preview` ? `{ visitIds, roundtrip? }`
-- `POST /routes/preview-customers` — `{ customerIds, employeeIds, roundtrip?, date?, recordTrip?, originMode? }` (`originMode`: `EMPLOYEE_LAST` padrão ou `COMPANY`; 1–25 clientes, 1–8 funcionários com login; sem persistir; inclui `dayLoad` + `startOrigin`); ordem das paradas = **mais perto → mais longe** da origem escolhida; `recordTrip: true` exige exatamente 1 cliente
+- `POST /routes/preview-customers` — `{ customerIds, employeeIds, roundtrip?, date?, recordTrip?, originMode? }` (`originMode`: `EMPLOYEE_LAST` padrão ou `COMPANY`; 1–25 clientes, 1–8 funcionários com login; sem persistir; inclui `dayLoad` + `startOrigin`); ordem das paradas = **mais perto → mais longe** da origem escolhida; `recordTrip: true` grava trilha em **todas** as rotas do lote (1+ clientes)
 - `POST /routes/dispatch-customers` — mesmo body; cria OS+visitas+rotas `PUBLISHED` + `plannedStepsJson` + `recordTrip` (ADMIN/MANAGER); **permite várias rotas no dia**; reusa veículo do dia; `origin*` = início do traçado (funcionário ou E); roundtrip volta ao E; se cliente tem `CustomerAccessPath` ACTIVE e a rota tem 1 parada, usa geometria gravada **recortada a partir da origem** (não a trilha inteira)
-- `GET /routes`, `POST /routes` (`recordTrip?`), `GET /routes/:id`, `POST /routes/:id/publish`
+- `GET /routes`, `POST /routes` (`recordTrip?`), `GET /routes/:id`, `PATCH /routes/:id` (ADMIN/MANAGER; só `PLANNED`|`PUBLISHED`), `POST /routes/:id/publish`, `POST /routes/:id/cancel` (idem)
 - `POST /routes/:id/start` — EMPLOYEE atribuído → `IN_PROGRESS`; body wizard: `vehicleId`, `startOdometerKm`, `startFuelLevel`, `latitude`, `longitude`, `startNotes?`; grava checklist + GPS inicial; **reordena paradas da mais perto para a mais longe** (GPS do celular) e recalcula geometria/manobras (trilha ACTIVE recortada no GPS); roundtrip volta ao E; erro `ROUTE_ALREADY_ACTIVE` se já houver outra
 - `POST /routes/:id/reroute` — EMPLOYEE atribuído + rota `IN_PROGRESS`; body `{ latitude, longitude, reorderRemaining }`; recalcula geometry/steps a partir do GPS (mesmo recorte de trilha); `reorderRemaining: true` = pendentes mais perto→mais longe; rate limit Redis 30/min (mesmo preview)
-- `POST /routes/:id/complete` — EMPLOYEE atribuído → `COMPLETED` + `actualDurationSeconds`
+- `POST /routes/:id/complete` — EMPLOYEE atribuído; body `{ mode: "COMPLETED" | "INCOMPLETE" }`; `actualDurationSeconds`; paradas `PENDING` → `SKIPPED`. `COMPLETED` se 0 pendentes **ou** distância restante planejada ≤ **500 m**; senão só `INCOMPLETE` (se o cliente mandar `INCOMPLETE` com ≤500 m, a API promove para `COMPLETED`). Visita `ARRIVED`/`IN_PROGRESS` → `ROUTE_HAS_OPEN_VISIT`. Status final: `COMPLETED` ou `INCOMPLETE`.
 - Motor: OSRM (`OSRM_URL`) + fallback + access path ACTIVE (1 parada); rate limit Redis 30/min no preview/dispatch-customers/reroute
 - Dia operacional: `APP_TIMEZONE` (default `America/Sao_Paulo`) quando `date` omitido no body
-- Erros frequentes: `CUSTOMER_NO_PIN`, `EMPLOYEE_LOGIN_REQUIRED`, `ROUTE_NOT_ENOUGH_VEHICLES`, `ROUTE_ALREADY_ACTIVE`, `ROUTE_NOT_IN_PROGRESS`, `ROUTE_RATE_LIMITED`, `ROUTE_RECORD_TRIP_SINGLE_CUSTOMER`
+- Erros frequentes: `CUSTOMER_NO_PIN`, `EMPLOYEE_LOGIN_REQUIRED`, `ROUTE_NOT_ENOUGH_VEHICLES`, `ROUTE_ALREADY_ACTIVE`, `ROUTE_NOT_IN_PROGRESS`, `ROUTE_NOT_EDITABLE`, `ROUTE_RATE_LIMITED`, `ROUTE_RECORD_TRIP_NO_CUSTOMERS`
 
 ## Field / Tracking (EMPLOYEE envia; gestores leem)
 
@@ -104,6 +104,7 @@ Detalhes: [modules/tracking.md](modules/tracking.md). UI: `/field/my-route`, `/f
   - Redis = posição atual (sempre); PostGIS = histórico amostrado (~25 m ou ~15 s)
   - resposta `{ accepted, persisted }`
 - `GET /tracking/live` — posições atuais (Redis); poll no mapa do gestor
+- `GET /tracking/history?routeId=` — trilha GPS congelada (ADMIN/MANAGER/SUPERVISOR; isolamento por empresa); `{ routeId, status, points, geometry }`
 - PWA: seed coarse + `watchPosition` (sem timeout) + amostragem no cliente (≥15 m ou ≥5 s; com `recordTrip` ≥5 m ou ≥2 s) via `startRouteGpsWatch`; `requestCurrentPosition` progressivo (fino → rede)
 - Sem WebSocket neste release (mapa usa poll HTTP)
 
@@ -115,5 +116,5 @@ Detalhes: [modules/ops.md](modules/ops.md). UI: `/`, `/map`, listas Recursos, `/
 - Summaries: `/ops/customers|employees|vehicles|service-orders|routes|agenda/summary`
 - Context: `/ops/customers|employees|vehicles|service-orders/:id`
 - Listas enriquecidas: `/ops/customers|employees|vehicles/list-enriched`
-- EMPLOYEE: summaries clientes/agenda, context cliente, lista clientes enriquecida
+- EMPLOYEE: summary agenda; **sem** summaries/lista/context de clientes
 - Sem inventar m?tricas: `null` / "?" quando n?o h? check-in, KM real ou custo R$

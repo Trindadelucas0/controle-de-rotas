@@ -21,7 +21,8 @@ import {
   RouteOriginReturnRow,
   RouteOriginStartRow,
 } from './route-origin-ui';
-
+import { ActionButton } from '@/components/ui/ActionButton';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 type PlanVisit = {
   id: string;
   scheduledStart: string;
@@ -85,7 +86,8 @@ type Props = {
 
 export function RoutesPlannerVisits({ company }: Props) {
   const user = useSessionUser();
-  const canSave = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canSave =
+    user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN' || user?.role === 'MANAGER';
   const mapRef = useRef<MapRef>(null);
   const [visits, setVisits] = useState<PlanVisit[]>([]);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -262,7 +264,7 @@ export function RoutesPlannerVisits({ company }: Props) {
   }
 
   async function saveRoute(thenPublish: boolean) {
-    if (!preview || !canSave) return;
+    if (!preview || !canSave || saving || publishing) return;
     if (!employeeId || !vehicleId) {
       setError('Selecione funcionário e veículo para salvar a rota.');
       return;
@@ -358,8 +360,14 @@ export function RoutesPlannerVisits({ company }: Props) {
           };
         });
 
+  const busy = saving || publishing;
+
   return (
-    <div className="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col gap-3 lg:flex-row">
+    <div className="relative flex h-[calc(100vh-11rem)] min-h-[480px] flex-col gap-3 lg:flex-row">
+      <LoadingOverlay
+        show={busy}
+        label={publishing ? 'Publicando…' : 'Salvando…'}
+      />
       <aside className="flex w-full shrink-0 flex-col gap-3 overflow-auto rounded-2xl border border-brand-100 bg-surface p-4 lg:w-96">
         <div>
           <h2 className="text-lg font-semibold text-brand-900">Visitas agendadas</h2>
@@ -513,22 +521,25 @@ export function RoutesPlannerVisits({ company }: Props) {
               </select>
             </label>
             <div className="flex flex-col gap-2">
-              <button
-                type="button"
-                disabled={!preview || saving || publishing}
+              <ActionButton
+                variant="secondary"
+                disabled={!preview || busy}
+                loading={saving}
+                loadingLabel="Salvando…"
                 onClick={() => void saveRoute(false)}
-                className="rounded-xl border border-brand-200 px-3 py-2 text-sm font-medium disabled:opacity-60"
+                className="w-full justify-center"
               >
-                {saving ? 'Salvando…' : savedRouteId ? 'Já salva' : 'Salvar rota'}
-              </button>
-              <button
-                type="button"
-                disabled={!preview || saving || publishing}
+                {savedRouteId ? 'Já salva' : 'Salvar rota'}
+              </ActionButton>
+              <ActionButton
+                disabled={!preview || busy}
+                loading={publishing}
+                loadingLabel="Publicando…"
                 onClick={() => void saveRoute(true)}
-                className="rounded-xl bg-brand-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60"
+                className="w-full justify-center"
               >
-                {publishing ? 'Publicando…' : 'Publicar'}
-              </button>
+                Publicar
+              </ActionButton>
             </div>
           </div>
         ) : (

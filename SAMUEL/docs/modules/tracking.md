@@ -52,9 +52,10 @@ Temas 10–11. Isolamento por `companyId` do JWT. Transporte de localização: *
 ## POST /api/v1/routes/:id/complete
 
 - Auth: EMPLOYEE atribuído à rota
-- Pré: status `IN_PROGRESS` → `COMPLETED` + `actualDurationSeconds` (desde `startedAt`)
-- UI: botão Concluir em `/field/my-route` (libera Play na próxima rota do dia)
-- Erro: `ROUTE_NOT_IN_PROGRESS` (422)
+- Body: `{ mode: "COMPLETED" | "INCOMPLETE" }`
+- Pré: status `IN_PROGRESS`; grava `actualDurationSeconds`; PENDING → SKIPPED conforme regras de 500 m / incompleta
+- UI: arrastar em `/field/my-route` e `/field/navigate`
+- Erros: `ROUTE_NOT_IN_PROGRESS`, `ROUTE_HAS_PENDING_STOPS`, `ROUTE_HAS_OPEN_VISIT` (422)
 
 ## POST /api/v1/tracking/points
 
@@ -73,9 +74,17 @@ Temas 10–11. Isolamento por `companyId` do JWT. Transporte de localização: *
 
 ## GET /api/v1/tracking/live
 
+- Auth: ADMIN, MANAGER, SUPERVISOR (PLATFORM_ADMIN herda)
+- `{ positions: [{ employeeId, employeeName, vehiclePlate, latitude, longitude, presence, ... }] }`
+- `presence`: `online` se `updatedAt`/`recordedAt` há ≤30 s; senão `stale` (UI reduz opacidade)
+- Fonte: Redis (poll no mapa a cada **~3s**; interpolação do pin 3s); chave some após TTL ~120 s
+
+## GET /api/v1/tracking/history?routeId=
+
 - Auth: ADMIN, MANAGER, SUPERVISOR
-- `{ positions: [{ employeeId, employeeName, vehiclePlate, latitude, longitude, ... }] }`
-- Fonte: Redis (poll no mapa a cada **~3s**; interpolação do pin 3s)
+- Isolamento: `route.companyId === user.companyId`
+- Resposta: `{ routeId, status, points: [{ lat, lng, recordedAt }], geometry: LineString | null }`
+- Downsample se >2000 pontos; UI: linha âmbar no `/map` ao pintar rota terminal / deep-link `?routeId=`
 
 ## Checklist ponta solta
 

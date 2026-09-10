@@ -57,7 +57,7 @@ N/A.
 | already_active | 422 `ROUTE_ALREADY_ACTIVE` com data da rota travada + link “Ir para Minha rota e concluir” |
 | gpsError | texto vermelho no passo gps |
 | invalid km | “Informe o km inicial do veículo.” |
-| submitting | “Iniciando…” |
+| submitting | overlay + botão **Iniciando…** (pending desde o toque, antes do GPS); trava de reentrada |
 | success | redirect navigate |
 
 ### 8. Permissões

@@ -2,11 +2,13 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
+:root,
+html[data-theme='dark'] {
   --bg: #121212;
   --background: #121212;
   --surface: #1c1c1e;
   --surface-2: #242426;
+  --input-bg: #161618;
   --border: rgba(255, 255, 255, 0.08);
   --border-strong: rgba(255, 255, 255, 0.14);
   --ink: #f2f2f4;
@@ -25,6 +27,39 @@
   --radius-sm: 4px;
   --radius: 6px;
   --radius-md: 8px;
+  --map-ctrl-bg: #1c1c1e;
+  --map-ctrl-border: rgba(255, 255, 255, 0.1);
+  --map-attrib: #9a9aa0;
+  --ops-danger-text: #ff8a8d;
+  --input-hover-border: rgba(255, 255, 255, 0.2);
+}
+
+html[data-theme='light'] {
+  --bg: #f4f4f5;
+  --background: #f4f4f5;
+  --surface: #ffffff;
+  --surface-2: #ececee;
+  --input-bg: #ffffff;
+  --border: rgba(0, 0, 0, 0.08);
+  --border-strong: rgba(0, 0, 0, 0.16);
+  --ink: #1a1a1c;
+  --muted: #6b6b73;
+  --brand: #ff5722;
+  --accent: #ff5722;
+  --accent-hover: #e64a19;
+  --danger: #d92d20;
+  --danger-bg: rgba(217, 45, 32, 0.1);
+  --ok: #12b76a;
+  --ok-bg: rgba(18, 183, 106, 0.12);
+  --warn: #dc6803;
+  --warn-bg: rgba(220, 104, 3, 0.12);
+  --route: #0d9488;
+  --focus: #ff5722;
+  --map-ctrl-bg: #ffffff;
+  --map-ctrl-border: rgba(0, 0, 0, 0.12);
+  --map-attrib: #6b6b73;
+  --ops-danger-text: #d92d20;
+  --input-hover-border: rgba(0, 0, 0, 0.28);
 }
 
 html,
@@ -34,6 +69,10 @@ body {
 
 html {
   color-scheme: dark;
+}
+
+html[data-theme='light'] {
+  color-scheme: light;
 }
 
 body {
@@ -56,7 +95,7 @@ body {
 input,
 select,
 textarea {
-  color-scheme: dark;
+  color-scheme: inherit;
 }
 
 @layer base {
@@ -72,13 +111,13 @@ textarea {
   input[type='time'],
   select,
   textarea {
-    background-color: #161618;
+    background-color: var(--input-bg);
     border-color: var(--border-strong);
     color: var(--ink);
   }
 
   option {
-    background-color: #1c1c1e;
+    background-color: var(--surface);
     color: var(--ink);
   }
 }
@@ -91,14 +130,14 @@ textarea {
 
   .ops-input {
     @apply w-full px-3 py-2 text-sm outline-none transition;
-    background: #161618;
+    background: var(--input-bg);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
     color: var(--ink);
   }
 
   .ops-input:hover {
-    border-color: rgba(255, 255, 255, 0.2);
+    border-color: var(--input-hover-border);
   }
 
   .ops-input:focus {
@@ -151,7 +190,7 @@ textarea {
   .ops-btn-danger {
     background: transparent;
     border: 1px solid rgba(229, 72, 77, 0.45);
-    color: #ff8a8d;
+    color: var(--ops-danger-text);
   }
 
   .ops-btn-danger:hover:not(:disabled) {
@@ -189,7 +228,7 @@ textarea {
     display: inline-flex;
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
-    background: #161618;
+    background: var(--input-bg);
     padding: 3px;
   }
 
@@ -222,17 +261,21 @@ textarea {
 
 .maplibregl-ctrl-attrib,
 .maplibregl-ctrl-attrib a {
-  color: #9a9aa0 !important;
+  color: var(--map-attrib) !important;
 }
 
 .maplibregl-ctrl-group {
-  background: #1c1c1e !important;
-  border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  background: var(--map-ctrl-bg) !important;
+  border: 1px solid var(--map-ctrl-border) !important;
   box-shadow: none !important;
 }
 
-.maplibregl-ctrl-group button {
+html[data-theme='dark'] .maplibregl-ctrl-group button {
   filter: invert(1);
+}
+
+html[data-theme='light'] .maplibregl-ctrl-group button {
+  filter: none;
 }
 
 @media (prefers-reduced-motion: reduce) {

@@ -89,7 +89,7 @@ Empresas com equipes em campo, incluindo: assistência técnica, manutenção, i
 | ADMIN | Dono / TI / responsável da empresa | Configurar empresa, usuários e acessos; criar OS e publicar rotas |
 | MANAGER | Gestor / despachante | Mapa, cadastros, OS, agenda, rotas, acompanhamento |
 | SUPERVISOR | Supervisor de equipe | Ver mapa, agenda e rotas (leitura); acompanhar operação |
-| EMPLOYEE | Técnico / vendedor / campo | Cadastro de cliente; agenda própria; **Minha rota** (iniciar, navegar, concluir) |
+| EMPLOYEE | Técnico / vendedor / campo | Agenda própria; **Minha rota** (iniciar, navegar, concluir); **sem** catálogo Clientes |
 
 ---
 
@@ -156,7 +156,7 @@ Autorização **sempre no backend**. Nenhum usuário acessa dados de outra empre
 | `ADMIN` | Configuração + operação | Empresa, usuários, funcionários, clientes, veículos, mapa, geocode, **criar/editar OS**, agenda, **preview/salvar/publicar rotas** |
 | `MANAGER` | Operação e cadastros | Funcionários, clientes, veículos, mapa, geocode, **criar/editar OS**, agenda, **preview/salvar/publicar rotas** |
 | `SUPERVISOR` | Acompanhamento (leitura) | Clientes, mapa, **agenda**, **rotas (leitura/preview)**; sem geocode, sem frota/equipe, **sem** criar OS nem publicar rotas |
-| `EMPLOYEE` | Campo | Listar/criar/ver clientes; **agenda própria**; **Minha rota / Play / navegar / concluir**; **sem** `/routes`, mapa, funcionários, veículos, settings |
+| `EMPLOYEE` | Campo | **Agenda própria**; **Minha rota / Play / navegar / concluir**; nome/endereço do cliente só na rota/visita; landmarks em rota `IN_PROGRESS`; **sem** catálogo `/customers`, `/routes`, mapa, funcionários, veículos, settings |
 
 Regras futuras (não implementadas): check-in/out, evidência, “em atendimento” real.
 
@@ -202,7 +202,7 @@ Monitorar GPS em tempo real → Ajustar rota no dia
 **Já funciona:**
 
 ```
-Login → capa `/` (Minha rota / Agenda / Clientes)
+Login → capa `/` (Minha rota / Agenda)
   → Minha rota (`PUBLISHED` do dia + qualquer `IN_PROGRESS`)
   → Wizard Iniciar (GPS / veículo / km / combustível)
   → Navegar (`/field/navigate`) — curva a curva no Rotas
@@ -540,7 +540,7 @@ Lista → KPI strip (API) → Filtros → Tabela enriquecida → Detalhe → Res
 | `/settings/company` | Empresa + pin origem | ADMIN | N/A | [settings-company.md](docs/screens/settings-company.md) |
 | `/settings/users` · `/new` · `/[id]` | Acessos | ADMIN | N/A | [settings-users.md](docs/screens/settings-users.md) |
 | `/employees` · `/new` · `/[id]` | Equipe + login campo | ADMIN, MANAGER | Summary `/ops/employees/summary` + rota/live na lista | [employees.md](docs/screens/employees.md) |
-| `/customers` · `/new` · `/[id]` | Clientes + prontuário | Todos (update SUPERVISOR+) | Summary `/ops/customers/summary` + OS/visita na lista | [customers.md](docs/screens/customers.md) |
+| `/customers` · `/new` · `/[id]` | Clientes + prontuário | ADMIN, MANAGER, SUPERVISOR (update SUPERVISOR+; EMPLOYEE 403 / redirect) | Summary `/ops/customers/summary` + OS/visita na lista | [customers.md](docs/screens/customers.md) |
 | `/vehicles` · `/new` · `/[id]` | Frota | ADMIN, MANAGER | Summary `/ops/vehicles/summary` + rota/motorista | [vehicles.md](docs/screens/vehicles.md) |
 | `/map` | Hub operacional + live + context | ADMIN, MANAGER, SUPERVISOR | Equipe · visitas · ao vivo | [map.md](docs/screens/map.md) |
 | `/services` · `/new` · `/[id]` | Ordens de serviço | ADMIN, MANAGER (SUPERVISOR leitura) | Summary `/ops/service-orders/summary` | [services.md](docs/screens/services.md) |

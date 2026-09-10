@@ -136,11 +136,13 @@ Reset de senha inline (vai em Usuários).
 
 - Rota: `/employees/[id]`
 - Papéis: ADMIN, MANAGER
-- Arquivo: `EditEmployeePage` + `EmployeeForm` mode=edit
+- Arquivo: `EditEmployeePage` + `EditableRecordShell` + `EmployeeForm` mode=edit
 
 ### 2. Componentes
 
-Form perfil + bloco Acesso:
+Abre em **modo leitura** (Identificação / Acesso / Função). **Editar** libera o FormCard; **Cancelar** / **Salvar** voltam à leitura.
+
+Form perfil + bloco Acesso (só no edit):
 
 - Com login: e-mail somente leitura; link “Redefinir senha em Usuários” (ADMIN → `/settings/users/:userId`); MANAGER vê texto pedindo admin
 - Sem login: e-mail + senha obrigatórios (cria User EMPLOYEE; não dá para deixar “depois”)
@@ -159,11 +161,11 @@ N/A.
 
 ### 6. Ações
 
-Salvar → `PATCH /employees/:id` (sem `userId` exige `password`).
+Editar → edit; Cancelar → view; Salvar → `PATCH /employees/:id` (sem `userId` exige `password`) → view.
 
 ### 7. Estados
 
-loading skeleton | error load | success msg | error `EMPLOYEE_ALREADY_HAS_LOGIN`
+loading skeleton | view | edit | error load | success msg | error `EMPLOYEE_ALREADY_HAS_LOGIN`
 
 ### 8. Permissões
 
@@ -175,7 +177,7 @@ Para Usuários se já tem login (ADMIN).
 
 ### 10. Mobile / PWA
 
-Fieldset de acesso empilhado; e-mail e senha sempre visíveis se ainda não houver login.
+Fieldset de acesso empilhado; e-mail e senha no edit se ainda não houver login.
 
 ### 11. Fora de escopo
 
@@ -183,6 +185,7 @@ Tornar `userId` NOT NULL no banco.
 
 ### 12. Como testar
 
-1. Legado sem login → e-mail + senha → aparece no planner.
-2. Já com login + password no PATCH → `EMPLOYEE_ALREADY_HAS_LOGIN`.
-3. Sem login + salvar sem senha → `EMPLOYEE_LOGIN_REQUIRED`.
+1. Abrir detalhe → view sem inputs; Editar → form.
+2. Legado sem login → e-mail + senha → aparece no planner.
+3. Já com login + password no PATCH → `EMPLOYEE_ALREADY_HAS_LOGIN`.
+4. Sem login + salvar sem senha → `EMPLOYEE_LOGIN_REQUIRED`.

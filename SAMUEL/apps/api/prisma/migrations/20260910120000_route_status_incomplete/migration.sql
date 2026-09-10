@@ -1,0 +1,2 @@
+-- AlterEnum: RouteStatus += INCOMPLETE
+ALTER TYPE "RouteStatus" ADD VALUE IF NOT EXISTS 'INCOMPLETE';

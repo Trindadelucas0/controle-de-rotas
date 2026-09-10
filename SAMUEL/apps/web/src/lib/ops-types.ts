@@ -31,7 +31,7 @@ export type OpsSnapshot = {
     currentCustomerName: string | null;
     currentCustomerId: string | null;
     routeId: string | null;
-    routeStatus: 'IN_PROGRESS' | 'COMPLETED' | 'PUBLISHED' | 'ASSIGNED' | null;
+    routeStatus: 'IN_PROGRESS' | 'COMPLETED' | 'INCOMPLETE' | 'PUBLISHED' | 'ASSIGNED' | null;
     vehiclePlate: string | null;
     minutesWithoutGps: number | null;
     latitude: number | null;
@@ -51,6 +51,7 @@ export type RoutesSummary = {
   published: number;
   inProgress: number;
   completed: number;
+  incomplete: number;
   assigned: number;
   plannedDistanceMeters: number | null;
   actualDistanceMeters: number | null;
@@ -214,6 +215,7 @@ export const OPS_OPERATIONAL_LABELS: Record<string, string> = {
 export const OPS_ROUTE_STATUS_LABELS: Record<string, string> = {
   IN_PROGRESS: 'Em andamento',
   COMPLETED: 'Saiu da rota (concluída)',
+  INCOMPLETE: 'Saiu da rota (incompleta)',
   PUBLISHED: 'Rota não iniciada',
   ASSIGNED: 'Rota não iniciada',
 };
@@ -225,6 +227,7 @@ export function opsEmployeeStatusLine(row: {
   routeStatus?: string | null;
 }): string {
   if (row.routeStatus === 'COMPLETED') return 'Saiu da rota';
+  if (row.routeStatus === 'INCOMPLETE') return 'Rota incompleta';
   if (row.routeStatus === 'PUBLISHED' || row.routeStatus === 'ASSIGNED') {
     if (row.presence === 'offline') return 'Rota não iniciada';
   }

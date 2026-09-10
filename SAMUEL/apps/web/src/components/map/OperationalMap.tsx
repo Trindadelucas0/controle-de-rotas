@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState, useRef } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import Map, { Layer, Marker, NavigationControl, Source } from 'react-map-gl/maplibre';
+import MapGL, { Layer, Marker, NavigationControl, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useSessionUser } from '@/lib/session-context';
-import { osmRasterStyle, ROUTE_GLOW, ROUTE_LINE, type MapCustomerPin } from '@/lib/map-style';
+import { ROUTE_EXECUTED_GLOW, ROUTE_EXECUTED_LINE, ROUTE_GLOW, ROUTE_LINE, getRasterStyleForTheme, type MapCustomerPin } from '@/lib/map-style';
+import { useTheme } from '@/components/theme/ThemeProvider';
 import { toDateInputValue } from '@/lib/ops-labels';
 import {
   formatMetersKm,
@@ -22,6 +23,7 @@ import {
 } from '@/lib/ops-types';
 import { parseGeometryJson, type LngLat } from '@/lib/nav-geometry';
 import { LiveVehicleMarker, type OpsLiveVehicle } from '@/components/map/LiveVehicleMarker';
+import { LandmarkMapMarker } from '@/components/map/LandmarkMapMarker';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 4 };
 const LIVE_POLL_MS = 3_000;
@@ -68,11 +70,18 @@ type RouteDetail = {
 
 export function OperationalMap() {
   const user = useSessionUser();
+  const { theme } = useTheme();
+  const mapStyle = getRasterStyleForTheme(theme);
   const searchParams = useSearchParams();
   const employeeIdFromUrl = searchParams.get('employeeId')?.trim() || '';
-  const canCreateService = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const routeIdFromUrl = searchParams.get('routeId')?.trim() || '';
+  const canCreateService =
+    user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN' || user?.role === 'MANAGER';
   const canSeeLive =
-    user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'SUPERVISOR';
+    user?.role === 'ADMIN' ||
+    user?.role === 'PLATFORM_ADMIN' ||
+    user?.role === 'MANAGER' ||
+    user?.role === 'SUPERVISOR';
   const mapRef = useRef<MapRef>(null);
   const deepLinkHandledRef = useRef<string | null>(null);
 
@@ -93,7 +102,8 @@ export function OperationalMap() {
   const [mobileTab, setMobileTab] = useState<MobileTab>('equipe');
   const [drawerView, setDrawerView] = useState<DrawerView>('closed');
   const [mapLayer, setMapLayer] = useState<MapLayer>('all');
-  const canManageEmployees = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canManageEmployees =
+    user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN' || user?.role === 'MANAGER';
 
   const [vehicleRoute, setVehicleRoute] = useState<RouteDetail | null>(null);
   const [loadingRoute, setLoadingRoute] = useState(false);
@@ -103,8 +113,36 @@ export function OperationalMap() {
     type: 'LineString';
     coordinates: LngLat[];
   } | null>(null);
+  const [paintedExecutedGeometry, setPaintedExecutedGeometry] = useState<{
+    type: 'LineString';
+    coordinates: LngLat[];
+  } | null>(null);
+  const [trailMessage, setTrailMessage] = useState<string | null>(null);
   const [paintedStops, setPaintedStops] = useState<RouteStopDetail[]>([]);
   const [paintedRouteId, setPaintedRouteId] = useState<string | null>(null);
+  const [paintedLandmarks, setPaintedLandmarks] = useState<
+    {
+      id: string;
+      type: string;
+      latitude: number;
+      longitude: number;
+      note: string | null;
+    }[]
+  >([]);
+  const accessCacheRef = useRef<
+    Map<
+      string,
+      {
+        landmarks: {
+          id: string;
+          type: string;
+          latitude: number;
+          longitude: number;
+          note: string | null;
+        }[];
+      }
+    >
+  >(new globalThis.Map());
   const [customerAccess, setCustomerAccess] = useState<{
     accessPath: {
       id: string;
@@ -205,7 +243,45 @@ export function OperationalMap() {
       setPaintedStops(orderedStops);
       setPaintedRouteId(route.id);
       setRoutePainted(true);
+      setPaintedExecutedGeometry(null);
+      setTrailMessage(null);
       fitRouteBounds(geometry, orderedStops, vehicle);
+
+      const loadTrail =
+        route.status === 'COMPLETED' ||
+        route.status === 'INCOMPLETE' ||
+        route.status === 'IN_PROGRESS';
+      if (!loadTrail) return;
+
+      void apiFetch<{
+        geometry: { type: 'LineString'; coordinates: LngLat[] } | null;
+      }>(`/api/v1/tracking/history?routeId=${encodeURIComponent(route.id)}`)
+        .then((hist) => {
+          if (hist.geometry?.coordinates?.length) {
+            setPaintedExecutedGeometry(hist.geometry);
+            setTrailMessage(
+              route.status === 'INCOMPLETE'
+                ? 'Trilha real (rota incompleta)'
+                : 'Trilha real percorrida',
+            );
+            fitRouteBounds(hist.geometry, orderedStops, vehicle);
+          } else {
+            setTrailMessage('Sem GPS gravado nesta rota');
+          }
+        })
+        .catch((e) => {
+          const detail =
+            e instanceof ApiError
+              ? e.message
+              : e instanceof Error
+                ? e.message
+                : null;
+          setTrailMessage(
+            detail
+              ? `Não foi possível carregar a trilha GPS — ${detail}`
+              : 'Não foi possível carregar a trilha GPS',
+          );
+        });
     },
     [fitRouteBounds],
   );
@@ -213,8 +289,11 @@ export function OperationalMap() {
   const hideRoutePaint = useCallback(() => {
     setRoutePainted(false);
     setPaintedGeometry(null);
+    setPaintedExecutedGeometry(null);
+    setTrailMessage(null);
     setPaintedStops([]);
     setPaintedRouteId(null);
+    setPaintedLandmarks([]);
   }, []);
 
   const selectVehicle = useCallback(
@@ -417,7 +496,12 @@ export function OperationalMap() {
       }[];
     }>(`/api/v1/customers/${selection.pin.id}/access`)
       .then((r) => {
-        if (!cancelled) setCustomerAccess(r);
+        if (!cancelled) {
+          setCustomerAccess(r);
+          accessCacheRef.current.set(selection.pin.id, {
+            landmarks: r.landmarks ?? [],
+          });
+        }
       })
       .catch(() => {
         if (!cancelled) setCustomerAccess(null);
@@ -426,6 +510,67 @@ export function OperationalMap() {
       cancelled = true;
     };
   }, [selection?.kind === 'customer' ? selection.pin.id : null, hideRoutePaint]);
+
+  // Marcos dos clientes da rota pintada (visíveis sem clicar no pin)
+  useEffect(() => {
+    if (!routePainted || !paintedStops.length) {
+      setPaintedLandmarks([]);
+      return;
+    }
+    const customerIds = [
+      ...new Set(
+        paintedStops
+          .map((s) => s.visit?.customer?.id)
+          .filter((id): id is string => Boolean(id)),
+      ),
+    ];
+    if (!customerIds.length) {
+      setPaintedLandmarks([]);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const byId = new globalThis.Map<
+        string,
+        {
+          id: string;
+          type: string;
+          latitude: number;
+          longitude: number;
+          note: string | null;
+        }
+      >();
+      await Promise.all(
+        customerIds.map(async (customerId) => {
+          let cached = accessCacheRef.current.get(customerId);
+          if (!cached) {
+            try {
+              const r = await apiFetch<{
+                landmarks: {
+                  id: string;
+                  type: string;
+                  latitude: number;
+                  longitude: number;
+                  note: string | null;
+                }[];
+              }>(`/api/v1/customers/${customerId}/access`);
+              cached = { landmarks: r.landmarks ?? [] };
+              accessCacheRef.current.set(customerId, cached);
+            } catch {
+              cached = { landmarks: [] };
+            }
+          }
+          for (const lm of cached.landmarks) {
+            byId.set(lm.id, lm);
+          }
+        }),
+      );
+      if (!cancelled) setPaintedLandmarks([...byId.values()]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [routePainted, paintedStops]);
 
   // Deep-link /map?employeeId=
   useEffect(() => {
@@ -451,6 +596,31 @@ export function OperationalMap() {
     selectVehicle,
     selectRosterEmployee,
   ]);
+
+  // Deep-link /map?routeId= — pinta plano + trilha congelada
+  useEffect(() => {
+    if (!routeIdFromUrl || !canSeeLive) return;
+    const key = `route:${routeIdFromUrl}`;
+    if (deepLinkHandledRef.current === key) return;
+    deepLinkHandledRef.current = key;
+    setMapLayer('routes');
+    setLoadingRoute(true);
+    setRouteError(null);
+    void fetchRouteDetail(routeIdFromUrl)
+      .then((route) => {
+        if (!route) {
+          setRouteError('Rota não encontrada');
+          return;
+        }
+        setVehicleRoute(route);
+        setDrawerView('detail');
+        paintRoute(route);
+      })
+      .catch((e) => {
+        setRouteError(e instanceof ApiError ? e.message : 'Falha ao carregar rota');
+      })
+      .finally(() => setLoadingRoute(false));
+  }, [routeIdFromUrl, canSeeLive, fetchRouteDetail, paintRoute]);
 
   const filteredLive = useMemo(() => {
     if (!teamFilter) return live;
@@ -479,6 +649,15 @@ export function OperationalMap() {
       geometry: paintedGeometry,
     };
   }, [paintedGeometry]);
+
+  const executedRouteGeoJson = useMemo(() => {
+    if (!paintedExecutedGeometry) return null;
+    return {
+      type: 'Feature' as const,
+      properties: {},
+      geometry: paintedExecutedGeometry,
+    };
+  }, [paintedExecutedGeometry]);
 
   const accessPathGeoJson = useMemo(() => {
     const geo = parseGeometryJson(customerAccess?.accessPath?.geometryJson);
@@ -943,10 +1122,18 @@ export function OperationalMap() {
               Selecione um funcionário para ver a rota.
             </div>
           ) : null}
-          <Map
+          {trailMessage ? (
+            <div className="pointer-events-none absolute bottom-3 left-3 z-10 rounded-lg bg-surface px-3 py-2 text-xs text-brand-800 shadow">
+              <span className="font-semibold">{trailMessage}</span>
+              <span className="mt-0.5 block text-[10px] text-[var(--muted)]">
+                Menta = planejado · Âmbar = percorrido
+              </span>
+            </div>
+          ) : null}
+          <MapGL
             ref={mapRef}
             initialViewState={initialView}
-            mapStyle={osmRasterStyle}
+            mapStyle={mapStyle}
             style={{ width: '100%', height: '100%' }}
             attributionControl
           >
@@ -975,6 +1162,29 @@ export function OperationalMap() {
               </Source>
             ) : null}
 
+            {showRouteLayer && executedRouteGeoJson ? (
+              <Source id="admin-executed-route" type="geojson" data={executedRouteGeoJson}>
+                <Layer
+                  id="admin-executed-route-glow"
+                  type="line"
+                  paint={{
+                    'line-color': ROUTE_EXECUTED_GLOW,
+                    'line-width': 10,
+                    'line-opacity': 0.3,
+                  }}
+                />
+                <Layer
+                  id="admin-executed-route-line"
+                  type="line"
+                  paint={{
+                    'line-color': ROUTE_EXECUTED_LINE,
+                    'line-width': 4,
+                    'line-opacity': 0.95,
+                  }}
+                />
+              </Source>
+            ) : null}
+
             {accessPathGeoJson ? (
               <Source id="customer-access-path" type="geojson" data={accessPathGeoJson}>
                 <Layer
@@ -990,27 +1200,29 @@ export function OperationalMap() {
               </Source>
             ) : null}
 
-            {customerAccess?.landmarks?.map((lm) => (
-              <Marker
-                key={`lm-${lm.id}`}
-                latitude={lm.latitude}
-                longitude={lm.longitude}
-                anchor="bottom"
-              >
-                <div
-                  className="rounded border border-white/80 bg-[#1c1c1e] px-1 py-0.5 text-[9px] font-bold uppercase text-accent"
-                  title={lm.type}
-                >
-                  {lm.type === 'PORTEIRA'
-                    ? 'Por'
-                    : lm.type === 'PONTE'
-                      ? 'Pon'
-                      : lm.type === 'BIFURCACAO'
-                        ? 'Bif'
-                        : 'Est'}
-                </div>
-              </Marker>
-            ))}
+            {customerAccess?.landmarks
+              ?.filter((lm) => !paintedLandmarks.some((p) => p.id === lm.id))
+              .map((lm) => (
+                <LandmarkMapMarker
+                  key={`lm-${lm.id}`}
+                  latitude={lm.latitude}
+                  longitude={lm.longitude}
+                  type={lm.type}
+                  variant="ops"
+                />
+              ))}
+
+            {routePainted
+              ? paintedLandmarks.map((lm) => (
+                  <LandmarkMapMarker
+                    key={`route-lm-${lm.id}`}
+                    latitude={lm.latitude}
+                    longitude={lm.longitude}
+                    type={lm.type}
+                    variant="ops"
+                  />
+                ))
+              : null}
 
             {showRouteLayer && routePainted
               ? paintedStops.map((s) => (
@@ -1075,7 +1287,7 @@ export function OperationalMap() {
                   />
                 ))
               : null}
-          </Map>
+          </MapGL>
         </div>
 
         {/* Desktop command rail */}

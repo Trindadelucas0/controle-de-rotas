@@ -27,7 +27,7 @@ Telas: `/employees`, `/employees/new`, `/employees/[id]`
 
 ## Customers
 
-- CRUD `/api/v1/customers` — ADMIN, MANAGER, SUPERVISOR; EMPLOYEE pode listar/criar/ver
+- CRUD `/api/v1/customers` — ADMIN, MANAGER, SUPERVISOR (listar/criar/ver/update); EMPLOYEE **sem** catálogo (403); landmarks EMPLOYEE só em rota IN_PROGRESS
 - `locationStatus`: OK se lat+lng; senão PENDING
 
 Telas: `/customers`, `/customers/new`, `/customers/[id]`

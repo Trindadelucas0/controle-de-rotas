@@ -35,6 +35,7 @@ export async function vehiclesSummary(
             RouteStatus.PUBLISHED,
             RouteStatus.IN_PROGRESS,
             RouteStatus.COMPLETED,
+            RouteStatus.INCOMPLETE,
             RouteStatus.ASSIGNED,
           ],
         },
@@ -95,6 +96,7 @@ export async function employeesSummary(
             RouteStatus.PUBLISHED,
             RouteStatus.IN_PROGRESS,
             RouteStatus.COMPLETED,
+            RouteStatus.INCOMPLETE,
           ],
         },
       },
@@ -246,6 +248,7 @@ export async function routesSummary(
           RouteStatus.PUBLISHED,
           RouteStatus.IN_PROGRESS,
           RouteStatus.COMPLETED,
+          RouteStatus.INCOMPLETE,
           RouteStatus.ASSIGNED,
         ],
       },
@@ -264,6 +267,7 @@ export async function routesSummary(
     published: routes.filter((r) => r.status === RouteStatus.PUBLISHED).length,
     inProgress: routes.filter((r) => r.status === RouteStatus.IN_PROGRESS).length,
     completed: routes.filter((r) => r.status === RouteStatus.COMPLETED).length,
+    incomplete: routes.filter((r) => r.status === RouteStatus.INCOMPLETE).length,
     assigned: routes.filter((r) => r.status === RouteStatus.ASSIGNED).length,
   };
 

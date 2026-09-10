@@ -22,7 +22,8 @@ FieldPwaLocationGate (PWA+GPS em HTTPS; HTTP = faixa NÃO ESTÁ EM HTTPS)
     └── articles por rota
         ├── status, veículo, km/tempo, paradas
         ├── ▶ Iniciar rota → /field/start/:id
-        ├── Continuar navegação / Concluir
+        ├── Continuar navegação
+        ├── SlideToComplete (arrastar) + modal CompleteRouteConfirm
         ├── mini-mapa (~160–176px) Dark Matter + polyline menta (`plannedGeometryJson` ou linha pelas paradas) + pinos numerados
         └── stops: cliente + OS (sem Maps/Waze)
 ```
@@ -30,6 +31,7 @@ FieldPwaLocationGate (PWA+GPS em HTTPS; HTTP = faixa NÃO ESTÁ EM HTTPS)
 ### 3. Informação
 
 Por rota: índice, status (Publicada / Em andamento), **data se não for hoje**, placa, duração/distância planejadas, N paradas.
+Conclusão: arrastar → modal. `COMPLETED` se 0 pendentes ou restante ≤ 500 m; senão `INCOMPLETE`. Visita aberta bloqueia. Encerrar navegação **não** conclui.
 Mini-mapa: traçado planejado (OSRM se `plannedGeometryJson` existir; senão LineString pelas coordenadas das paradas). Sem zoom por scroll. Pinos = sequência. Nome do cliente no card é tinta (não laranja).
 Por parada: sequência publicada = mais perto do funcionário (GPS live ou empresa); após Play = ordem pelo GPS real. Navegação só pelo Rotas (`/field/navigate`).
 

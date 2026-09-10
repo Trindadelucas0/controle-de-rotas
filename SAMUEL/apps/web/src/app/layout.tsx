@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next';
 import { PwaRegister } from '@/components/pwa/PwaRegister';
+import { ThemeProvider } from '@/components/theme/ThemeProvider';
 import './globals.css';
 
 export const metadata: Metadata = {
@@ -22,10 +23,13 @@ export const viewport: Viewport = {
   initialScale: 1,
 };
 
+const themeBootScript = `(function(){try{var t=localStorage.getItem('samuel-theme');if(t!=='light'&&t!=='dark')t='dark';document.documentElement.setAttribute('data-theme',t);document.documentElement.style.colorScheme=t;}catch(e){document.documentElement.setAttribute('data-theme','dark');document.documentElement.style.colorScheme='dark';}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="pt-BR">
+    <html lang="pt-BR" suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: themeBootScript }} />
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="" />
         <link
@@ -34,16 +38,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className="min-h-screen bg-canvas font-sans antialiased text-brand-900">
-        {/*
-          THESIS: Operational dispatch console — density and consequence, not dashboard cards.
-          OWN-WORLD: #121212 ground, #1C1C1E plates, #FF5722 the only interactive hue; Overpass; mint #2EE6C7 only on route polylines.
-          STORY: Dispatcher or field tech knows where they are, what is late, and what to do next.
-          FIRST VIEWPORT: Dark chrome. Situation first, then attention, then execution. One orange primary per view.
-          FORM: Brief-pinned operational dark console (2026-09-06). Seed: brief-pinned.
-          FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, DESIGN.md, and every shipping raster carrying its provenance
-        */}
-        <PwaRegister />
-        {children}
+        <ThemeProvider>
+          <PwaRegister />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -53,7 +53,19 @@ import {
   type PlannedNavStep,
 } from '@/lib/nav-geometry';
 import { LivePositionMarker } from '@/components/map/LivePositionMarker';
+import {
+  LandmarkMapMarker,
+  LANDMARK_LABELS,
+  type LandmarkType,
+} from '@/components/map/LandmarkMapMarker';
 import { useSmoothedLngLat, type LngLatTarget } from '@/hooks/useSmoothedLngLat';
+import { SlideToComplete } from '@/components/field/SlideToComplete';
+import { CompleteRouteConfirm } from '@/components/field/CompleteRouteConfirm';
+import {
+  canCompleteAsFinished,
+  hasOpenVisitOnStops,
+  remainingPlannedMeters,
+} from '@/lib/route-complete';
 
 const NAV_FOLLOW_ZOOM = 16;
 const NAV_FOLLOW_MIN_ZOOM = 15;
@@ -68,21 +80,12 @@ const REROUTE_COOLDOWN_MS = 8_000;
 const LANDMARK_PROXIMITY_M = 120;
 const LANDMARK_COOLDOWN_MS = 5 * 60 * 1000;
 
-type LandmarkType = 'PORTEIRA' | 'PONTE' | 'BIFURCACAO' | 'ESTRADA_RUIM';
-
 type CustomerLandmark = {
   id: string;
   type: LandmarkType;
   latitude: number;
   longitude: number;
   note: string | null;
-};
-
-const LANDMARK_LABELS: Record<LandmarkType, string> = {
-  PORTEIRA: 'Porteira',
-  PONTE: 'Ponte',
-  BIFURCACAO: 'Bifurcação',
-  ESTRADA_RUIM: 'Estrada ruim',
 };
 
 /** Polyline restante — menta, só no traçado. */
@@ -95,10 +98,12 @@ type RouteStop = {
   status: string;
   latitude: number;
   longitude: number;
+  plannedDistanceMeters?: number | null;
   landmarks?: CustomerLandmark[];
   accessPath?: { id: string; geometryJson: unknown; distanceMeters: number | null } | null;
   visit: {
     id: string;
+    status?: string;
     customer: { id: string; name: string };
     serviceOrder: { id: string; number: number; title: string };
   };
@@ -285,13 +290,16 @@ export function FieldNavigatePage() {
   const [gpsBlocked, setGpsBlocked] = useState(false);
   const [mapReady, setMapReady] = useState(false);
   const [showExitConfirm, setShowExitConfirm] = useState(false);
+  const [showCompleteConfirm, setShowCompleteConfirm] = useState(false);
+  const [completing, setCompleting] = useState(false);
+  const [completeError, setCompleteError] = useState<string | null>(null);
   const [recalculating, setRecalculating] = useState(false);
   const [rerouteError, setRerouteError] = useState<string | null>(null);
   const [proximityLandmark, setProximityLandmark] = useState<CustomerLandmark | null>(null);
   const [landmarkBusy, setLandmarkBusy] = useState(false);
   const [landmarkMsg, setLandmarkMsg] = useState<string | null>(null);
   const [trackStats, setTrackStats] = useState({ queued: 0, posted: 0, trail: 0 });
-  const landmarkCooldownRef = useRef<Map<string, number>>(new Map());
+  const landmarkCooldownRef = useRef<globalThis.Map<string, number>>(new globalThis.Map());
   const routeFitDoneRef = useRef(false);
 
   useEffect(() => {
@@ -384,16 +392,25 @@ export function FieldNavigatePage() {
 
   const arriving = Boolean(gps && nextStop && haversineMeters(gps, nextStop) <= NEAR_STOP_M);
 
-  const nextLandmarks = nextStop?.landmarks ?? [];
+  const routeLandmarks = useMemo(() => {
+    const stops = route?.stops ?? [];
+    const byId = new globalThis.Map<string, CustomerLandmark>();
+    for (const s of stops) {
+      for (const lm of s.landmarks ?? []) {
+        byId.set(lm.id, lm);
+      }
+    }
+    return [...byId.values()];
+  }, [route?.stops]);
 
   useEffect(() => {
-    if (!gps || !nextLandmarks.length) {
+    if (!gps || !routeLandmarks.length) {
       setProximityLandmark(null);
       return;
     }
     const now = Date.now();
     let nearest: { lm: CustomerLandmark; d: number } | null = null;
-    for (const lm of nextLandmarks) {
+    for (const lm of routeLandmarks) {
       const d = haversineMeters(gps, lm);
       if (d > LANDMARK_PROXIMITY_M) continue;
       const coolUntil = landmarkCooldownRef.current.get(lm.id) ?? 0;
@@ -401,7 +418,7 @@ export function FieldNavigatePage() {
       if (!nearest || d < nearest.d) nearest = { lm, d };
     }
     setProximityLandmark(nearest?.lm ?? null);
-  }, [gps, nextLandmarks]);
+  }, [gps, routeLandmarks]);
 
   async function dismissProximity() {
     if (proximityLandmark) {
@@ -459,7 +476,7 @@ export function FieldNavigatePage() {
   }, [flushLandmarkQueue]);
 
   async function markLandmark(type: LandmarkType) {
-    if (!gps || !nextStop || landmarkBusy) return;
+    if (!route?.recordTrip || !gps || !nextStop || landmarkBusy) return;
     const customerId = nextStop.visit.customer.id;
     const body = {
       type,
@@ -662,39 +679,23 @@ export function FieldNavigatePage() {
       if (opts?.initial && !initialCenterDoneRef.current) {
         initialCenterDoneRef.current = true;
         routeFitDoneRef.current = true;
-        const lngs = [target.longitude];
-        const lats = [target.latitude];
-        const firstStop = orderedStopsRef.current[0];
-        if (firstStop) {
-          lngs.push(firstStop.longitude);
-          lats.push(firstStop.latitude);
-        }
-        map.fitBounds(
-          [
-            [Math.min(...lngs), Math.min(...lats)],
-            [Math.max(...lngs), Math.max(...lats)],
-          ],
-          { padding: 96, maxZoom: NAV_FOLLOW_ZOOM, duration: 400 },
+        const [centerLng, centerLat] = cameraCenterWithLookAhead(
+          map,
+          target.latitude,
+          target.longitude,
+          CAMERA_LOOK_AHEAD_PX,
         );
-        window.setTimeout(() => {
-          const [centerLng, centerLat] = cameraCenterWithLookAhead(
-            map,
-            target.latitude,
-            target.longitude,
-            CAMERA_LOOK_AHEAD_PX,
-          );
-          map.jumpTo({
-            center: [centerLng, centerLat],
-            zoom: NAV_FOLLOW_ZOOM,
-            bearing,
-          });
-          lastCameraRef.current = {
-            lat: target.latitude,
-            lng: target.longitude,
-            heading: target.heading ?? null,
-          };
-          setFollow(true);
-        }, 450);
+        map.jumpTo({
+          center: [centerLng, centerLat],
+          zoom: NAV_FOLLOW_ZOOM,
+          bearing,
+        });
+        lastCameraRef.current = {
+          lat: target.latitude,
+          lng: target.longitude,
+          heading: target.heading ?? null,
+        };
+        setFollow(true);
         return;
       }
 
@@ -901,15 +902,25 @@ export function FieldNavigatePage() {
     fitRouteOverview();
   }, [mapReady, gps, route, fitRouteOverview]);
 
-  // Câmera acompanha o ícone interpolado enquanto follow estiver ligado.
+  // 1º center: GPS bruto (não espera interpolação). Depois acompanha o ícone suave.
   useEffect(() => {
-    if (!mapReady || !smoothedGps || !follow || userPanningRef.current) return;
+    if (!mapReady || !follow || userPanningRef.current) return;
+    const rawTarget = gps
+      ? {
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          heading: gps.heading,
+        }
+      : null;
+    const target = smoothedGps ?? rawTarget;
+    if (!target) return;
     if (!initialCenterDoneRef.current) {
-      followCamera(smoothedGps, { initial: true });
+      followCamera(target, { initial: true });
       return;
     }
+    if (!smoothedGps) return;
     followCamera(smoothedGps);
-  }, [mapReady, smoothedGps, follow, followCamera]);
+  }, [mapReady, smoothedGps, gps, follow, followCamera]);
 
   useEffect(() => {
     if (route?.status !== 'IN_PROGRESS') return;
@@ -1093,6 +1104,45 @@ export function FieldNavigatePage() {
     router.push('/field/my-route');
   }
 
+  function openCompleteConfirm() {
+    if (!route || completing) return;
+    if (hasOpenVisitOnStops(route.stops)) {
+      setCompleteError('Finalize a visita em andamento antes de concluir a rota.');
+      setShowCompleteConfirm(true);
+      return;
+    }
+    setCompleteError(null);
+    setShowCompleteConfirm(true);
+  }
+
+  async function submitCompleteRoute() {
+    if (!route || completing) return;
+    if (hasOpenVisitOnStops(route.stops)) {
+      setCompleteError('Finalize a visita em andamento antes de concluir a rota.');
+      return;
+    }
+    const pending = route.stops.filter((s) => s.status === 'PENDING');
+    const remaining = remainingPlannedMeters(route.stops);
+    const asFinished = canCompleteAsFinished(remaining, pending.length);
+    const mode = asFinished ? 'COMPLETED' : 'INCOMPLETE';
+    setCompleting(true);
+    setCompleteError(null);
+    try {
+      await apiFetch(`/api/v1/routes/${route.id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      });
+      stopWatch();
+      void releaseWakeLock();
+      setShowCompleteConfirm(false);
+      router.push('/field/my-route');
+    } catch (e) {
+      setCompleteError(e instanceof ApiError ? e.message : 'Não foi possível concluir a rota');
+    } finally {
+      setCompleting(false);
+    }
+  }
+
   if (loading) {
     return (
       <div className="flex h-full min-h-0 flex-col items-center justify-center gap-3 bg-[#121212] px-6 text-center text-sm text-white/70">
@@ -1164,9 +1214,20 @@ export function FieldNavigatePage() {
           onLoad={() => {
             setMapReady(true);
             window.setTimeout(() => {
-              if (!gpsRef.current && !initialCenterDoneRef.current) {
-                fitRouteOverview();
+              if (initialCenterDoneRef.current) return;
+              const g = gpsRef.current;
+              if (g) {
+                followCamera(
+                  {
+                    latitude: g.latitude,
+                    longitude: g.longitude,
+                    heading: g.heading,
+                  },
+                  { initial: true },
+                );
+                return;
               }
+              fitRouteOverview();
             }, 50);
           }}
           onError={() => {
@@ -1228,20 +1289,14 @@ export function FieldNavigatePage() {
             : null}
 
           {mapReady
-            ? (nextStop?.landmarks ?? []).map((lm) => (
-                <Marker
+            ? routeLandmarks.map((lm) => (
+                <LandmarkMapMarker
                   key={lm.id}
                   latitude={lm.latitude}
                   longitude={lm.longitude}
-                  anchor="bottom"
-                >
-                  <div
-                    className="rounded-md border border-white bg-accent px-1.5 py-0.5 text-[9px] font-bold uppercase text-white"
-                    title={LANDMARK_LABELS[lm.type]}
-                  >
-                    {LANDMARK_LABELS[lm.type].slice(0, 3)}
-                  </div>
-                </Marker>
+                  type={lm.type}
+                  variant="field"
+                />
               ))
             : null}
 
@@ -1390,24 +1445,6 @@ export function FieldNavigatePage() {
         ) : null}
       </div>
 
-      <button
-        type="button"
-        onClick={reenableFollow}
-        className={`absolute bottom-36 right-3 z-10 flex h-12 w-12 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
-          follow
-            ? 'bg-accent text-white'
-            : 'bg-black/60 text-white/80'
-        }`}
-        aria-label="Centralizar na minha posição"
-        title="Centralizar"
-      >
-        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
-          <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
-          <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
-          <path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.8" />
-        </svg>
-      </button>
-
       {showExitConfirm ? (
         <div
           className="absolute inset-0 z-20 flex items-center justify-center bg-black/60 p-4"
@@ -1443,62 +1480,111 @@ export function FieldNavigatePage() {
         </div>
       ) : null}
 
+      {showCompleteConfirm && route ? (
+        <CompleteRouteConfirm
+          pendingCount={route.stops.filter((s) => s.status === 'PENDING').length}
+          totalStops={route.stops.length}
+          remainingMeters={remainingPlannedMeters(route.stops)}
+          asFinished={
+            !hasOpenVisitOnStops(route.stops) &&
+            canCompleteAsFinished(
+              remainingPlannedMeters(route.stops),
+              route.stops.filter((s) => s.status === 'PENDING').length,
+            )
+          }
+          busy={completing}
+          error={completeError}
+          onCancel={() => {
+            if (completing) return;
+            setShowCompleteConfirm(false);
+            setCompleteError(null);
+          }}
+          onConfirm={() => void submitCompleteRoute()}
+        />
+      ) : null}
+
       <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-        {nextStop && gps ? (
-          <div className="mx-auto mb-2 max-w-md">
-            <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-              {(Object.keys(LANDMARK_LABELS) as LandmarkType[]).map((type) => (
-                <button
-                  key={type}
-                  type="button"
-                  disabled={landmarkBusy || gpsBlocked}
-                  onClick={() => void markLandmark(type)}
-                  className="rounded-xl bg-black/65 px-2 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
-                >
-                  {LANDMARK_LABELS[type]}
-                </button>
-              ))}
+        <div className="relative mx-auto max-w-md">
+          <button
+            type="button"
+            onClick={reenableFollow}
+            className={`absolute -top-14 right-0 z-10 flex h-12 w-12 items-center justify-center rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent sm:-top-16 ${
+              follow
+                ? 'bg-accent text-white'
+                : 'bg-black/60 text-white/80'
+            }`}
+            aria-label="Centralizar na minha posição"
+            title="Centralizar"
+          >
+            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" aria-hidden>
+              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2" />
+              <circle cx="12" cy="12" r="9" stroke="currentColor" strokeWidth="1.8" />
+              <path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.8" />
+            </svg>
+          </button>
+          {route?.recordTrip && nextStop && gps ? (
+            <div className="mb-2">
+              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+                {(Object.keys(LANDMARK_LABELS) as LandmarkType[]).map((type) => (
+                  <button
+                    key={type}
+                    type="button"
+                    disabled={landmarkBusy || gpsBlocked}
+                    onClick={() => void markLandmark(type)}
+                    className="rounded-xl bg-black/65 px-2 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
+                  >
+                    {LANDMARK_LABELS[type]}
+                  </button>
+                ))}
+              </div>
+              {landmarkMsg ? (
+                <p className="mt-1 text-center text-[10px] text-white/70">{landmarkMsg}</p>
+              ) : null}
             </div>
-            {landmarkMsg ? (
-              <p className="mt-1 text-center text-[10px] text-white/70">{landmarkMsg}</p>
-            ) : null}
+          ) : null}
+          <div className="mb-2">
+            <SlideToComplete
+              busy={completing}
+              disabled={showExitConfirm}
+              onComplete={openCompleteConfirm}
+            />
           </div>
-        ) : null}
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-2 rounded-2xl bg-black/70 px-3 py-3 text-center shadow-lg backdrop-blur">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Tempo</p>
-            <p className="mt-0.5 text-sm font-bold tabular-nums">
-              {progress.remainingDuration == null
-                ? '—'
-                : formatDuration(progress.remainingDuration)}
-            </p>
+          <div className="grid grid-cols-4 gap-2 rounded-2xl bg-black/70 px-3 py-3 text-center shadow-lg backdrop-blur">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Tempo</p>
+              <p className="mt-0.5 text-sm font-bold tabular-nums">
+                {progress.remainingDuration == null
+                  ? '—'
+                  : formatDuration(progress.remainingDuration)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
+                Restante
+              </p>
+              <p className="mt-0.5 text-sm font-bold tabular-nums">
+                {progress.remainingDistance == null
+                  ? '—'
+                  : formatDistanceKm(progress.remainingDistance)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">ETA</p>
+              <p className="mt-0.5 text-sm font-bold tabular-nums">
+                {progress.remainingDuration == null
+                  ? '—'
+                  : formatEta(progress.remainingDuration)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Vel.</p>
+              <p className="mt-0.5 text-sm font-bold tabular-nums">{speed} km/h</p>
+            </div>
           </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">
-              Restante
-            </p>
-            <p className="mt-0.5 text-sm font-bold tabular-nums">
-              {progress.remainingDistance == null
-                ? '—'
-                : formatDistanceKm(progress.remainingDistance)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">ETA</p>
-            <p className="mt-0.5 text-sm font-bold tabular-nums">
-              {progress.remainingDuration == null
-                ? '—'
-                : formatEta(progress.remainingDuration)}
-            </p>
-          </div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Vel.</p>
-            <p className="mt-0.5 text-sm font-bold tabular-nums">{speed} km/h</p>
-          </div>
+          <p className="mt-1.5 text-center text-[10px] text-white/45">
+            {gps ? gpsHint : 'Aguardando GPS para tempo e km reais'}
+          </p>
         </div>
-        <p className="mx-auto mt-1.5 max-w-md text-center text-[10px] text-white/45">
-          {gps ? gpsHint : 'Aguardando GPS para tempo e km reais'}
-        </p>
       </div>
     </div>
   );

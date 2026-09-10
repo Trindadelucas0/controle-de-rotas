@@ -16,18 +16,27 @@ import {
 import { toDateInputValue } from '@/lib/ops-labels';
 import { formatDuration, formatMeters } from '@/components/routes/routes-planner-shared';
 import { FieldRoutePreviewMap } from '@/components/field/FieldRoutePreviewMap';
+import { SlideToComplete } from '@/components/field/SlideToComplete';
+import { CompleteRouteConfirm } from '@/components/field/CompleteRouteConfirm';
+import {
+  canCompleteAsFinished,
+  hasOpenVisitOnStops,
+  remainingPlannedMeters,
+} from '@/lib/route-complete';
 
 const POLL_MS = 15_000;
 
 type RouteStop = {
   id: string;
   sequence: number;
+  status: string;
   latitude: number;
   longitude: number;
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
   visit: {
     id: string;
+    status?: string;
     customer: { id: string; name: string };
     serviceOrder: { id: string; number: number; title: string };
   };
@@ -70,6 +79,8 @@ export function FieldMyRoutePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [completingId, setCompletingId] = useState<string | null>(null);
+  const [confirmRoute, setConfirmRoute] = useState<MyRoute | null>(null);
+  const [confirmError, setConfirmError] = useState<string | null>(null);
   const [gpsStatus, setGpsStatus] = useState('GPS parado');
   const [lastAccuracy, setLastAccuracy] = useState<number | null>(null);
   const watchRef = useRef<RouteGpsWatchHandle | null>(null);
@@ -173,16 +184,37 @@ export function FieldMyRoutePage() {
     };
   }, [load, stopWatch]);
 
-  async function onComplete(routeId: string) {
-    setCompletingId(routeId);
+  async function openCompleteConfirm(route: MyRoute) {
+    if (completingId) return;
+    if (hasOpenVisitOnStops(route.stops)) {
+      setError('Finalize a visita em andamento antes de concluir a rota.');
+      return;
+    }
+    setConfirmError(null);
+    setError(null);
+    setConfirmRoute(route);
+  }
+
+  async function submitComplete() {
+    if (!confirmRoute || completingId) return;
+    const pending = confirmRoute.stops.filter((s) => s.status === 'PENDING');
+    const remaining = remainingPlannedMeters(confirmRoute.stops);
+    const asFinished = canCompleteAsFinished(remaining, pending.length);
+    const mode = asFinished ? 'COMPLETED' : 'INCOMPLETE';
+    setCompletingId(confirmRoute.id);
+    setConfirmError(null);
     setError(null);
     try {
-      await apiFetch(`/api/v1/routes/${routeId}/complete`, { method: 'POST' });
+      await apiFetch(`/api/v1/routes/${confirmRoute.id}/complete`, {
+        method: 'POST',
+        body: JSON.stringify({ mode }),
+      });
       stopWatch();
       setGpsStatus('GPS parado');
+      setConfirmRoute(null);
       await load();
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Não foi possível concluir a rota');
+      setConfirmError(e instanceof ApiError ? e.message : 'Não foi possível concluir a rota');
     } finally {
       setCompletingId(null);
     }
@@ -249,8 +281,8 @@ export function FieldMyRoutePage() {
             Rota de {formatDateBr(inProgressYmd)} ainda em andamento
           </p>
           <p className="mt-1">
-            Encerrar a navegação não conclui a rota. Toque em <strong>Concluir rota</strong> no
-            card abaixo para liberar o início de outra.
+            Encerrar a navegação não conclui a rota. Arraste para{' '}
+            <strong>concluir a rota</strong> no card abaixo para liberar o início de outra.
           </p>
         </div>
       ) : null}
@@ -323,25 +355,25 @@ export function FieldMyRoutePage() {
                     </p>
                   ) : null}
                   {isActive ? (
-                    <>
-                      <Link
-                        href="/field/navigate"
-                        className="ops-btn ops-btn-primary"
-                      >
-                        Continuar navegação
-                      </Link>
-                      <button
-                        type="button"
-                        disabled={completingId === route.id}
-                        onClick={() => void onComplete(route.id)}
-                        className="ops-btn ops-btn-secondary disabled:opacity-60"
-                      >
-                        {completingId === route.id ? 'Concluindo…' : 'Concluir rota'}
-                      </button>
-                    </>
+                    <Link
+                      href="/field/navigate"
+                      className="ops-btn ops-btn-primary"
+                    >
+                      Continuar navegação
+                    </Link>
                   ) : null}
                 </div>
               </div>
+
+              {isActive ? (
+                <div className="mt-3">
+                  <SlideToComplete
+                    busy={completingId === route.id}
+                    disabled={completingId != null && completingId !== route.id}
+                    onComplete={() => void openCompleteConfirm(route)}
+                  />
+                </div>
+              ) : null}
 
               <FieldRoutePreviewMap
                 geometryJson={route.plannedGeometryJson}
@@ -363,12 +395,7 @@ export function FieldMyRoutePage() {
                       Parada {s.sequence}
                     </p>
                     <p className="mt-1 text-base font-semibold text-brand-900">
-                      <Link
-                        href={`/customers/${s.visit.customer.id}`}
-                        className="hover:underline"
-                      >
-                        {s.visit.customer.name}
-                      </Link>
+                      {s.visit.customer.name}
                     </p>
                     <p className="text-sm text-[var(--muted)]">
                       <Link
@@ -387,6 +414,26 @@ export function FieldMyRoutePage() {
           );
         })}
       </div>
+
+      {confirmRoute ? (
+        <CompleteRouteConfirm
+          pendingCount={confirmRoute.stops.filter((s) => s.status === 'PENDING').length}
+          totalStops={confirmRoute.stops.length}
+          remainingMeters={remainingPlannedMeters(confirmRoute.stops)}
+          asFinished={canCompleteAsFinished(
+            remainingPlannedMeters(confirmRoute.stops),
+            confirmRoute.stops.filter((s) => s.status === 'PENDING').length,
+          )}
+          busy={completingId === confirmRoute.id}
+          error={confirmError}
+          onCancel={() => {
+            if (completingId) return;
+            setConfirmRoute(null);
+            setConfirmError(null);
+          }}
+          onConfirm={() => void submitComplete()}
+        />
+      ) : null}
     </section>
   );
 }

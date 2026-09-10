@@ -20,6 +20,7 @@ export function LoginForm({ changedBanner }: { changedBanner?: boolean }) {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     const errors = validateLogin(email, password);
     setFieldErrors(errors);

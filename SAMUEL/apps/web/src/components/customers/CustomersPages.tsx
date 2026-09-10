@@ -4,7 +4,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
-import { DataTable, FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
+import { useSessionUser } from '@/lib/session-context';
+import { DataTable, DetailItem, DetailSection, EditableRecordShell, FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
 import { CustomerLocationMap } from '@/components/customers/CustomerLocationMap';
 import {
   OperationalSummaryStrip,
@@ -68,7 +69,21 @@ function buildAddressQuery(parts: {
     .join(', ');
 }
 
+/** EMPLOYEE não acessa o catálogo Clientes — redireciona para Minha rota. */
+function useBlockEmployeeFromCustomers(): boolean {
+  const user = useSessionUser();
+  const router = useRouter();
+  const blocked = user?.role === 'EMPLOYEE';
+
+  useEffect(() => {
+    if (blocked) router.replace('/field/my-route');
+  }, [blocked, router]);
+
+  return blocked;
+}
+
 export function CustomersListPage() {
+  const blocked = useBlockEmployeeFromCustomers();
   const [rows, setRows] = useState<
     (CustomerDto & {
       openServiceOrders?: number;
@@ -108,9 +123,12 @@ export function CustomersListPage() {
   }
 
   useEffect(() => {
+    if (blocked) return;
     load('');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [blocked]);
+
+  if (blocked) return null;
 
   return (
     <div>
@@ -801,8 +819,70 @@ function CustomerForm({
   );
 }
 
+function CustomerDetailView({ data }: { data: CustomerDto }) {
+  const statusLabel = data.status === 'ACTIVE' ? 'Ativo' : data.status === 'INACTIVE' ? 'Inativo' : data.status;
+  return (
+    <>
+      <DetailSection title="Identificação">
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <DetailItem label="Nome / razão social" value={data.name} />
+          <DetailItem label="Nome fantasia" value={data.tradeName} />
+          <DetailItem label="CPF/CNPJ" value={data.document} className="sm:col-span-2" />
+        </dl>
+      </DetailSection>
+      <DetailSection title="Contato">
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <DetailItem label="Telefone" value={data.phone} />
+          <DetailItem label="WhatsApp" value={data.whatsapp} />
+          <DetailItem label="E-mail" value={data.email} className="sm:col-span-2" />
+        </dl>
+      </DetailSection>
+      <DetailSection title="Endereço">
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <DetailItem label="CEP" value={data.zipCode} />
+          <DetailItem label="Rua" value={data.street} />
+          <DetailItem label="Número" value={data.number} />
+          <DetailItem label="Complemento" value={data.complement} />
+          <DetailItem label="Bairro" value={data.district} />
+          <DetailItem label="Cidade" value={data.city} />
+          <DetailItem label="UF" value={data.state} />
+        </dl>
+      </DetailSection>
+      <DetailSection title="Localização no mapa">
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <DetailItem
+            label="Latitude"
+            value={data.latitude != null ? String(data.latitude) : null}
+          />
+          <DetailItem
+            label="Longitude"
+            value={data.longitude != null ? String(data.longitude) : null}
+          />
+        </dl>
+        <CustomerLocationMap
+          latitude={data.latitude}
+          longitude={data.longitude}
+          readOnly
+          title="Local no mapa"
+        />
+      </DetailSection>
+      <DetailSection title="Classificação">
+        <dl className="grid gap-3 sm:grid-cols-2">
+          <DetailItem label="Categoria" value={data.category} />
+          <DetailItem label="Prioridade" value={data.priority} />
+          <DetailItem label="Observações" value={data.notes} className="sm:col-span-2" />
+          <DetailItem label="Status" value={statusLabel} />
+          <DetailItem label="Situação do pin" value={data.locationStatus} />
+        </dl>
+      </DetailSection>
+    </>
+  );
+}
+
 export function NewCustomerPage() {
+  const blocked = useBlockEmployeeFromCustomers();
   const router = useRouter();
+  if (blocked) return null;
   return (
     <div>
       <PageHeader
@@ -823,20 +903,25 @@ export function NewCustomerPage() {
 }
 
 export function EditCustomerPage({ id }: { id: string }) {
+  const blocked = useBlockEmployeeFromCustomers();
   const [data, setData] = useState<CustomerDto | null>(null);
   const [context, setContext] = useState<CustomerOpsContext | null>(null);
   const [ctxLoading, setCtxLoading] = useState(true);
   const [ctxError, setCtxError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [formKey, setFormKey] = useState(0);
 
   useEffect(() => {
+    if (blocked) return;
     apiFetch<{ customer: CustomerDto }>(`/api/v1/customers/${id}`)
       .then((r) => setData(r.customer))
       .catch((e) => setError(e instanceof ApiError ? e.message : 'Falha'));
-  }, [id]);
+  }, [id, blocked]);
 
   useEffect(() => {
+    if (blocked) return;
     setCtxLoading(true);
     apiFetch<CustomerOpsContext>(`/api/v1/ops/customers/${id}`)
       .then((r) => {
@@ -845,8 +930,9 @@ export function EditCustomerPage({ id }: { id: string }) {
       })
       .catch((e) => setCtxError(e instanceof ApiError ? e.message : 'Contexto indisponível'))
       .finally(() => setCtxLoading(false));
-  }, [id]);
+  }, [id, blocked]);
 
+  if (blocked) return null;
   if (error) return <p className="text-sm text-[var(--danger)]">{error}</p>;
   if (!data) return <div className="h-40 animate-pulse rounded-2xl bg-surface" />;
 
@@ -898,12 +984,32 @@ export function EditCustomerPage({ id }: { id: string }) {
         acoes={card?.acoes ?? []}
       />
       {msg ? <p className="mb-3 text-sm text-[var(--ok)]">{msg}</p> : null}
-      <CustomerForm
-        initial={data}
-        onSave={async (body) => {
-          await apiFetch(`/api/v1/customers/${id}`, { method: 'PATCH', body: JSON.stringify(body) });
-          setMsg('Salvo.');
+      <EditableRecordShell
+        mode={mode}
+        onEdit={() => {
+          setMsg(null);
+          setMode('edit');
         }}
+        onCancel={() => {
+          setFormKey((k) => k + 1);
+          setMode('view');
+        }}
+        view={<CustomerDetailView data={data} />}
+        edit={
+          <CustomerForm
+            key={formKey}
+            initial={data}
+            onSave={async (body) => {
+              const r = await apiFetch<{ customer: CustomerDto }>(`/api/v1/customers/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+              });
+              setData(r.customer ?? { ...data, ...(body as Partial<CustomerDto>) });
+              setMsg('Salvo.');
+              setMode('view');
+            }}
+          />
+        }
       />
     </div>
   );

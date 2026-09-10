@@ -27,13 +27,13 @@ export class CustomersController {
   constructor(private readonly customersService: CustomersService) {}
 
   @Get()
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR, UserRole.EMPLOYEE)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
   list(@CurrentUser() user: AuthUser, @Query() query: ListCustomersQueryDto) {
     return this.customersService.list(user, query);
   }
 
   @Post()
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR, UserRole.EMPLOYEE)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
   create(@CurrentUser() user: AuthUser, @Body() dto: CreateCustomerDto) {
     return this.customersService.create(user, dto);
   }
@@ -61,7 +61,7 @@ export class CustomersController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR, UserRole.EMPLOYEE)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
   getOne(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.getOne(user, id);
   }

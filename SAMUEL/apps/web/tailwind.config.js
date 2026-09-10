@@ -4,23 +4,23 @@ module.exports = {
   theme: {
     extend: {
       colors: {
-        canvas: '#121212',
-        surface: '#1C1C1E',
+        canvas: 'var(--bg)',
+        surface: 'var(--surface)',
         accent: {
-          DEFAULT: '#FF5722',
-          hover: '#E64A19',
+          DEFAULT: 'var(--accent)',
+          hover: 'var(--accent-hover)',
         },
-        route: '#2EE6C7',
+        route: 'var(--route)',
         brand: {
-          50: '#242426',
-          100: '#2c2c2e',
-          200: '#3a3a3c',
-          300: '#48484a',
-          500: '#FF5722',
-          600: '#FF5722',
-          700: '#E64A19',
-          800: '#c8c8ca',
-          900: '#f2f2f4',
+          50: 'var(--surface-2)',
+          100: 'var(--surface-2)',
+          200: 'var(--border-strong)',
+          300: 'var(--muted)',
+          500: 'var(--accent)',
+          600: 'var(--accent)',
+          700: 'var(--accent-hover)',
+          800: 'var(--muted)',
+          900: 'var(--ink)',
         },
       },
       fontFamily: {

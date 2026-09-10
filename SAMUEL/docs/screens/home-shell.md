@@ -59,7 +59,7 @@ Top-nav horizontal (removida; `AppNav` legado só no mobile antigo).
 ### 12. Como testar
 
 1. ADMIN: três grupos visíveis.
-2. EMPLOYEE: Início, Agenda, Campo, Clientes; sem Mapa/Serviços/Rotas/Empresa.
+2. EMPLOYEE: Início, Agenda, Campo; sem Clientes/Mapa/Serviços/Rotas/Empresa.
 3. SUPERVISOR: Mapa/Agenda/Serviços/Rotas/Clientes; sem Funcionários/Veículos/Admin.
 4. `/` e `/map` sem padding `max-w-5xl`.
 

@@ -34,14 +34,14 @@ Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-mult
 }
 ```
 
-- EMPLOYEE: só se existe `RouteStop` do cliente em rota `IN_PROGRESS` do próprio `employeeId`
+- EMPLOYEE: só se existe `RouteStop` do cliente em rota `IN_PROGRESS` do próprio `employeeId` **e** essa rota tem `recordTrip: true` (Gravar viagem)
 - Side effects: cria `CustomerLandmark` + Point PostGIS (trigger)
 
 ### Respostas
 
 **201/200** — `{ landmark }`
 
-**403** — `LANDMARK_FORBIDDEN` / `AUTH_FORBIDDEN`
+**403** — `LANDMARK_FORBIDDEN` / `LANDMARK_RECORD_TRIP_REQUIRED` / `AUTH_FORBIDDEN`
 
 **404** — `CUSTOMER_NOT_FOUND`
 
@@ -49,7 +49,7 @@ Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-mult
 
 ### Como testar
 
-Campo em navegação com GPS → botão Porteira; gestor em `/map` vê o marco.
+Campo em navegação **com Gravar viagem** + GPS → botão Porteira; gestor em `/map` (pin ou rota pintada) vê o marco. Sem Gravar viagem os botões não aparecem e o POST do EMPLOYEE retorna 403.
 
 ---
 
@@ -127,16 +127,16 @@ Campo em navegação com GPS → botão Porteira; gestor em `/map` vê o marco.
 }
 ```
 
-- `customerIds`: 1–25, únicos, ACTIVE, mesma empresa, **com pin**; se `recordTrip: true`, exatamente **1**
+- `customerIds`: 1–25, únicos, ACTIVE, mesma empresa, **com pin**; `recordTrip: true` exige ≥1 cliente (aplica a todas as rotas do lote)
 - `employeeIds`: 1–8, ≤ clientes, ACTIVE, **com `userId`**
 - `originMode`: `EMPLOYEE_LAST` (padrão) ou `COMPANY`. Última loc. = Redis live (120 s) senão último `tracking_points` da **mesma empresa**; sem ponto → pin E (`company_fallback`)
-- `recordTrip`: default false; grava trilha no check-in
+- `recordTrip`: default false; grava trilha no check-in de cada cliente
 - Não cria OS/visita/rota
 - Split: carga balanceada (±1), proximidade a partir da origem escolhida, clusters por ângulo se todos no E
 - Ordem das paradas: **mais perto → mais longe** a partir da origem escolhida; traçado OSRM `/route` (ordem fixa), **CustomerAccessPath ACTIVE** (1 parada, geometria recortada a partir da origem GPS — não a trilha inteira da gravação) ou linha reta; roundtrip volta ao pin da empresa (**E**)
 - Cada assignment inclui `startOrigin`: `{ source: live|tracking_history|company|company_fallback, name, latitude, longitude, recordedAt }`
 - Play (`POST /routes/:id/start`) e `reroute`: mesma regra com o GPS real do celular; HUD de navegação calcula Tempo/ETA com a velocidade ao vivo
-- Erro: `ROUTE_RECORD_TRIP_SINGLE_CUSTOMER`
+- Erro: `ROUTE_RECORD_TRIP_NO_CUSTOMERS` (só se `recordTrip` sem clientes)
 
 ### Respostas
 
@@ -258,6 +258,25 @@ Formato interno de `plannedStepsJson`:
 - Body: `{ date, employeeId, vehicleId, stops: [{ visitId, sequence, distanceMeters?, durationSeconds? }], roundtrip?, recordTrip?, plannedDistanceMeters?, plannedDurationSeconds?, geometry?, quality? }`
 - Cria rota `PLANNED`; `recordTrip` exige 1 visita
 
+## Endpoint PATCH /api/v1/routes/:id
+
+- Auth: ADMIN, MANAGER
+- Pré: status `PLANNED` | `PUBLISHED` (antes do Play); senão `422 ROUTE_NOT_EDITABLE`
+- Body: mesmo shape de `POST /routes` (`date`, `employeeId`, `vehicleId`, `stops`, `roundtrip?`, `recordTrip?`, métricas/geometria)
+- Side effects: substitui paradas; visitas removidas `ASSIGNED` → `SCHEDULED` + `employeeId` null; se rota `PUBLISHED`, visitas finais → `ASSIGNED` com o funcionário da rota; atualiza PostGIS `planned_geometry`
+- Visitas novas não podem estar em outra rota ativa (`ROUTE_VISIT_ALREADY_ASSIGNED`; a própria rota é ignorada)
+- Respostas: **200** `{ route }` | **404** `ROUTE_NOT_FOUND` | **422** `ROUTE_NOT_EDITABLE` / `ROUTE_DUPLICATE_VISITS` / …
+- Como testar: Rotas de hoje → Gerir → alterar funcionário/paradas → Salvar
+
+## Endpoint POST /api/v1/routes/:id/cancel
+
+- Auth: ADMIN, MANAGER
+- Pré: status `PLANNED` | `PUBLISHED`; senão `422 ROUTE_NOT_EDITABLE`
+- Body: vazio
+- Side effects: visitas `ASSIGNED` das paradas → `SCHEDULED` + limpa `employeeId`; apaga `RouteStop`s (`visitId` unique); `status = CANCELLED`
+- Respostas: **200** `{ route }` (stops vazios) | **404** | **422** `ROUTE_NOT_EDITABLE`
+- Como testar: Rotas de hoje → Gerir → Cancelar rota → visitas livres no planejador
+
 ## Endpoint POST /api/v1/routes/:id/publish
 
 - Auth: ADMIN, MANAGER
@@ -298,11 +317,13 @@ Formato interno de `plannedStepsJson`:
 ## Endpoint POST /api/v1/routes/:id/complete
 
 - Auth: EMPLOYEE atribuído
-- Body: vazio
-- Pré: `IN_PROGRESS` → `COMPLETED`; grava `actualDurationSeconds` a partir de `startedAt`
+- Body: `{ mode: "COMPLETED" | "INCOMPLETE" }`
+- Pré: `IN_PROGRESS`; visita `ARRIVED`/`IN_PROGRESS` → `ROUTE_HAS_OPEN_VISIT`
+- Regra 500 m: restante planejado das paradas `PENDING` ≤ 500 m (ou 0 pendentes) → pode `COMPLETED` (PENDING → `SKIPPED`); acima de 500 m só `INCOMPLETE`. Se `mode=INCOMPLETE` com ≤500 m, API promove para `COMPLETED`.
 - Respostas:
-  - **200** — `{ route }` (mesmo shape de `getOne`)
-  - **422** `ROUTE_NOT_IN_PROGRESS` — rota não está em andamento
+  - **200** — `{ route }` (mesmo shape de `getOne`); status `COMPLETED` ou `INCOMPLETE`
+  - **422** `ROUTE_NOT_IN_PROGRESS` / `ROUTE_HAS_PENDING_STOPS` / `ROUTE_HAS_OPEN_VISIT`
   - **403** `ROUTE_NOT_ASSIGNED` / `ROUTE_COMPLETE_EMPLOYEE_ONLY`
-- Side effects: status `COMPLETED`; libera o funcionário para dar Play em outra rota do dia
-- Como testar: Play → Encerrar nav → Concluir em `/field/my-route` → Play na segunda rota
+- Side effects: status terminal; libera Play em outra rota; gestor vê incompletas + trilha em `/map?routeId=`
+- UI: arrastar em `/field/my-route` e `/field/navigate`
+- Como testar: Play → concluir com pendentes longe → `INCOMPLETE`; ≤500 m ou tudo feito → `COMPLETED`

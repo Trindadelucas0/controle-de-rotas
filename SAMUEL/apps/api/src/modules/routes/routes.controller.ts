@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   ParseUUIDPipe,
+  Patch,
   Post,
   Query,
   UseGuards,
@@ -11,6 +12,7 @@ import {
 import { UserRole } from '@prisma/client';
 import { RoutesService } from './routes.service';
 import {
+  CompleteRouteDto,
   CreateRouteDto,
   DispatchCustomersRouteDto,
   ListRoutesQueryDto,
@@ -18,6 +20,7 @@ import {
   PreviewRouteDto,
   RerouteRouteDto,
   StartRouteDto,
+  UpdateRouteDto,
 } from './dto/routes.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -64,6 +67,22 @@ export class RoutesController {
     return this.routesService.getOne(user, id);
   }
 
+  @Patch(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRouteDto,
+  ) {
+    return this.routesService.update(user, id, dto);
+  }
+
+  @Post(':id/cancel')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  cancel(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.routesService.cancel(user, id);
+  }
+
   @Post(':id/publish')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   publish(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
@@ -92,7 +111,11 @@ export class RoutesController {
 
   @Post(':id/complete')
   @Roles(UserRole.EMPLOYEE)
-  complete(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.routesService.complete(user, id);
+  complete(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: CompleteRouteDto,
+  ) {
+    return this.routesService.complete(user, id, dto);
   }
 }

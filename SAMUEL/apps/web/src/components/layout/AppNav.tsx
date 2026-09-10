@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import type { SessionUser } from '@/lib/auth';
+import { roleAllowed } from '@/lib/roles';
 
 type NavItem = { href: string; label: string; roles?: string[] };
 type NavGroup = { id: string; label: string; items: NavItem[] };
@@ -24,7 +25,7 @@ const groups: NavGroup[] = [
     id: 'recursos',
     label: 'Recursos',
     items: [
-      { href: '/customers', label: 'Clientes' },
+      { href: '/customers', label: 'Clientes', roles: ['ADMIN', 'MANAGER', 'SUPERVISOR'] },
       { href: '/employees', label: 'Funcionários', roles: ['ADMIN', 'MANAGER'] },
       { href: '/vehicles', label: 'Veículos', roles: ['ADMIN', 'MANAGER'] },
     ],
@@ -33,6 +34,7 @@ const groups: NavGroup[] = [
     id: 'administracao',
     label: 'Administração',
     items: [
+      { href: '/settings/companies', label: 'Empresas', roles: ['PLATFORM_ADMIN'] },
       { href: '/settings/company', label: 'Empresa', roles: ['ADMIN'] },
       { href: '/settings/users', label: 'Usuários', roles: ['ADMIN'] },
     ],
@@ -56,7 +58,7 @@ export function AppSidebarNav({
   const visibleGroups = groups
     .map((g) => ({
       ...g,
-      items: g.items.filter((l) => !l.roles || l.roles.includes(user.role)),
+      items: g.items.filter((l) => roleAllowed(user.role, l.roles)),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -78,7 +80,7 @@ export function AppSidebarNav({
                     className={`block rounded-[6px] px-3 py-2 text-sm font-medium transition ${
                       active
                         ? 'bg-accent text-white'
-                        : 'text-brand-800 hover:bg-white/[0.04] hover:text-brand-900'
+                        : 'text-[var(--muted)] hover:bg-[var(--surface-2)] hover:text-[var(--ink)]'
                     }`}
                   >
                     {l.label}
@@ -90,15 +92,5 @@ export function AppSidebarNav({
         </div>
       ))}
     </nav>
-  );
-}
-
-/** @deprecated top-nav removida — mantido nome AppNav para imports legados */
-export function AppNav({ user }: { user: SessionUser | null }) {
-  if (!user) return null;
-  return (
-    <div className="border-b border-brand-100 bg-surface lg:hidden">
-      <AppSidebarNav user={user} />
-    </div>
   );
 }

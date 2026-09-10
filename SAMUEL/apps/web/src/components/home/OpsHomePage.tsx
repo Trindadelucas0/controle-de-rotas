@@ -38,6 +38,7 @@ const ROUTE_LIST_STATUS: Record<string, string> = {
   PUBLISHED: 'Publicada',
   IN_PROGRESS: 'Em andamento',
   COMPLETED: 'Concluída',
+  INCOMPLETE: 'Incompleta',
   CANCELLED: 'Cancelada',
 };
 
@@ -133,7 +134,10 @@ export function OpsHomePage() {
   }
 
   const isOpsRole =
-    user.role === 'ADMIN' || user.role === 'MANAGER' || user.role === 'SUPERVISOR';
+    user.role === 'ADMIN' ||
+    user.role === 'PLATFORM_ADMIN' ||
+    user.role === 'MANAGER' ||
+    user.role === 'SUPERVISOR';
 
   if (!isOpsRole) {
     return (
@@ -149,15 +153,13 @@ export function OpsHomePage() {
           <Link href="/agenda" className="ops-btn ops-btn-secondary">
             Agenda
           </Link>
-          <Link href="/customers" className="ops-btn ops-btn-ghost">
-            Clientes
-          </Link>
         </div>
       </section>
     );
   }
 
-  const canManageTeam = user.role === 'ADMIN' || user.role === 'MANAGER';
+  const canManageTeam =
+    user.role === 'ADMIN' || user.role === 'PLATFORM_ADMIN' || user.role === 'MANAGER';
 
   const empty =
     data &&

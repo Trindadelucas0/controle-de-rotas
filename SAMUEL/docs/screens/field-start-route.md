@@ -23,7 +23,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - Permitir localização → passo Resumo (solicita câmera/microfone em best-effort, não bloqueia)
   - Continuar / Voltar entre passos
   - **▶ Iniciar rota** (confirmar) → `POST /routes/:id/start` com body completo → `/field/navigate`
-- Estados: loading | error (rota não encontrada) | already_active (link Minha rota) | wizard steps | submitting
+- Estados: loading | error (rota não encontrada) | already_active (link Minha rota) | wizard steps | submitting (botão disabled + overlay **Iniciando…** desde o toque, antes do GPS; trava de reentrada)
 - Chamadas de API:
   - `GET /field/my-route?date=` — valida rota `PUBLISHED`
   - `GET /field/vehicles?routeId=`

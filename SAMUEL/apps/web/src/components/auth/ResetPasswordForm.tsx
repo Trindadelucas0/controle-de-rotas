@@ -47,6 +47,7 @@ export function ResetPasswordForm({ token }: { token: string | null }) {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     const errors = validateReset(password, passwordConfirmation);
     setFieldErrors(errors);

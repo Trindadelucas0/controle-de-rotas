@@ -2,7 +2,6 @@
 
 export const LANDMARK_NOTE_MAX = 300;
 export const LANDMARK_PROXIMITY_M = 120;
-export const RECORD_TRIP_MAX_CUSTOMERS = 1;
 
 export type LatLngPoint = { latitude: number; longitude: number };
 
@@ -13,18 +12,18 @@ export type LineStringGeometry = {
 
 export type RecordTripValidation =
   | { ok: true }
-  | { ok: false; code: 'ROUTE_RECORD_TRIP_SINGLE_CUSTOMER'; message: string };
+  | { ok: false; code: 'ROUTE_RECORD_TRIP_NO_CUSTOMERS'; message: string };
 
 export function validateRecordTripCustomers(
   recordTrip: boolean | undefined,
   customerCount: number,
 ): RecordTripValidation {
   if (!recordTrip) return { ok: true };
-  if (customerCount === RECORD_TRIP_MAX_CUSTOMERS) return { ok: true };
+  if (customerCount >= 1) return { ok: true };
   return {
     ok: false,
-    code: 'ROUTE_RECORD_TRIP_SINGLE_CUSTOMER',
-    message: 'Gravar viagem exige exatamente 1 cliente na rota.',
+    code: 'ROUTE_RECORD_TRIP_NO_CUSTOMERS',
+    message: 'Gravar viagem exige ao menos 1 cliente na rota.',
   };
 }
 
@@ -174,6 +173,8 @@ export type LandmarkAuthInput = {
   customerFoundInTenant: boolean;
   /** EMPLOYEE: tem rota IN_PROGRESS com parada neste cliente */
   employeeOnInProgressRouteForCustomer: boolean;
+  /** EMPLOYEE: essa rota IN_PROGRESS tem recordTrip (Gravar viagem) */
+  routeHasRecordTrip: boolean;
 };
 
 export type LandmarkAuthResult =
@@ -207,6 +208,14 @@ export function evaluateLandmarkCreateAuth(input: LandmarkAuthInput): LandmarkAu
         statusCode: 403,
         code: 'LANDMARK_FORBIDDEN',
         message: 'Só é possível marcar marcos em rota em andamento deste cliente.',
+      };
+    }
+    if (!input.routeHasRecordTrip) {
+      return {
+        ok: false,
+        statusCode: 403,
+        code: 'LANDMARK_RECORD_TRIP_REQUIRED',
+        message: 'Marcos só podem ser marcados em rota com Gravar viagem.',
       };
     }
     return { ok: true };

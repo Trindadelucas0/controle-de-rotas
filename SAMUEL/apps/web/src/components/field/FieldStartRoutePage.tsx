@@ -15,6 +15,8 @@ import {
   type RouteGpsWatchHandle,
 } from '@/lib/field-tracking';
 import { StartRoutePreviewMap } from './StartRoutePreviewMap';
+import { ActionButton } from '@/components/ui/ActionButton';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 
 type RouteStop = {
   id: string;
@@ -247,13 +249,16 @@ export function FieldStartRoutePage() {
   }
 
   async function onStartRoute() {
-    if (!route || !vehicleId) return;
+    if (!route || !vehicleId || submitting) return;
     const km = Number(odometerKm.replace(',', '.'));
     if (!Number.isFinite(km) || km <= 0) {
       setError('Informe o km inicial do veículo.');
       setErrorCode(null);
       return;
     }
+    setSubmitting(true);
+    setError(null);
+    setErrorCode(null);
     let fix = gps;
     if (!fix) {
       if (isInsecureGeolocationContext()) {
@@ -270,6 +275,7 @@ export function FieldStartRoutePage() {
         } catch (e) {
           setError(e instanceof Error ? e.message : 'GPS obrigatório para iniciar');
           setErrorCode(null);
+          setSubmitting(false);
           return;
         }
       }
@@ -277,11 +283,9 @@ export function FieldStartRoutePage() {
     if (!fix) {
       setError('GPS obrigatório para iniciar');
       setErrorCode(null);
+      setSubmitting(false);
       return;
     }
-    setSubmitting(true);
-    setError(null);
-    setErrorCode(null);
     try {
       await apiFetch(`/api/v1/routes/${route.id}/start`, {
         method: 'POST',
@@ -347,7 +351,8 @@ export function FieldStartRoutePage() {
   ) : null;
 
   return (
-    <section className="mx-auto max-w-lg space-y-6">
+    <section className="relative mx-auto max-w-lg space-y-6">
+      <LoadingOverlay show={submitting} label="Iniciando…" />
       <div>
         <Link href="/field/my-route" className="text-sm ops-link">
           ← Minha rota
@@ -593,19 +598,21 @@ export function FieldStartRoutePage() {
           <div className="flex gap-2">
             <button
               type="button"
+              disabled={submitting}
               onClick={() => setStep('checklist')}
-              className="flex-1 rounded-xl border border-brand-200 px-4 py-2 text-sm font-semibold"
+              className="flex-1 rounded-xl border border-brand-200 px-4 py-2 text-sm font-semibold disabled:opacity-60"
             >
               Voltar
             </button>
-            <button
-              type="button"
+            <ActionButton
               disabled={submitting}
+              loading={submitting}
+              loadingLabel="Iniciando…"
               onClick={() => void onStartRoute()}
-              className="flex-1 ops-btn ops-btn-primary disabled:opacity-60"
+              className="flex-1 justify-center"
             >
-              {submitting ? 'Iniciando…' : '▶ Iniciar rota'}
-            </button>
+              ▶ Iniciar rota
+            </ActionButton>
           </div>
         </div>
       ) : null}

@@ -34,7 +34,7 @@ async function main() {
     update: {
       name: 'Admin Demo',
       passwordHash,
-      role: UserRole.ADMIN,
+      role: UserRole.PLATFORM_ADMIN,
       status: UserStatus.ACTIVE,
       companyId: company.id,
     },
@@ -42,7 +42,7 @@ async function main() {
       name: 'Admin Demo',
       email,
       passwordHash,
-      role: UserRole.ADMIN,
+      role: UserRole.PLATFORM_ADMIN,
       status: UserStatus.ACTIVE,
       companyId: company.id,
     },

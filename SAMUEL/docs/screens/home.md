@@ -23,7 +23,7 @@ H1 Centro de Operações + Dia
 └── Rotas do dia
 ```
 
-EMPLOYEE: capa com Minha rota / Agenda / Clientes (sem snapshot).
+EMPLOYEE: capa com Minha rota / Agenda (sem Clientes, sem snapshot).
 
 ### 3. Informação / KPI (só API)
 

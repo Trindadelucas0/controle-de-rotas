@@ -70,11 +70,13 @@ Telemetria, cartão combustível, associação manual rota↔veículo nesta tela
 
 - Rotas: `/vehicles/new`, `/vehicles/[id]`
 - Papéis: ADMIN, MANAGER
-- Arquivo: `VehicleForm` em `VehiclesPages.tsx`
+- Arquivo: `VehicleForm` + `EditableRecordShell` em `VehiclesPages.tsx`
 
 ### 2. Componentes
 
-`PageHeader` + `FormCard` com TextFields + SelectField Status.
+**Novo:** `PageHeader` + `FormCard` sempre editável.
+
+**Detalhe `[id]`:** modo leitura (Identificação / Especificações / Situação) + botão **Editar**; Cancelar/Salvar voltam à leitura.
 
 ### 3. Informação
 
@@ -98,11 +100,11 @@ N/A no form.
 
 ### 6. Ações
 
-Salvar → `POST /vehicles` ou `PATCH /vehicles/:id`; após criar → `/vehicles/:id`.
+Editar / Cancelar (só detalhe); Salvar → `POST /vehicles` ou `PATCH /vehicles/:id`; após criar → `/vehicles/:id` (já em view).
 
 ### 7. Estados
 
-loading detalhe (skeleton) | saving | error (ex.: placa duplicada) | success
+loading detalhe (skeleton) | view | edit / saving | error (ex.: placa duplicada) | success
 
 ### 8. Permissões
 
@@ -110,7 +112,7 @@ ADMIN, MANAGER.
 
 ### 9. Navegação
 
-Lista ↔ form; create redirect para edit.
+Lista ↔ form; create redirect para detalhe.
 
 ### 10. Mobile / PWA
 
@@ -121,6 +123,8 @@ Form full-width.
 Histórico de KM real da rota; fotos do veículo.
 
 ### 12. Como testar
+
+Abrir `[id]` → view; Editar → Salvar → view atualizada.
 
 1. Placa duplicada → erro API.
 2. Status AVAILABLE → aparece no fluxo de rotas.

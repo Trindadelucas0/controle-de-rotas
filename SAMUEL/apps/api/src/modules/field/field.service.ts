@@ -39,6 +39,7 @@ const myRouteSelect = {
           id: true,
           customer: { select: { id: true, name: true } },
           serviceOrder: { select: { id: true, number: true, title: true } },
+          status: true,
         },
       },
     },

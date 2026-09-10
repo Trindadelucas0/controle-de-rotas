@@ -64,3 +64,8 @@ export class PostTrackingPointsDto {
   @Type(() => TrackingPointDto)
   points!: TrackingPointDto[];
 }
+
+export class TrackingHistoryQueryDto {
+  @IsUUID('4')
+  routeId!: string;
+}

@@ -15,14 +15,15 @@ describe('validateRecordTripCustomers', () => {
     expect(validateRecordTripCustomers(true, 1)).toEqual({ ok: true });
   });
 
-  it('recusa recordTrip=true com 0 ou 2+ clientes', () => {
+  it('permite quando recordTrip=true com vários clientes', () => {
+    expect(validateRecordTripCustomers(true, 2)).toEqual({ ok: true });
+    expect(validateRecordTripCustomers(true, 5)).toEqual({ ok: true });
+  });
+
+  it('recusa recordTrip=true sem clientes', () => {
     const a = validateRecordTripCustomers(true, 0);
     expect(a.ok).toBe(false);
-    if (!a.ok) expect(a.code).toBe('ROUTE_RECORD_TRIP_SINGLE_CUSTOMER');
-
-    const b = validateRecordTripCustomers(true, 2);
-    expect(b.ok).toBe(false);
-    if (!b.ok) expect(b.code).toBe('ROUTE_RECORD_TRIP_SINGLE_CUSTOMER');
+    if (!a.ok) expect(a.code).toBe('ROUTE_RECORD_TRIP_NO_CUSTOMERS');
   });
 });
 
@@ -32,6 +33,7 @@ describe('evaluateLandmarkCreateAuth', () => {
     actorEmployeeId: 'emp-1',
     customerFoundInTenant: true,
     employeeOnInProgressRouteForCustomer: true,
+    routeHasRecordTrip: true,
   };
 
   it('ADMIN pode criar', () => {
@@ -41,11 +43,12 @@ describe('evaluateLandmarkCreateAuth', () => {
         actorRole: 'ADMIN',
         actorEmployeeId: null,
         employeeOnInProgressRouteForCustomer: false,
+        routeHasRecordTrip: false,
       }),
     ).toEqual({ ok: true });
   });
 
-  it('EMPLOYEE na rota IN_PROGRESS do cliente pode criar', () => {
+  it('EMPLOYEE na rota IN_PROGRESS com Gravar viagem pode criar', () => {
     expect(evaluateLandmarkCreateAuth(base)).toEqual({ ok: true });
   });
 
@@ -58,6 +61,18 @@ describe('evaluateLandmarkCreateAuth', () => {
     if (!r.ok) {
       expect(r.statusCode).toBe(403);
       expect(r.code).toBe('LANDMARK_FORBIDDEN');
+    }
+  });
+
+  it('EMPLOYEE na rota sem Gravar viagem é 403', () => {
+    const r = evaluateLandmarkCreateAuth({
+      ...base,
+      routeHasRecordTrip: false,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.statusCode).toBe(403);
+      expect(r.code).toBe('LANDMARK_RECORD_TRIP_REQUIRED');
     }
   });
 

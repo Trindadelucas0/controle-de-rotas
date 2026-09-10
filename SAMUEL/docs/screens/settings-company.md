@@ -7,21 +7,26 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §6.
 ### 1. Identidade
 
 - Rota: `/settings/company`
-- Papéis: ADMIN (nav + API `PATCH`); leitura via `GET /companies/me` autenticado
-- Objetivo: dados da empresa + pin de origem para cálculo de rotas
+- Papéis: ADMIN / PLATFORM_ADMIN (nav + API `PATCH`); leitura via `GET /companies/me` autenticado
+- Objetivo: dados da **própria** empresa + pin de origem para cálculo de rotas
 - Arquivo: `CompanyAndUsers.tsx` → `CompanySettingsPage`
+- Relacionado: provisionamento de outros tenants em `/settings/companies` (só PLATFORM_ADMIN)
 
 ### 2. Componentes
 
 ```
 PageHeader “Empresa”
 ├── msg sucesso “Salvo com sucesso.”
-└── FormCard
-    ├── TextFields (razão, fantasia, CNPJ, telefone, e-mail, CEP, endereço)
-    ├── Buscar endereço + lista sugestões Nominatim
-    ├── CustomerLocationMap (pin opcional)
-    └── SelectField Status
+└── EditableRecordShell
+    ├── view: DetailSections + mapa readOnly
+    └── edit: FormCard
+        ├── TextFields (razão, fantasia, CNPJ, telefone, e-mail, CEP, endereço)
+        ├── Buscar endereço + lista sugestões Nominatim
+        ├── CustomerLocationMap (pin opcional)
+        └── SelectField Status
 ```
+
+Abre em **modo leitura**; **Editar** libera inputs; **Cancelar**/Salvar voltam à leitura.
 
 ### 3. Informação
 
@@ -49,8 +54,10 @@ Busca de endereço (Nominatim); CEP lookup. Sem filtro de lista.
 
 | Ação | Efeito |
 | --- | --- |
-| Salvar | `PATCH /api/v1/companies/me` (incl. lat/lng) |
-| Clique/arraste no mapa | define pin |
+| Editar | mode=edit |
+| Cancelar | restaura dados salvos → view |
+| Salvar | `PATCH /api/v1/companies/me` (incl. lat/lng) → view |
+| Clique/arraste no mapa | define pin (só edit) |
 | Escolher sugestão | preenche endereço + pin |
 
 Hints CEP/endereço: loading / not_found / rate_limit / error.

@@ -159,7 +159,7 @@ N/A.
 
 ### 7. Estados
 
-loading | not found | error | success msg | empty visitas
+loading | not found | error | success msg | empty visitas | cancelando (botão disabled + trava) | add visit (FormCard loading + campos disabled)
 
 ### 8. Permissões
 

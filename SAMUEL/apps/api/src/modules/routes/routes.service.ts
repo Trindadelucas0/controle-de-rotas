@@ -7,6 +7,7 @@ import {
   EmployeeStatus,
   Prisma,
   RouteStatus,
+  RouteStopStatus,
   ServiceOrderStatus,
   UserRole,
   VehicleStatus,
@@ -20,6 +21,7 @@ import { TrackingService } from '../tracking/tracking.service';
 import { allocateServiceOrderNumber } from '../service-orders/service-order-seq';
 import { customerHasPin, visitAddressSnapshot } from '../service-orders/visit-snapshot';
 import {
+  CompleteRouteDto,
   CreateRouteDto,
   DispatchCustomersRouteDto,
   ListRoutesQueryDto,
@@ -27,8 +29,14 @@ import {
   PreviewRouteDto,
   RerouteRouteDto,
   StartRouteDto,
+  UpdateRouteDto,
   type RouteOriginMode,
 } from './dto/routes.dto';
+import {
+  canCompleteAsFinished,
+  remainingPlannedMeters,
+  ROUTE_COMPLETE_REMAINING_TOLERANCE_METERS,
+} from './route-complete.util';
 import {
   GeoStop,
   OptimizedTrip,
@@ -66,6 +74,12 @@ const ACTIVE_ROUTE_STATUSES: RouteStatus[] = [
   RouteStatus.ASSIGNED,
   RouteStatus.PUBLISHED,
   RouteStatus.IN_PROGRESS,
+];
+
+/** Cancelar / editar só antes do Play. */
+const EDITABLE_ROUTE_STATUSES: RouteStatus[] = [
+  RouteStatus.PLANNED,
+  RouteStatus.PUBLISHED,
 ];
 
 const DAY_ACTIVE_ROUTE_STATUSES: RouteStatus[] = [
@@ -354,11 +368,20 @@ export class RoutesService {
         employee: { select: { id: true, name: true } },
         vehicle: { select: { id: true, plate: true } },
         _count: { select: { stops: true } },
+        stops: { select: { status: true } },
       },
       orderBy: [{ date: 'desc' }, { createdAt: 'desc' }],
       take: 100,
     });
-    return { routes };
+    return {
+      routes: routes.map(({ stops, ...route }) => ({
+        ...route,
+        stopsDone: stops.filter(
+          (s) =>
+            s.status === RouteStopStatus.COMPLETED || s.status === RouteStopStatus.FAILED,
+        ).length,
+      })),
+    };
   }
 
   async getOne(user: AuthUser, id: string) {
@@ -525,6 +548,188 @@ export class RoutesService {
           employeeId: route.employeeId,
         },
       });
+    });
+
+    return this.getOne(user, id);
+  }
+
+  async cancel(user: AuthUser, id: string) {
+    const route = await this.prisma.route.findFirst({
+      where: { id, companyId: user.companyId },
+      include: { stops: { select: { visitId: true } } },
+    });
+    if (!route) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
+    }
+    this.assertRouteEditable(route.status);
+
+    const visitIds = route.stops.map((s) => s.visitId);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (visitIds.length) {
+        await tx.visit.updateMany({
+          where: {
+            id: { in: visitIds },
+            companyId: user.companyId,
+            status: VisitStatus.ASSIGNED,
+          },
+          data: {
+            status: VisitStatus.SCHEDULED,
+            employeeId: null,
+          },
+        });
+        await tx.routeStop.deleteMany({ where: { routeId: id } });
+      }
+      await tx.route.update({
+        where: { id },
+        data: { status: RouteStatus.CANCELLED },
+      });
+    });
+
+    return this.getOne(user, id);
+  }
+
+  async update(user: AuthUser, id: string, dto: UpdateRouteDto) {
+    const route = await this.prisma.route.findFirst({
+      where: { id, companyId: user.companyId },
+      include: { stops: { select: { visitId: true } } },
+    });
+    if (!route) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
+    }
+    this.assertRouteEditable(route.status);
+
+    const roundtrip = dto.roundtrip !== false;
+    const visitIds = dto.stops.map((s) => s.visitId);
+    const uniqueIds = [...new Set(visitIds)];
+    if (uniqueIds.length !== visitIds.length) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_DUPLICATE_VISITS',
+        'Remova visitas duplicadas da rota.',
+      );
+    }
+    if (new Set(dto.stops.map((s) => s.sequence)).size !== dto.stops.length) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_DUPLICATE_SEQUENCE',
+        'Sequência de paradas inválida.',
+      );
+    }
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { id: dto.employeeId, companyId: user.companyId },
+      select: { id: true },
+    });
+    if (!employee) {
+      throw httpError(HttpStatus.NOT_FOUND, 'EMPLOYEE_NOT_FOUND', 'Funcionário não encontrado.');
+    }
+
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: { id: dto.vehicleId, companyId: user.companyId },
+      select: { id: true },
+    });
+    if (!vehicle) {
+      throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
+    }
+
+    const { origin, stops: visitStops } = await this.loadVisitStops(user.companyId, uniqueIds);
+    await this.assertVisitsAvailable(user.companyId, uniqueIds, id);
+
+    const recordTrip = dto.recordTrip === true;
+    const recordCheck = validateRecordTripCustomers(recordTrip, uniqueIds.length);
+    if (!recordCheck.ok) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        recordCheck.code,
+        recordCheck.message,
+      );
+    }
+
+    const byId = new Map(visitStops.map((v) => [v.id, v]));
+    const orderedStops = [...dto.stops].sort((a, b) => a.sequence - b.sequence);
+    const previousVisitIds = route.stops.map((s) => s.visitId);
+    const nextSet = new Set(uniqueIds);
+    const removedVisitIds = previousVisitIds.filter((vid) => !nextSet.has(vid));
+
+    await this.prisma.$transaction(async (tx) => {
+      if (removedVisitIds.length) {
+        await tx.visit.updateMany({
+          where: {
+            id: { in: removedVisitIds },
+            companyId: user.companyId,
+            status: VisitStatus.ASSIGNED,
+          },
+          data: {
+            status: VisitStatus.SCHEDULED,
+            employeeId: null,
+          },
+        });
+      }
+
+      await tx.routeStop.deleteMany({ where: { routeId: id } });
+
+      await tx.route.update({
+        where: { id },
+        data: {
+          employeeId: dto.employeeId,
+          vehicleId: dto.vehicleId,
+          date: new Date(`${dto.date.slice(0, 10)}T00:00:00.000Z`),
+          roundtrip,
+          originName: origin.name,
+          originAddress: origin.address,
+          originLatitude: origin.latitude,
+          originLongitude: origin.longitude,
+          plannedDistanceMeters: dto.plannedDistanceMeters ?? null,
+          plannedDurationSeconds: dto.plannedDurationSeconds ?? null,
+          plannedGeometryJson: dto.geometry ?? Prisma.JsonNull,
+          recordTrip,
+          quality: dto.quality ?? null,
+          stops: {
+            create: orderedStops.map((s) => {
+              const visit = byId.get(s.visitId)!;
+              return {
+                companyId: user.companyId,
+                visitId: s.visitId,
+                sequence: s.sequence,
+                plannedDistanceMeters: s.distanceMeters ?? null,
+                plannedDurationSeconds: s.durationSeconds ?? null,
+                latitude: visit.latitude,
+                longitude: visit.longitude,
+              };
+            }),
+          },
+        },
+      });
+
+      if (dto.geometry?.coordinates?.length) {
+        const wkt = lineStringWkt(dto.geometry.coordinates);
+        await tx.$executeRaw`
+          UPDATE routes
+          SET planned_geometry = ST_SetSRID(ST_GeomFromText(${wkt}), 4326)
+          WHERE id = ${id}::uuid
+        `;
+      } else {
+        await tx.$executeRaw`
+          UPDATE routes
+          SET planned_geometry = NULL
+          WHERE id = ${id}::uuid
+        `;
+      }
+
+      if (route.status === RouteStatus.PUBLISHED) {
+        await tx.visit.updateMany({
+          where: {
+            id: { in: uniqueIds },
+            companyId: user.companyId,
+            status: { in: [VisitStatus.SCHEDULED, VisitStatus.RESCHEDULED, VisitStatus.ASSIGNED] },
+          },
+          data: {
+            status: VisitStatus.ASSIGNED,
+            employeeId: dto.employeeId,
+          },
+        });
+      }
     });
 
     return this.getOne(user, id);
@@ -919,7 +1124,7 @@ export class RoutesService {
     return this.getOne(user, id);
   }
 
-  async complete(user: AuthUser, id: string) {
+  async complete(user: AuthUser, id: string, dto: CompleteRouteDto) {
     if (user.role !== UserRole.EMPLOYEE) {
       throw httpError(
         HttpStatus.FORBIDDEN,
@@ -942,6 +1147,20 @@ export class RoutesService {
 
     const route = await this.prisma.route.findFirst({
       where: { id, companyId: user.companyId },
+      include: {
+        stops: {
+          orderBy: { sequence: 'asc' },
+          select: {
+            id: true,
+            status: true,
+            sequence: true,
+            latitude: true,
+            longitude: true,
+            plannedDistanceMeters: true,
+            visit: { select: { id: true, status: true } },
+          },
+        },
+      },
     });
     if (!route) {
       throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
@@ -953,7 +1172,10 @@ export class RoutesService {
         'Esta rota não está atribuída a você.',
       );
     }
-    if (route.status === RouteStatus.COMPLETED) {
+    if (
+      route.status === RouteStatus.COMPLETED ||
+      route.status === RouteStatus.INCOMPLETE
+    ) {
       return this.getOne(user, id);
     }
     if (route.status !== RouteStatus.IN_PROGRESS) {
@@ -964,18 +1186,60 @@ export class RoutesService {
       );
     }
 
+    const openVisit = route.stops.find(
+      (s) =>
+        s.visit?.status === VisitStatus.ARRIVED ||
+        s.visit?.status === VisitStatus.IN_PROGRESS,
+    );
+    if (openVisit) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_HAS_OPEN_VISIT',
+        'Finalize a visita em andamento antes de concluir a rota.',
+      );
+    }
+
+    const pendingStops = route.stops.filter((s) => s.status === RouteStopStatus.PENDING);
+    const remainingMeters = remainingPlannedMeters(route.stops);
+    const withinTolerance = canCompleteAsFinished(remainingMeters, pendingStops.length);
+
+    let finalStatus: RouteStatus = RouteStatus.COMPLETED;
+    if (dto.mode === 'INCOMPLETE') {
+      if (withinTolerance) {
+        finalStatus = RouteStatus.COMPLETED;
+      } else {
+        finalStatus = RouteStatus.INCOMPLETE;
+      }
+    } else if (!withinTolerance) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_HAS_PENDING_STOPS',
+        `Ainda há mais de ${ROUTE_COMPLETE_REMAINING_TOLERANCE_METERS} m de paradas pendentes. Finalize como incompleta ou complete as visitas.`,
+      );
+    }
+
     const now = new Date();
     const actualDurationSeconds =
       route.startedAt != null
         ? Math.max(0, Math.round((now.getTime() - route.startedAt.getTime()) / 1000))
         : null;
 
-    await this.prisma.route.update({
-      where: { id },
-      data: {
-        status: RouteStatus.COMPLETED,
-        actualDurationSeconds,
-      },
+    const pendingIds = pendingStops.map((s) => s.id);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (pendingIds.length) {
+        await tx.routeStop.updateMany({
+          where: { id: { in: pendingIds }, routeId: id },
+          data: { status: RouteStopStatus.SKIPPED },
+        });
+      }
+      await tx.route.update({
+        where: { id },
+        data: {
+          status: finalStatus,
+          actualDurationSeconds,
+        },
+      });
     });
 
     return this.getOne(user, id);
@@ -1448,10 +1712,25 @@ export class RoutesService {
     return { origin, stops };
   }
 
-  private async assertVisitsAvailable(companyId: string, visitIds: string[]) {
+  private assertRouteEditable(status: RouteStatus) {
+    if (!EDITABLE_ROUTE_STATUSES.includes(status)) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_NOT_EDITABLE',
+        'Só é possível cancelar ou alterar rotas planejadas ou publicadas (antes do início).',
+      );
+    }
+  }
+
+  private async assertVisitsAvailable(
+    companyId: string,
+    visitIds: string[],
+    exceptRouteId?: string,
+  ) {
     const busy = await this.prisma.routeStop.findMany({
       where: {
         visitId: { in: visitIds },
+        ...(exceptRouteId ? { routeId: { not: exceptRouteId } } : {}),
         route: { companyId, status: { in: ACTIVE_ROUTE_STATUSES } },
       },
       select: { visitId: true },

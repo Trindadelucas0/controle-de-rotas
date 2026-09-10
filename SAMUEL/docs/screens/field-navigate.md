@@ -18,13 +18,13 @@ div 100dvh (sem chrome do app)
 ├── Map Carto Dark
 │   ├── LineString ativa menta (`#2EE6C7`) — só até a parada-alvo; nasce no carro; atualiza após reroute
 │   ├── Markers paradas (próxima âmbar `#121212`; futuras laranja + branco)
-│   ├── Markers de marcos (laranja + texto branco)
+│   ├── Markers de marcos de **todas** as paradas (ícone por tipo: porteira / ponte / bifurcação / estrada ruim; `title` + aria-label em PT)
 │   └── Marker GPS = ícone de **carro** (heading + interpolação suave)
 ├── faixa superior: instrução (superfície escura + tinta) / “Chegando…” (âmbar + `#121212`) / “Recalculando…” / “Fora da rota…” / badge Gravando · N pts (âmbar se fila de rede)
-├── banner proximidade de marco (superfície `#1C1C1E` + **OK** laranja legível)
-├── botões rápidos de marco (Porteira / Ponte / Bifurcação / Estrada ruim)
+├── banner proximidade de marco (superfície `#1C1C1E` + **OK** laranja legível) — qualquer marco da rota ≤120 m
+├── botões rápidos de marco (Porteira / Ponte / Bifurcação / Estrada ruim) — **só se** `recordTrip` (Gravar viagem)
 ├── HUD inferior: tempo, km, ETA, km/h
-└── controles: Encerrar (confirm); botão alvo / Centralizar (follow)
+└── controles: Encerrar (confirm); botão alvo / Centralizar (follow) **acima do HUD** (`-top-14` / `sm:-top-16`, sobe com marcos)
 ```
 
 ### 3. Informação
@@ -63,7 +63,9 @@ Sem GPS: banner âmbar “Localização necessária” só para HTTP inseguro, p
 
 Banner “Recalculando…” enquanto a API responde; durante o recálculo / fora da rota **não** pinta a geometria velha (U-turn) — mostra conector GPS → próxima parada. Em erro, mantém o conector e mostra a mensagem.
 
-Mapa: tiles CARTO Dark Matter (`dark_all`) com `?key=` via `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` (não OSM.org). **Com GPS:** follow ligado por padrão — câmera acompanha o **ícone interpolado** do carro (zoom ~16, look-ahead para rua à frente); overview da rota inteira **não** compete com o follow. **Sem GPS:** `fitBounds` na rota ao carregar (evita tela preta). Sem a env, a CARTO desenha watermark “API KEY REQUIRED”.
+Mapa: tiles CARTO Dark Matter (`dark_all`) com `?key=` via `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` (não OSM.org). **Com GPS:** no 1º fix (ou se o GPS já existir no `onLoad`) a câmera faz `jumpTo` **direto no carro** em zoom ~16 (look-ahead); follow ligado por padrão e acompanha o **ícone interpolado**; overview da rota inteira **não** compete com o follow. **Sem GPS:** `fitBounds` na rota ao carregar (evita tela preta). Sem a env, a CARTO desenha watermark “API KEY REQUIRED”.
+
+Botão **Centralizar** (alvo): ancorado **acima** do bloco inferior (marcos opcionais + HUD), alinhado à coluna `max-w-md`; sobe junto quando os chips de marco aparecem.
 
 Contraste do HUD: não usar `bg-brand-900` + `text-amber-50` (depois do remap, `brand-900` é tinta clara). Banner de marco = superfície + **OK** `ops-btn-primary`. Cheguei = `#121212` + branco. Texto sobre âmbar = `#121212`.
 
@@ -83,7 +85,7 @@ N/A.
 | Tentar GPS de novo | `requestCurrentPosition` progressivo (fino → coarse) + reinicia watch |
 | Arrastar mapa (pan/drag) | desliga follow; toque simples **não** desliga |
 | GPS watch | seed coarse + `watchPosition` → fila local → `POST /tracking/points` (lote até 50, retry) |
-| Marcos | POST imediato; se falhar, fila `samuel:landmark-queue` + retry online/visibility |
+| Marcos | Só com `recordTrip`; POST imediato; se falhar, fila `samuel:landmark-queue` + retry online/visibility |
 | 1º GPS / off-route | `POST /routes/:id/reroute` |
 | beforeunload / popstate | aviso sair |
 
@@ -127,6 +129,6 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 7. Encerrar → lista ainda IN_PROGRESS.
 8. Abrir navigate sem Play → erro.
 9. Publish/reroute novo → se OSRM mandar `lanes`, ícones de faixa no banner; senão texto “Faixa da esquerda/direita…”.
-10. Rota **Gravar viagem**: badge **Gravando · N pts**; com rede ruim fica âmbar (`N na fila`); marco com falha de rede reenvia sozinho.
+10. Rota **Gravar viagem**: badge **Gravando · N pts**; botões de marco visíveis; com rede ruim fica âmbar (`N na fila`); marco com falha de rede reenvia sozinho. Rota **sem** Gravar: sem botões; se o cliente já tem marcos, ícones + banner ≤120 m.
 11. Rota de 1 cliente com trilha ACTIVE (viagem passada): Play → Navegar com GPS. Tempo/Restante/ETA preenchidos após o 1º fix; linha menta nasce no carro (não no início da gravação). Acelerar/reduzir muda Tempo e ETA; Restante só cai com o deslocamento. Parado: VEL. 0; Tempo não volta às horas da viagem original.
-12. Banner de marco: fundo escuro, título âmbar, **OK** laranja com texto branco — legível sobre o mapa.
+12. Banner de marco: fundo escuro, título âmbar, **OK** laranja com texto branco — legível sobre o mapa; considera marcos de **todas** as paradas da rota.

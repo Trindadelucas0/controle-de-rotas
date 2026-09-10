@@ -121,7 +121,7 @@ Get-NetTCPConnection -LocalPort 3000,3001 -ErrorAction SilentlyContinue |
 
 Não usa as portas de dev (3000/3001). Build + Docker + PM2 em `/opt/analise/SAMUEL`.
 
-**Atualizar o que já está no ar:** colar o bloco de [`vps-atualizar.txt`](vps-atualizar.txt) no SSH (git pull + Docker + Prisma + build + PM2). Não rode seed de novo.
+**Atualizar o que já está no ar:** colar o bloco **inteiro** de [`vps-atualizar.txt`](vps-atualizar.txt) no SSH (`set -e` no começo). Copia `.env` para `/root/analise-pre-update-*`, descarta edições locais da VPS (`git reset --hard` + `git clean -fd`) e alinha com `origin/main`. Sem isso o `git pull` aborta e o npm/prisma podem rodar no código antigo. Não rode seed. `.env` ignorado permanece.
 
 Primeira subida:
 

@@ -27,7 +27,8 @@ import {
   RouteOriginReturnRow,
   RouteOriginStartRow,
 } from './route-origin-ui';
-
+import { ActionButton } from '@/components/ui/ActionButton';
+import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 type CustomerOption = {
   id: string;
   name: string;
@@ -116,8 +117,12 @@ type Props = {
 export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) {
   const user = useSessionUser();
   const canPreview =
-    user?.role === 'ADMIN' || user?.role === 'MANAGER' || user?.role === 'SUPERVISOR';
-  const canPublish = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+    user?.role === 'ADMIN' ||
+    user?.role === 'PLATFORM_ADMIN' ||
+    user?.role === 'MANAGER' ||
+    user?.role === 'SUPERVISOR';
+  const canPublish =
+    user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN' || user?.role === 'MANAGER';
   const mapRef = useRef<MapRef>(null);
   const previewAbort = useRef<AbortController | null>(null);
   const preselectApplied = useRef(false);
@@ -381,10 +386,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
   }, [preview, pinByCustomerId, hasOrigin, company]);
 
   function addCustomer(id: string) {
-    setSelectedCustomerIds((prev) => {
-      if (recordTrip) return [id];
-      return prev.includes(id) ? prev : [...prev, id];
-    });
+    setSelectedCustomerIds((prev) => (prev.includes(id) ? prev : [...prev, id]));
     setMsg(null);
   }
 
@@ -401,7 +403,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
   }
 
   async function publishRoutes() {
-    if (!preview || !canPublish) return;
+    if (!preview || !canPublish || publishing) return;
     if (selectedCustomerIds.length === 0 || selectedEmployeeIds.length === 0) {
       setError('Selecione clientes e funcionários com login.');
       return;
@@ -470,7 +472,8 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
     originMode === 'EMPLOYEE_LAST' ? 'F' : 'E';
 
   return (
-    <div className="flex h-[calc(100vh-11rem)] min-h-[480px] flex-col gap-3 lg:flex-row">
+    <div className="relative flex h-[calc(100vh-11rem)] min-h-[480px] flex-col gap-3 lg:flex-row">
+      <LoadingOverlay show={publishing} label="Publicando…" />
       <aside className="flex w-full shrink-0 flex-col gap-3 overflow-auto rounded-2xl border border-brand-100 bg-surface p-4 lg:w-[26rem]">
         <div>
           <p className="ops-label mb-0">
@@ -510,20 +513,16 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
             type="checkbox"
             checked={recordTrip}
             onChange={(e) => {
-              const on = e.target.checked;
-              setRecordTrip(on);
-              if (on && selectedCustomerIds.length > 1) {
-                setSelectedCustomerIds((prev) => prev.slice(0, 1));
-                setPreview(null);
-                setMsg('Gravar viagem: mantido só o 1º cliente selecionado.');
-              }
+              setRecordTrip(e.target.checked);
+              setMsg(null);
             }}
             className="mt-0.5 rounded border-brand-300"
           />
           <span>
             <span className="font-medium">Gravar viagem</span>
             <span className="mt-0.5 block text-xs text-[var(--muted)]">
-              Registra a trilha real até o cliente (fazenda). Exige exatamente 1 cliente.
+              Densifica o GPS e grava a trilha real até cada cliente (fazenda) no Cheguei.
+              Vale para todas as rotas publicadas neste lote.
             </span>
           </span>
         </label>
@@ -844,14 +843,15 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
         </div>
 
         {canPublish ? (
-          <button
-            type="button"
+          <ActionButton
             disabled={!preview || publishing || loadingPreview}
+            loading={publishing}
+            loadingLabel="Publicando…"
             onClick={() => void publishRoutes()}
-            className="rounded-xl bg-brand-600 px-3 py-2.5 text-sm font-semibold text-white disabled:opacity-60"
+            className="w-full justify-center"
           >
-            {publishing ? 'Publicando…' : 'Publicar rotas'}
-          </button>
+            Publicar rotas
+          </ActionButton>
         ) : (
           <p className="text-xs text-[var(--muted)]">
             Preview disponível. Publicar exige perfil ADMIN ou MANAGER.

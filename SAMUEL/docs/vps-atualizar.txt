@@ -1,18 +1,20 @@
-Rotas — atualizar a VPS (colar no SSH como root)
-
-ANTES no Windows: git add / commit / git push. O pull só traz o que já está no GitHub.
-
-Git: /opt/analise
-App: /opt/analise/SAMUEL
-Nao apaga .env nem apps/web/.env.local (ficam so no servidor).
-Nao rode seed neste script (so na primeira subida).
-Nao cole senha, token Cloudflare nem chave CARTO.
-
---- cole daqui ---
-
 set -e
 cd /opt/analise
-git pull
+
+STAMP=$(date +%Y%m%d-%H%M%S)
+BAK=/root/analise-pre-update-$STAMP
+mkdir -p "$BAK"
+cp -a SAMUEL/.env "$BAK/.env" 2>/dev/null || true
+cp -a SAMUEL/apps/api/.env "$BAK/api.env" 2>/dev/null || true
+cp -a SAMUEL/apps/web/.env.local "$BAK/web.env.local" 2>/dev/null || true
+
+git fetch origin
+git reset --hard HEAD
+git clean -fd
+git reset --hard origin/main
+
+echo "HEAD=$(git rev-parse --short HEAD) origin/main=$(git rev-parse --short origin/main)"
+test "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)"
 
 cd /opt/analise/SAMUEL
 docker compose -f docker-compose.prod.yml up -d --wait
@@ -20,6 +22,9 @@ docker compose -f docker-compose.prod.yml up -d --wait
 npm ci
 npx prisma generate --schema apps/api/prisma/schema.prisma
 npx prisma migrate deploy --schema apps/api/prisma/schema.prisma
+
+# Opcional: promover operador da plataforma (se o seed não atualizar o admin)
+# psql "$DATABASE_URL" -c "UPDATE users SET role = 'PLATFORM_ADMIN' WHERE email = 'admin@demo.local';"
 
 API_PROXY_TARGET=http://127.0.0.1:3469 NODE_OPTIONS=--max-old-space-size=1536 npm run web:build
 npm run api:build
@@ -34,10 +39,3 @@ fi
 curl -sS http://127.0.0.1:3468/api/v1/health
 echo
 pm2 status
-
---- ate aqui ---
-
-Depois: no navegador, hard refresh (Ctrl+Shift+R) em https://rotas.avadesk.com.br
-
-Se o git pull recusar (arquivos locais na VPS), nao use reset --hard sem backup do .env.
-Se o mapa mostrar API KEY REQUIRED, a chave CARTO precisa estar em apps/web/.env.local ANTES do web:build.

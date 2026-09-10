@@ -4,18 +4,21 @@ import { useEffect, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
 import type { MapRef, MapLayerMouseEvent, MarkerDragEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { osmRasterStyle } from '@/lib/map-style';
+import { getRasterStyleForTheme } from '@/lib/map-style';
+import { useTheme } from '@/components/theme/ThemeProvider';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 3.8 };
 
 type Props = {
   latitude: number | null;
   longitude: number | null;
-  onPinChange: (latitude: number, longitude: number) => void;
+  onPinChange?: (latitude: number, longitude: number) => void;
   /** Quando false, pin é recomendado mas não obrigatório (ex.: empresa). Default true. */
   required?: boolean;
   title?: string;
   pinLabel?: string;
+  /** Só leitura: sem clique/arraste para mover o pin. */
+  readOnly?: boolean;
 };
 
 export function CustomerLocationMap({
@@ -25,7 +28,10 @@ export function CustomerLocationMap({
   required = true,
   title,
   pinLabel = 'Pin do cliente',
+  readOnly = false,
 }: Props) {
+  const { theme } = useTheme();
+  const mapStyle = getRasterStyleForTheme(theme);
   const mapRef = useRef<MapRef>(null);
   const hasPin = latitude != null && longitude != null;
   const heading = title ?? (required ? 'Local no mapa *' : 'Local no mapa');
@@ -40,10 +46,12 @@ export function CustomerLocationMap({
   }, [hasPin, latitude, longitude]);
 
   function handleClick(e: MapLayerMouseEvent) {
+    if (readOnly || !onPinChange) return;
     onPinChange(e.lngLat.lat, e.lngLat.lng);
   }
 
   function handleDragEnd(e: MarkerDragEvent) {
+    if (readOnly || !onPinChange) return;
     onPinChange(e.lngLat.lat, e.lngLat.lng);
   }
 
@@ -70,10 +78,12 @@ export function CustomerLocationMap({
           </button>
         ) : null}
       </div>
-      <p className="text-xs text-[var(--muted)]">
-        Clique no mapa para marcar o local ou preencha CEP/rua para puxar automaticamente. Arraste o
-        pin para ajustar.
-      </p>
+      {!readOnly ? (
+        <p className="text-xs text-[var(--muted)]">
+          Clique no mapa para marcar o local ou preencha CEP/rua para puxar automaticamente. Arraste o
+          pin para ajustar.
+        </p>
+      ) : null}
       <div className="h-[280px] overflow-hidden rounded-xl border border-brand-100 bg-brand-50">
         <Map
           ref={mapRef}
@@ -82,11 +92,11 @@ export function CustomerLocationMap({
               ? { latitude: latitude!, longitude: longitude!, zoom: 15 }
               : BRASIL
           }
-          mapStyle={osmRasterStyle}
+          mapStyle={mapStyle}
           style={{ width: '100%', height: '100%' }}
           attributionControl
-          onClick={handleClick}
-          cursor="crosshair"
+          onClick={readOnly ? undefined : handleClick}
+          cursor={readOnly ? 'default' : 'crosshair'}
         >
           <NavigationControl position="bottom-right" />
           {hasPin ? (
@@ -94,8 +104,8 @@ export function CustomerLocationMap({
               latitude={latitude!}
               longitude={longitude!}
               anchor="bottom"
-              draggable
-              onDragEnd={handleDragEnd}
+              draggable={!readOnly}
+              onDragEnd={readOnly ? undefined : handleDragEnd}
             >
               <div
                 className="h-4 w-4 rounded-full border-2 border-white bg-brand-600 shadow"

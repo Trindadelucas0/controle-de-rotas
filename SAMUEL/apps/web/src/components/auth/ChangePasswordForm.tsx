@@ -19,6 +19,7 @@ export function ChangePasswordForm() {
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
+    if (loading) return;
     setError(null);
     const errors = validateChangePassword(currentPassword, newPassword, newPasswordConfirmation);
     setFieldErrors(errors);

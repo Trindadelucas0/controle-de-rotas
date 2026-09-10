@@ -55,7 +55,10 @@ Middleware Next **só exige cookie** `access_token`. Papel filtra **sidebar, bot
 | --- | --- |
 | `OperationalSummaryStrip` | KPI strip nas listas; esconde item com valor `—` ou vazio; loading = 4 skeletons; erro = faixa vermelha |
 | `EntityContextPanel` | Detalhe: status, métricas, relacionamentos, timeline (máx. 6), ações habilitadas com `href` |
-| `PageHeader` / `FormCard` / `DataTable` | Cadastros (`crud.tsx`) |
+| `PageHeader` / `FormCard` / `DataTable` | Cadastros (`crud.tsx`); `FormCard` desabilita campos + submit enquanto `loading` |
+| `SubmitButton` / `ActionButton` | Mutações: `disabled` + spinner + label (padrão **Aguarde…**) |
+| `LoadingOverlay` | Overlay local no container `relative` em ops longas (publicar / iniciar rota) |
+| `useAsyncAction` | Hook opcional com trava por ref (`hooks/useAsyncAction.ts`) |
 | `FieldPwaLocationGate` | Overlay em todo `/field/*` |
 
 ### 0.5 Telas previstas (não existem)
@@ -66,6 +69,16 @@ Middleware Next **só exige cookie** `access_token`. Papel filtra **sidebar, bot
 | `/field/visits/[id]/evidence` | 13 | fotos |
 | `/settings/audit` | 16 | UI de `audit_logs` |
 | `/dashboard` | — | **não** criar; tema 14 enriquece `/` |
+
+### 0.6 Submissão assíncrona (anti-duplo-clique)
+
+Toda mutação na UI (POST/PATCH/DELETE disparado por botão ou submit):
+
+1. **Botão** fica `disabled` + `aria-busy` + spinner até o `await` terminar (sucesso, erro ou redirect).
+2. **Handler** com trava de reentrada (`if (pending) return` ou `useAsyncAction.run`) — não basta só o `disabled` do DOM.
+3. **Label:** padrão **Aguarde…**; ações longas podem usar label específico (Publicando…, Iniciando…, Salvando…).
+4. **Overlay:** `LoadingOverlay` no container da tela só em ops longas (publicar rotas, iniciar rota com GPS+POST). Não há interceptor global em `apiFetch` (GET de lista continua com skeleton).
+5. **Formulários:** `FormCard` envolve campos em `fieldset disabled` enquanto `loading`.
 
 ---
 
@@ -101,7 +114,7 @@ flex min-h-screen
 | Rotas | `/routes` | ADMIN, MANAGER, SUPERVISOR |
 | Campo | `/field/my-route` | EMPLOYEE |
 
-**Recursos:** Clientes (todos) · Funcionários (ADMIN, MANAGER) · Veículos (ADMIN, MANAGER)
+**Recursos:** Clientes (ADMIN, MANAGER, SUPERVISOR) · Funcionários (ADMIN, MANAGER) · Veículos (ADMIN, MANAGER)
 
 **Administração:** Empresa · Usuários (só ADMIN)
 
@@ -286,7 +299,7 @@ Hint: “Em atendimento” só se `!meta.inServiceAvailable`.
 
 **Estados:** idle. Sem loading de ops.
 
-**Navegação:** `/field/my-route`, `/agenda`, `/customers`.
+**Navegação:** `/field/my-route`, `/agenda`.
 
 Ficha: [home.md](screens/home.md)
 
@@ -416,7 +429,7 @@ H1 Rotas
 
 Modo Visitas agendadas: inalterado nesta entrega.
 
-**KPI / ações / estados / permissões:** iguais (summary + preview-customers + dispatch). SUPERVISOR sem Publicar. Campo ausente → —.
+**KPI / ações / estados / permissões:** iguais (summary + preview-customers + dispatch). SUPERVISOR sem Publicar. Campo ausente → —. Publicar/salvar: botão bloqueado + overlay **Publicando…** / **Salvando…** até a API retornar (anti-duplo-clique).
 
 Ficha: [routes.md](screens/routes.md)
 
@@ -428,7 +441,7 @@ Ficha: [routes.md](screens/routes.md)
 
 #### Lista — `/customers`
 
-**Papéis:** todos autenticados (listar/criar/ver). Update: SUPERVISOR+.
+**Papéis:** ADMIN, MANAGER, SUPERVISOR (listar/criar/ver). Update: SUPERVISOR+. EMPLOYEE sem nav; redirect `/field/my-route`.
 
 **Componentes:** `PageHeader` + Novo · strip · busca · `DataTable`.
 
@@ -611,7 +624,7 @@ Ficha: [field-my-route.md](screens/field-my-route.md)
 
 **Ações:** Continuar / Voltar · ▶ Iniciar rota → `POST /routes/:id/start` `{ vehicleId, startOdometerKm, startFuelLevel, startNotes?, latitude, longitude }` → `/field/navigate`.
 
-**Estados:** “Preparando início da rota…” · erro sem rota + voltar · `ROUTE_ALREADY_ACTIVE` com data da rota travada + link “Ir para Minha rota e concluir” · gpsError vermelho · “Informe o km inicial do veículo.” · “Iniciando…” · success redirect. Já IN_PROGRESS → erro ao abrir.
+**Estados:** “Preparando início da rota…” · erro sem rota + voltar · `ROUTE_ALREADY_ACTIVE` com data da rota travada + link “Ir para Minha rota e concluir” · gpsError vermelho · “Informe o km inicial do veículo.” · submitting desde o toque em Iniciar (antes do GPS) + overlay **Iniciando…** · success redirect. Já IN_PROGRESS → erro ao abrir.
 
 Fichas: [field-start.md](screens/field-start.md) (canônica; `field-start-route.md` é duplicata curta)
 
@@ -625,7 +638,7 @@ Fichas: [field-start.md](screens/field-start.md) (canônica; `field-start-route.
 
 **Componentes:** mapa Carto Dark Matter · LineString menta **só até a próxima parada** · markers de todas as paradas · marker GPS = **carro** (heading + interpolação) · faixa instrução (próxima **virada** + rua + faixa/distância; superfície escura + tinta; Chegando em âmbar + `#121212`) · banner de marco com **OK** laranja · HUD · Encerrar (confirm) · botão alvo / Centralizar (follow).
 
-**Mapa / follow:** com GPS, follow ligado por padrão — câmera acompanha o ícone interpolado (zoom ~16, look-ahead); arrastar desliga follow; toque simples não desliga; botão alvo religa e recentraliza. Sem GPS, overview da rota (`fitBounds`). A linha **menta** (`#2EE6C7`) nasce no carro e **não** continua depois do pin-alvo (paradas futuras só como pinos).
+**Mapa / follow:** com GPS, no 1º fix (ou GPS já presente no `onLoad`) a câmera centraliza **direto no carro** (zoom ~16, look-ahead) — sem overview carro+parada; follow ligado por padrão e acompanha o ícone interpolado; arrastar desliga follow; toque simples não desliga; botão alvo (acima do HUD) religa e recentraliza. Sem GPS, overview da rota (`fitBounds`). A linha **menta** (`#2EE6C7`) nasce no carro e **não** continua depois do pin-alvo (paradas futuras só como pinos).
 
 **HUD (só com GPS; senão `—`)**
 
@@ -767,7 +780,7 @@ Ficha: [settings-users.md](screens/settings-users.md)
 | Agenda | todas | todas | todas | próprias; sem Abrir OS |
 | Serviços | CRUD | CRUD | leitura | não |
 | Rotas publicar | sim | sim | preview só | não |
-| Clientes | sim | sim | update sim | criar/ver; update não |
+| Clientes | sim | sim | update sim | não |
 | Funcionários / Veículos | sim | sim | não | não |
 | Empresa / Usuários | sim | não | não | não |
 | Campo `/field/*` | não (nav) | não | não | sim |
@@ -799,3 +812,4 @@ Se o software ganhar tela nova: criar `docs/screens/{slug}.md` **e** incluir uma
 | 0.9.3 | 29/08/2026 | Iniciar rota em HTTP no celular: pula GPS, origem = 1ª parada (software v0.11.1) |
 | 0.9.4 | 01/09/2026 | Check-in: `/field/visits/[id]` + Cheguei na nav (software v0.12.0) |
 | 0.9.5 | 01/09/2026 | Navegação: LineString teal recorta na parada-alvo (software v0.12.1) |
+| 0.9.6 | 10/09/2026 | §0.6 anti-duplo-clique + LoadingOverlay em publicar/iniciar (software v0.16.9) |

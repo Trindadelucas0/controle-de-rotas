@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import type { SessionUser } from '@/lib/auth';
 import { logout } from '@/lib/auth';
+import { ThemeToggle } from '@/components/theme/ThemeToggle';
 
 export function UserMenu({ user }: { user: SessionUser }) {
   const router = useRouter();
@@ -22,6 +23,7 @@ export function UserMenu({ user }: { user: SessionUser }) {
 
   return (
     <div className="flex items-center gap-2 text-sm">
+      <ThemeToggle />
       <div className="min-w-0 text-right">
         <p className="truncate font-medium leading-tight text-brand-900">{user.name}</p>
         <p className="text-[11px] uppercase tracking-wide text-[var(--muted)]">{user.role}</p>

@@ -1,6 +1,14 @@
 import { UserRole, UserStatus } from '@prisma/client';
-import { IsEmail, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsEmail, IsEnum, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { Transform } from 'class-transformer';
+
+/** Papéis atribuíveis no tenant — PLATFORM_ADMIN só via seed/ops. */
+const TENANT_ROLES = [
+  UserRole.ADMIN,
+  UserRole.MANAGER,
+  UserRole.SUPERVISOR,
+  UserRole.EMPLOYEE,
+] as const;
 
 export class CreateUserDto {
   @IsString()
@@ -11,8 +19,8 @@ export class CreateUserDto {
   @IsEmail({}, { message: 'Informe um e-mail válido.' })
   email!: string;
 
-  @IsEnum(UserRole)
-  role!: UserRole;
+  @IsIn(TENANT_ROLES)
+  role!: (typeof TENANT_ROLES)[number];
 
   @IsString()
   @MinLength(8, { message: 'A senha deve ter pelo menos 8 caracteres.' })
@@ -26,8 +34,8 @@ export class UpdateUserDto {
   name?: string;
 
   @IsOptional()
-  @IsEnum(UserRole)
-  role?: UserRole;
+  @IsIn(TENANT_ROLES)
+  role?: (typeof TENANT_ROLES)[number];
 
   @IsOptional()
   @IsEnum(UserStatus)

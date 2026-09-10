@@ -7,7 +7,7 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §4.
 ### 1. Identidade
 
 - Rota: `/customers`
-- Papéis: ADMIN, MANAGER, SUPERVISOR, EMPLOYEE (listar/criar/ver)
+- Papéis: ADMIN, MANAGER, SUPERVISOR (listar/criar/ver; update SUPERVISOR+). EMPLOYEE: sem nav; URL redireciona para `/field/my-route`; API 403
 - Objetivo: cadastro e entrada ao prontuário
 - Arquivo: `CustomersPages.tsx` → `CustomersListPage`
 
@@ -67,7 +67,7 @@ loading | empty “Nenhum cliente.” | error
 
 ### 8. Permissões
 
-Todos autenticados listam. Update: SUPERVISOR+ conforme API (EMPLOYEE cria/vê).
+Todos autenticados gestores listam. Update: SUPERVISOR+. EMPLOYEE sem acesso (redirect + 403).
 
 ### 9. Navegação
 
@@ -92,21 +92,21 @@ Criar com pin → aparece na lista com Localização OK.
 ### 1. Identidade
 
 - Rotas: `/customers/new`, `/customers/[id]`
-- Papéis: criar/ver todos autenticados; update SUPERVISOR+
+- Papéis: criar/ver gestores (não EMPLOYEE); update SUPERVISOR+
 - Objetivo: prontuário com endereço inteligente e **pin obrigatório**
-- Arquivo: `CustomerForm` + `CustomerLocationMap`
+- Arquivo: `CustomerForm` + `CustomerLocationMap` + `EditableRecordShell`
 
 ### 2. Componentes
 
+**Novo** (`/customers/new`): FormCard sempre editável.
+
+**Detalhe** (`/customers/[id]`): abre em **modo leitura** (`DetailSection`/`DetailItem`); botão **Editar** (ícone lápis) libera o FormCard; **Cancelar** descarta e volta à leitura; **Salvar** persiste e volta à leitura.
+
 ```
-PageHeader
-└── FormCard
-    ├── Identificação (nome, fantasia, CPF/CNPJ)
-    ├── Contato (telefone, WhatsApp, e-mail)
-    ├── Endereço (busca, CEP, rua/número/complemento/bairro/cidade/UF)
-    ├── Localização no mapa (lat/lng + pin obrigatório)
-    ├── Classificação (categoria, prioridade, observações, status)
-    └── hints lookup (CNPJ/CEP/endereço)
+PageHeader + EntityContextPanel
+└── EditableRecordShell
+    ├── view: seções Identificação / Contato / Endereço / Mapa (readOnly) / Classificação
+    └── edit: FormCard (mesmos campos do novo)
 ```
 
 ### 3. Informação
@@ -115,14 +115,14 @@ PageHeader
 | --- | --- | --- |
 | Nome / razão social | sim | |
 | Nome fantasia | não | |
-| CPF/CNPJ | não | 14 dígitos → BrasilAPI preenche + pin |
+| CPF/CNPJ | não | 14 dígitos → BrasilAPI preenche + pin (só no edit) |
 | Telefone, WhatsApp, E-mail | não | |
-| Buscar endereço | não | debounce Nominatim |
+| Buscar endereço | não | debounce Nominatim (só no edit) |
 | CEP | não | 8 dígitos → BrasilAPI + pin; fazendas podem deixar vazio |
 | Latitude / Longitude | sim (pin) | digitação ou mapa; sincronizados |
 | Endereço (rua…) | não | geocode opcional |
 | Rua, Número, Complemento, Bairro, Cidade, UF | não | |
-| Local no mapa | **sim** | clique/arraste; lat/lng **não** digitáveis |
+| Local no mapa | **sim** | view: pin fixo; edit: clique/arraste |
 | Categoria, Prioridade, Observações | não | |
 | Status | ACTIVE / INACTIVE | |
 
@@ -140,8 +140,10 @@ Lookups: CNPJ, CEP, address (não são filtros de lista).
 
 | Ação | Efeito |
 | --- | --- |
-| Salvar | `POST/PATCH /customers` — bloqueia sem pin |
-| Clique/arraste no mapa | estado lat/lng |
+| Editar | mode=edit (só detalhe) |
+| Cancelar | descarta form → mode=view |
+| Salvar | `POST/PATCH /customers` — bloqueia sem pin; detalhe volta a view |
+| Clique/arraste no mapa | estado lat/lng (só edit) |
 | Escolher sugestão | preenche + pin |
 
 Hints: “Buscando CNPJ…”, “CNPJ aplicado.”, “CNPJ não encontrado.”, rate_limit, etc.
@@ -151,16 +153,18 @@ Hints: “Buscando CNPJ…”, “CNPJ aplicado.”, “CNPJ não encontrado.”
 | Estado | UI |
 | --- | --- |
 | loading detalhe | skeleton |
-| idle / saving | form |
+| view | DetailCard + Editar |
+| edit / saving | FormCard |
 | invalid pin | FormError |
 | lookup loading/error | texto amber |
 | success create | redirect `/customers/:id` |
+| success update | msg “Salvo.” + view |
 | empty | N/A |
 | forbidden | API 403 em update sem papel |
 
 ### 8. Permissões
 
-EMPLOYEE: criar/listar/ver. Update: SUPERVISOR+. Geocode no mapa operacional: ver [map.md](map.md).
+EMPLOYEE: sem catálogo. Update: SUPERVISOR+. Geocode no mapa operacional: ver [map.md](map.md).
 
 ### 9. Navegação
 
@@ -177,6 +181,7 @@ Checksum CNPJ; lookup CPF; contatos múltiplos; autocomplete no `/map`.
 
 ### 12. Como testar
 
+Abrir `[id]` → sem inputs até Editar; Cancelar descarta; Salvar atualiza a view.
 1. `/customers/new` sem pin → Salvar bloqueia.
 2. Clique no mapa → Salvar → aparece em `/map`.
 3. CEP 01310-100 → endereço + pin.

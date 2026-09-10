@@ -148,11 +148,11 @@ export class CustomersService {
     return emp?.id ?? null;
   }
 
-  private async employeeOnInProgressRouteForCustomer(
+  private async employeeInProgressLandmarkContext(
     companyId: string,
     employeeId: string,
     customerId: string,
-  ): Promise<boolean> {
+  ): Promise<{ onRoute: boolean; recordTrip: boolean }> {
     const stop = await this.prisma.routeStop.findFirst({
       where: {
         companyId,
@@ -163,9 +163,15 @@ export class CustomersService {
           status: RouteStatus.IN_PROGRESS,
         },
       },
-      select: { id: true },
+      select: {
+        id: true,
+        route: { select: { recordTrip: true } },
+      },
     });
-    return Boolean(stop);
+    return {
+      onRoute: Boolean(stop),
+      recordTrip: stop?.route.recordTrip === true,
+    };
   }
 
   async createLandmark(user: AuthUser, customerId: string, dto: CreateCustomerLandmarkDto) {
@@ -182,20 +188,21 @@ export class CustomersService {
       user.companyId,
     );
     const actorEmployeeId = await this.myEmployeeId(user);
-    const onRoute =
+    const ctx =
       actorEmployeeId != null
-        ? await this.employeeOnInProgressRouteForCustomer(
+        ? await this.employeeInProgressLandmarkContext(
             user.companyId,
             actorEmployeeId,
             customerId,
           )
-        : false;
+        : { onRoute: false, recordTrip: false };
 
     const auth = evaluateLandmarkCreateAuth({
       actorRole: user.role,
       actorEmployeeId,
       customerFoundInTenant: Boolean(customer),
-      employeeOnInProgressRouteForCustomer: onRoute,
+      employeeOnInProgressRouteForCustomer: ctx.onRoute,
+      routeHasRecordTrip: ctx.recordTrip,
     });
     if (!auth.ok) {
       throw httpError(auth.statusCode as HttpStatus, auth.code, auth.message);

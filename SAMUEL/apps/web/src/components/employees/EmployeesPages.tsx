@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
-import { DataTable, FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
+import { DataTable, DetailItem, DetailSection, EditableRecordShell, FieldGrid, FormCard, FormSection, PageHeader, SelectField, TextField } from '@/components/ui/crud';
 import { PasswordField } from '@/components/auth/PasswordField';
 import { useSessionUser } from '@/lib/session-context';
 import {
@@ -177,7 +177,7 @@ function EmployeeForm({
   onSave: (body: Record<string, unknown>) => Promise<void>;
 }) {
   const session = useSessionUser();
-  const isAdmin = session?.role === 'ADMIN';
+  const isAdmin = session?.role === 'ADMIN' || session?.role === 'PLATFORM_ADMIN';
   const hasLogin = Boolean(initial?.userId);
   const loginEmail = initial?.user?.email || initial?.email || '';
 
@@ -391,6 +391,10 @@ export function EditEmployeePage({ id }: { id: string }) {
   const [ctxError, setCtxError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
+  const [mode, setMode] = useState<'view' | 'edit'>('view');
+  const [formKey, setFormKey] = useState(0);
+  const session = useSessionUser();
+  const isAdmin = session?.role === 'ADMIN';
 
   useEffect(() => {
     apiFetch<{ employee: EmployeeDto }>(`/api/v1/employees/${id}`)
@@ -417,10 +421,12 @@ export function EditEmployeePage({ id }: { id: string }) {
     routeToday?: { id: string; status: string; vehicle?: { plate: string } } | null;
     loginUser?: { email: string } | null;
   };
+  const statusLabel = statusOpts.find((o) => o.value === data.status)?.label ?? data.status;
+  const loginEmail = data.user?.email || data.email || null;
 
   return (
     <div>
-      <PageHeader title="Editar funcionário" />
+      <PageHeader title="Funcionário" />
       <EntityContextPanel
         title={data.name}
         statusLabel={card?.statusAtual ?? data.status}
@@ -468,18 +474,65 @@ export function EditEmployeePage({ id }: { id: string }) {
         acoes={card?.acoes ?? []}
       />
       {msg ? <p className="mb-3 text-sm text-[var(--ok)]">{msg}</p> : null}
-      <EmployeeForm
-        key={`${data.id}-${data.userId ?? 'no-login'}`}
-        mode="edit"
-        initial={data}
-        onSave={async (body) => {
-          const r = await apiFetch<{ employee: EmployeeDto }>(`/api/v1/employees/${id}`, {
-            method: 'PATCH',
-            body: JSON.stringify(body),
-          });
-          setData(r.employee);
-          setMsg(body.password ? 'Acesso criado. O funcionário já pode entrar no Rotas.' : 'Salvo.');
+      <EditableRecordShell
+        mode={mode}
+        onEdit={() => {
+          setMsg(null);
+          setMode('edit');
         }}
+        onCancel={() => {
+          setFormKey((k) => k + 1);
+          setMode('view');
+        }}
+        view={
+          <>
+            <DetailSection title="Identificação">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Nome" value={data.name} />
+                <DetailItem label="Telefone" value={data.phone} />
+              </dl>
+            </DetailSection>
+            <DetailSection title="Acesso ao Rotas">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="E-mail de login" value={loginEmail} />
+                <DetailItem label="Situação" value={data.userId ? 'Login ativo' : 'Sem login'} />
+              </dl>
+              {isAdmin && data.userId ? (
+                <Link href={`/settings/users/${data.userId}`} className="ops-link text-sm">
+                  Redefinir senha em Usuários
+                </Link>
+              ) : null}
+            </DetailSection>
+            <DetailSection title="Função">
+              <dl className="grid gap-3 sm:grid-cols-2">
+                <DetailItem label="Cargo" value={data.jobTitle} />
+                <DetailItem label="Matrícula" value={data.registration} />
+                <DetailItem
+                  label="Especialidades"
+                  value={data.specialties?.length ? data.specialties.join(', ') : null}
+                />
+                <DetailItem label="Região" value={data.region} />
+                <DetailItem label="Status" value={statusLabel} />
+              </dl>
+            </DetailSection>
+          </>
+        }
+        edit={
+          <EmployeeForm
+            key={`${formKey}-${data.id}-${data.userId ?? 'no-login'}`}
+            mode="edit"
+            initial={data}
+            onSave={async (body) => {
+              const r = await apiFetch<{ employee: EmployeeDto }>(`/api/v1/employees/${id}`, {
+                method: 'PATCH',
+                body: JSON.stringify(body),
+              });
+              setData(r.employee);
+              setMsg(body.password ? 'Acesso criado. O funcionário já pode entrar no Rotas.' : 'Salvo.');
+              setMode('view');
+            }}
+          />
+        }
       />
     </div>
   );

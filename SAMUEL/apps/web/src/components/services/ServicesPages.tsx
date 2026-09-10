@@ -100,7 +100,7 @@ const statusFilterOpts = [
 ];
 
 function canManageOs(role: string | undefined) {
-  return role === 'ADMIN' || role === 'MANAGER';
+  return role === 'ADMIN' || role === 'PLATFORM_ADMIN' || role === 'MANAGER';
 }
 
 export function ServicesListPage() {
@@ -284,6 +284,7 @@ export function ServiceOrderNewPage() {
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading) return;
     if (!customerId || title.trim().length < 2) {
       setError('Informe cliente e título (mín. 2 caracteres).');
       return;
@@ -494,7 +495,7 @@ export function ServiceOrderDetailPage({ id }: { id: string }) {
   }, [id]);
 
   async function cancelOrder() {
-    if (!order || !confirm(`Cancelar a OS #${order.number}?`)) return;
+    if (!order || cancelling || !confirm(`Cancelar a OS #${order.number}?`)) return;
     setCancelling(true);
     setError(null);
     setMsg(null);
@@ -514,6 +515,7 @@ export function ServiceOrderDetailPage({ id }: { id: string }) {
 
   async function addVisit(e: React.FormEvent) {
     e.preventDefault();
+    if (addingVisit) return;
     const startIso = fromDatetimeLocalValue(visitStart);
     if (!startIso) {
       setError('Informe data/hora da visita.');

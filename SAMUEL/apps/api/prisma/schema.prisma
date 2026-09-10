@@ -13,6 +13,7 @@ enum CompanyStatus {
 }
 
 enum UserRole {
+  PLATFORM_ADMIN
   ADMIN
   MANAGER
   SUPERVISOR
@@ -83,6 +84,7 @@ enum RouteStatus {
   PUBLISHED
   IN_PROGRESS
   COMPLETED
+  INCOMPLETE
   CANCELLED
 }
 
