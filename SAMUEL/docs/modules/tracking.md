@@ -49,9 +49,15 @@ Temas 10–11. Isolamento por `companyId` do JWT. Transporte de localização: *
 - Abre sessão de tracking (pontos passam a ser aceitos)
 - UI: após sucesso no wizard, redirect para `/field/navigate`
 
+## POST /api/v1/field/routes/:id/complete
+
+- Auth: EMPLOYEE atribuído **ou** ADMIN/MANAGER (PLATFORM_ADMIN herda ADMIN)
+- Mesmas regras que `POST /routes/:id/complete`
+- UI: arrastar em `/field/my-route` e `/field/navigate`
+
 ## POST /api/v1/routes/:id/complete
 
-- Auth: EMPLOYEE atribuído à rota
+- Auth: EMPLOYEE atribuído à rota **ou** ADMIN/MANAGER da empresa
 - Body: `{ mode: "COMPLETED" | "INCOMPLETE" }`
 - Pré: status `IN_PROGRESS`; grava `actualDurationSeconds`; PENDING → SKIPPED conforme regras de 500 m / incompleta
 - UI: arrastar em `/field/my-route` e `/field/navigate`

@@ -588,7 +588,7 @@ Ficha: [field-pwa-gate.md](screens/field-pwa-gate.md)
 | --- | --- | --- |
 | ▶ Iniciar rota | PUBLISHED e nenhuma IN_PROGRESS | `/field/start/:id` |
 | Continuar navegação | IN_PROGRESS (do dia ou de outro dia) | `/field/navigate` |
-| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | `POST /routes/:id/complete` (“Concluindo…”) |
+| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | `POST /field/routes/:id/complete` (“Concluindo…”) |
 | Status GPS | sempre | `/field/tracking-status` |
 | Ver agenda | empty | `/agenda` |
 

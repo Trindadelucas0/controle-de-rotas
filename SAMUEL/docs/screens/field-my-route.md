@@ -54,7 +54,7 @@ Data implícita = hoje (`toDateInputValue`); a API também devolve `IN_PROGRESS`
 | --- | --- | --- |
 | ▶ Iniciar rota | PUBLISHED e nenhuma IN_PROGRESS | `/field/start/:id` |
 | Continuar navegação | IN_PROGRESS (do dia ou de outro dia) | `/field/navigate` |
-| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | `POST /routes/:id/complete` |
+| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | `POST /field/routes/:id/complete` |
 | Status GPS | sempre | `/field/tracking-status` |
 | Ver agenda | empty state | `/agenda` |
 

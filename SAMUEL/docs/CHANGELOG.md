@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.16.20 — 2026-09-10
+
+### Fix — “Você não tem permissão” ao concluir rota
+
+- Sintoma: modal **Sim, concluir** / **Sim, incompleta** devolvia `AUTH_FORBIDDEN`
+- Causa: `POST /routes/:id/complete` só aceitava papel `EMPLOYEE`; sessão de ADMIN/MANAGER (ou cookie de escritório com a tela de campo aberta) era recusada no `RolesGuard`
+- Correção: UI chama `POST /field/routes/:id/complete`; ADMIN/MANAGER (e PLATFORM_ADMIN) da mesma empresa podem encerrar rota `IN_PROGRESS`; EMPLOYEE só a atribuída; outro tenant 404
+- Como validar: campo com login EMPLOYEE conclui; gestor na mesma empresa também consegue encerrar rota travada; outro funcionário continua 403
+
 ## v0.16.19 — 2026-09-10
 
 ### Fix — build web (`TextField` em empresas)

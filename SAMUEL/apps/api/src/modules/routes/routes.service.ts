@@ -1125,25 +1125,15 @@ export class RoutesService {
   }
 
   async complete(user: AuthUser, id: string, dto: CompleteRouteDto) {
-    if (user.role !== UserRole.EMPLOYEE) {
-      throw httpError(
-        HttpStatus.FORBIDDEN,
-        'ROUTE_COMPLETE_EMPLOYEE_ONLY',
-        'Apenas o funcionário atribuído pode concluir a rota.',
-      );
-    }
+    const canOfficeComplete =
+      user.role === UserRole.ADMIN ||
+      user.role === UserRole.PLATFORM_ADMIN ||
+      user.role === UserRole.MANAGER;
 
     const employee = await this.prisma.employee.findFirst({
       where: { companyId: user.companyId, userId: user.id },
       select: { id: true },
     });
-    if (!employee) {
-      throw httpError(
-        HttpStatus.FORBIDDEN,
-        'EMPLOYEE_PROFILE_REQUIRED',
-        'Seu usuário não está vinculado a um funcionário.',
-      );
-    }
 
     const route = await this.prisma.route.findFirst({
       where: { id, companyId: user.companyId },
@@ -1165,7 +1155,15 @@ export class RoutesService {
     if (!route) {
       throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
     }
-    if (route.employeeId !== employee.id) {
+    const assignedToSelf = Boolean(employee && route.employeeId === employee.id);
+    if (!assignedToSelf && !canOfficeComplete) {
+      if (!employee) {
+        throw httpError(
+          HttpStatus.FORBIDDEN,
+          'EMPLOYEE_PROFILE_REQUIRED',
+          'Seu usuário não está vinculado a um funcionário.',
+        );
+      }
       throw httpError(
         HttpStatus.FORBIDDEN,
         'ROUTE_NOT_ASSIGNED',

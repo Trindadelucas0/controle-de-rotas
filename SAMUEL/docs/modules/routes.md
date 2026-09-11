@@ -316,14 +316,15 @@ Formato interno de `plannedStepsJson`:
 
 ## Endpoint POST /api/v1/routes/:id/complete
 
-- Auth: EMPLOYEE atribuído
+- Auth: EMPLOYEE atribuído **ou** ADMIN/MANAGER/PLATFORM_ADMIN da mesma empresa (encerrar rota travada)
+- Alias de campo (UI): `POST /api/v1/field/routes/:id/complete` (mesmos papéis e body)
 - Body: `{ mode: "COMPLETED" | "INCOMPLETE" }`
 - Pré: `IN_PROGRESS`; visita `ARRIVED`/`IN_PROGRESS` → `ROUTE_HAS_OPEN_VISIT`
 - Regra 500 m: restante planejado das paradas `PENDING` ≤ 500 m (ou 0 pendentes) → pode `COMPLETED` (PENDING → `SKIPPED`); acima de 500 m só `INCOMPLETE`. Se `mode=INCOMPLETE` com ≤500 m, API promove para `COMPLETED`.
 - Respostas:
   - **200** — `{ route }` (mesmo shape de `getOne`); status `COMPLETED` ou `INCOMPLETE`
   - **422** `ROUTE_NOT_IN_PROGRESS` / `ROUTE_HAS_PENDING_STOPS` / `ROUTE_HAS_OPEN_VISIT`
-  - **403** `ROUTE_NOT_ASSIGNED` / `ROUTE_COMPLETE_EMPLOYEE_ONLY`
+  - **403** `ROUTE_NOT_ASSIGNED` / `EMPLOYEE_PROFILE_REQUIRED` / `AUTH_FORBIDDEN`
 - Side effects: status terminal; libera Play em outra rota; gestor vê incompletas + trilha em `/map?routeId=`
 - UI: arrastar em `/field/my-route` e `/field/navigate`
 - Como testar: Play → concluir com pendentes longe → `INCOMPLETE`; ≤500 m ou tudo feito → `COMPLETED`

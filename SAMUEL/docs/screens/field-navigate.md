@@ -80,6 +80,7 @@ N/A.
 | Ação | Efeito |
 | --- | --- |
 | Encerrar | confirma → `/field/my-route` (não cancela rota) |
+| Arrastar para concluir | `POST /field/routes/:id/complete` |
 | Cheguei (banner ~80 m) | abre `/field/visits/[id]` — **não** grava check-in sozinho |
 | Centralizar (alvo) | reativa follow e recentraliza no ícone do carro na hora |
 | Tentar GPS de novo | `requestCurrentPosition` progressivo (fino → coarse) + reinicia watch |

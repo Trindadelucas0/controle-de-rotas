@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -61,22 +62,6 @@ export class RoutesController {
     return this.routesService.create(user, dto);
   }
 
-  @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
-  getOne(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
-    return this.routesService.getOne(user, id);
-  }
-
-  @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER)
-  update(
-    @CurrentUser() user: AuthUser,
-    @Param('id', ParseUUIDPipe) id: string,
-    @Body() dto: UpdateRouteDto,
-  ) {
-    return this.routesService.update(user, id, dto);
-  }
-
   @Post(':id/cancel')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   cancel(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
@@ -109,13 +94,31 @@ export class RoutesController {
     return this.routesService.reroute(user, id, dto);
   }
 
+  /** Campo + gestor (rota travada). Declaração antes de GET :id. */
   @Post(':id/complete')
-  @Roles(UserRole.EMPLOYEE)
+  @HttpCode(200)
+  @Roles(UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.MANAGER)
   complete(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteRouteDto,
   ) {
     return this.routesService.complete(user, id, dto);
+  }
+
+  @Get(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
+  getOne(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.routesService.getOne(user, id);
+  }
+
+  @Patch(':id')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: UpdateRouteDto,
+  ) {
+    return this.routesService.update(user, id, dto);
   }
 }

@@ -205,7 +205,7 @@ export function FieldMyRoutePage() {
     setConfirmError(null);
     setError(null);
     try {
-      await apiFetch(`/api/v1/routes/${confirmRoute.id}/complete`, {
+      await apiFetch(`/api/v1/field/routes/${confirmRoute.id}/complete`, {
         method: 'POST',
         body: JSON.stringify({ mode }),
       });

@@ -1128,7 +1128,7 @@ export function FieldNavigatePage() {
     setCompleting(true);
     setCompleteError(null);
     try {
-      await apiFetch(`/api/v1/routes/${route.id}/complete`, {
+      await apiFetch(`/api/v1/field/routes/${route.id}/complete`, {
         method: 'POST',
         body: JSON.stringify({ mode }),
       });
