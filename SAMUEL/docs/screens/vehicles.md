@@ -120,7 +120,7 @@ Form full-width.
 
 ### 11. Fora de escopo
 
-Histórico de KM real da rota; fotos do veículo.
+Histórico de KM da rota (start/end + fotos no fluxo de campo); conferência visual no admin. Sem OCR.
 
 ### 12. Como testar
 

@@ -4,6 +4,7 @@ import { CustomerAccessPathStatus, RouteStatus, UserRole, VehicleStatus } from '
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { AuthUser } from '../auth/decorators/auth.decorators';
 import { httpError } from '../../common/errors/http-error';
+import { mapLandmarkPublic } from '../customers/access-path.util';
 
 const myRouteSelect = {
   id: true,
@@ -12,6 +13,7 @@ const myRouteSelect = {
   startedAt: true,
   roundtrip: true,
   recordTrip: true,
+  recordNewCustomer: true,
   originName: true,
   originAddress: true,
   originLatitude: true,
@@ -22,8 +24,19 @@ const myRouteSelect = {
   plannedStepsJson: true,
   quality: true,
   publishedAt: true,
+  startOdometerKm: true,
+  startFuelLevel: true,
   employee: { select: { id: true, name: true } },
-  vehicle: { select: { id: true, plate: true, brand: true, model: true } },
+  vehicle: {
+    select: {
+      id: true,
+      plate: true,
+      brand: true,
+      model: true,
+      odometerKm: true,
+      lastFuelLevel: true,
+    },
+  },
   stops: {
     orderBy: { sequence: 'asc' as const },
     select: {
@@ -72,6 +85,57 @@ export class FieldService {
     return employee.id;
   }
 
+  private async attachRecordedCustomers<
+    T extends { id: string; recordNewCustomer?: boolean },
+  >(companyId: string, _employeeId: string, routes: T[]) {
+    const missionIds = routes.filter((r) => r.recordNewCustomer).map((r) => r.id);
+    if (!missionIds.length) {
+      return routes.map((r) => ({ ...r, recordedCustomers: [] as never[] }));
+    }
+    const rows = await this.prisma.customer.findMany({
+      where: {
+        companyId,
+        recordedFromRouteId: { in: missionIds },
+        recordSessionShell: false,
+      },
+      orderBy: { createdAt: 'asc' },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        document: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+        profileIncomplete: true,
+        recordedFromRouteId: true,
+      },
+    });
+    const paths = rows.length
+      ? await this.prisma.customerAccessPath.findMany({
+          where: {
+            companyId,
+            routeId: { in: missionIds },
+            customerId: { in: rows.map((r) => r.id) },
+          },
+          select: { customerId: true, distanceMeters: true },
+        })
+      : [];
+    const distByCustomer = new Map(paths.map((p) => [p.customerId, p.distanceMeters]));
+    const byRoute = new Map<string, Array<(typeof rows)[number] & { distanceMeters: number | null }>>();
+    for (const row of rows) {
+      const rid = row.recordedFromRouteId;
+      if (!rid) continue;
+      const list = byRoute.get(rid) ?? [];
+      list.push({ ...row, distanceMeters: distByCustomer.get(row.id) ?? null });
+      byRoute.set(rid, list);
+    }
+    return routes.map((r) => ({
+      ...r,
+      recordedCustomers: byRoute.get(r.id) ?? [],
+    }));
+  }
+
   private async enrichRoutesWithAccess<
     T extends {
       id: string;
@@ -116,6 +180,7 @@ export class FieldService {
           latitude: true,
           longitude: true,
           note: true,
+          createdByEmployee: { select: { id: true, name: true } },
         },
       }),
     ]);
@@ -143,13 +208,9 @@ export class FieldService {
                 status: path.status,
               }
             : null,
-          landmarks: (landmarksByCustomer.get(customerId) ?? []).map((lm) => ({
-            id: lm.id,
-            type: lm.type,
-            latitude: lm.latitude,
-            longitude: lm.longitude,
-            note: lm.note,
-          })),
+          landmarks: (landmarksByCustomer.get(customerId) ?? []).map((lm) =>
+            mapLandmarkPublic(lm),
+          ),
         };
       }),
     }));
@@ -174,13 +235,39 @@ export class FieldService {
     });
 
     const enriched = await this.enrichRoutesWithAccess(user.companyId, found);
+    const withPoints = await this.attachRecordedCustomers(user.companyId, employeeId, enriched);
 
-    const inProgress = enriched.find((r) => r.status === RouteStatus.IN_PROGRESS) ?? null;
-    const rest = inProgress ? enriched.filter((r) => r.id !== inProgress.id) : enriched;
+    const inProgress = withPoints.find((r) => r.status === RouteStatus.IN_PROGRESS) ?? null;
+    const rest = inProgress ? withPoints.filter((r) => r.id !== inProgress.id) : withPoints;
     const routes = inProgress ? [inProgress, ...rest] : rest;
     const route = inProgress ?? routes[0] ?? null;
 
-    return { date: dateYmd, routes, route };
+    const openRecordedCustomers = await this.prisma.customer.findMany({
+      where: {
+        companyId: user.companyId,
+        recordSessionShell: false,
+        profileIncomplete: true,
+        recordedFromRoute: { employeeId, companyId: user.companyId },
+      },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        id: true,
+        name: true,
+        phone: true,
+        document: true,
+        city: true,
+        state: true,
+        street: true,
+        notes: true,
+        profileIncomplete: true,
+        latitude: true,
+        longitude: true,
+        recordedFromRouteId: true,
+      },
+      take: 50,
+    });
+
+    return { date: dateYmd, routes, route, openRecordedCustomers };
   }
 
   async listVehicles(user: AuthUser, routeId?: string) {
@@ -198,22 +285,42 @@ export class FieldService {
       assignedVehicleId = route.vehicleId;
     }
 
-    const available = await this.prisma.vehicle.findMany({
-      where: { companyId: user.companyId, status: VehicleStatus.AVAILABLE },
-      select: { id: true, plate: true, brand: true, model: true, status: true },
+    const busy = await this.prisma.route.findMany({
+      where: {
+        companyId: user.companyId,
+        status: RouteStatus.IN_PROGRESS,
+        vehicleId: { not: null },
+        ...(routeId ? { NOT: { id: routeId } } : {}),
+      },
+      select: { vehicleId: true },
+    });
+    const busyIds = new Set(busy.map((r) => r.vehicleId).filter(Boolean) as string[]);
+
+    const vehicles = await this.prisma.vehicle.findMany({
+      where: {
+        companyId: user.companyId,
+        status: { notIn: [VehicleStatus.MAINTENANCE, VehicleStatus.INACTIVE] },
+      },
+      select: {
+        id: true,
+        plate: true,
+        brand: true,
+        model: true,
+        status: true,
+        odometerKm: true,
+        lastFuelLevel: true,
+      },
       orderBy: { plate: 'asc' },
     });
 
-    const ids = new Set(available.map((v) => v.id));
-    if (assignedVehicleId && !ids.has(assignedVehicleId)) {
-      const assigned = await this.prisma.vehicle.findFirst({
-        where: { id: assignedVehicleId, companyId: user.companyId },
-        select: { id: true, plate: true, brand: true, model: true, status: true },
-      });
-      if (assigned) available.unshift(assigned);
-    }
+    const listed = vehicles
+      .filter((v) => v.id === assignedVehicleId || !busyIds.has(v.id))
+      .map((v) => ({
+        ...v,
+        inUseByOther: busyIds.has(v.id),
+      }));
 
-    return { vehicles: available };
+    return { vehicles: listed };
   }
 
   async trackingStatus(user: AuthUser) {

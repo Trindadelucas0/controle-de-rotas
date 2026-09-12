@@ -6,6 +6,8 @@ Campo novo no modelo `routes`: `planned_steps_json` (`plannedStepsJson`) — man
 
 Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s no servidor) na navegação, enfileira pontos no celular e no check-in/check-out consolida trilha em `CustomerAccessPath`. Unique parcial: um ACTIVE por (empresa, cliente). Modelos `customer_access_paths` e `customer_landmarks` (tema 21 / v0.15.3).
 
+`record_new_customer` (`recordNewCustomer`) — missão **Gravar cliente** (v0.18.0): o gestor encaminha sessão sem lista de clientes; cada **Adicionar ponto** cria um `Customer` no GPS; **complete** só fecha a sessão. Placeholder `recordSessionShell` nunca vai ao mapa. Plano: [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
+
 ## Telas
 
 | Rota | Doc |
@@ -15,7 +17,7 @@ Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s
 | `/field/navigate` | [screens/field-navigate.md](../screens/field-navigate.md) |
 | `/field/visits/[id]` | [screens/field-visit.md](../screens/field-visit.md) |
 
-Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-multi-rotas-dia.md](../plans/18-multi-rotas-dia.md), [plans/21-gravar-viagem-acesso.md](../plans/21-gravar-viagem-acesso.md).
+Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-multi-rotas-dia.md](../plans/18-multi-rotas-dia.md), [plans/21-gravar-viagem-acesso.md](../plans/21-gravar-viagem-acesso.md), [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
 
 ---
 
@@ -39,7 +41,7 @@ Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-mult
 
 ### Respostas
 
-**201/200** — `{ landmark }`
+**201/200** — `{ landmark }` com `id`, `customerId`, `type`, lat/lng, `note`, `createdBy: { id, name } | null`
 
 **403** — `LANDMARK_FORBIDDEN` / `LANDMARK_RECORD_TRIP_REQUIRED` / `AUTH_FORBIDDEN`
 
@@ -53,10 +55,32 @@ Campo em navegação **com Gravar viagem** + GPS → botão Porteira; gestor em 
 
 ---
 
+## Endpoint DELETE /api/v1/customers/:id/landmarks/:landmarkId
+
+- Auth: ADMIN, MANAGER, EMPLOYEE (JWT)
+- Rate limit: N/A (ownership no servidor)
+- Body: nenhum
+- EMPLOYEE: mesma regra do POST (rota `IN_PROGRESS` do cliente **com** `recordTrip`)
+- Side effects: apaga a linha em `customer_landmarks` (só se `companyId` + `customerId` baterem)
+
+### Respostas
+
+**200** — `{ "ok": true }`
+
+**403** — `LANDMARK_FORBIDDEN` / `LANDMARK_RECORD_TRIP_REQUIRED` / `AUTH_FORBIDDEN`
+
+**404** — `CUSTOMER_NOT_FOUND` / `LANDMARK_NOT_FOUND` (outro cliente, outro tenant ou id inexistente)
+
+### Como testar
+
+Navegação com Gravar viagem → banner **Ainda existe …?** → **Não, retirar**. EMPLOYEE sem `recordTrip`: 403. UUID de outro cliente: 404.
+
+---
+
 ## Endpoint GET /api/v1/customers/:id/access
 
 - Auth: ADMIN, MANAGER
-- Resposta: `{ accessPath: { id, geometryJson, distanceMeters, status } | null, landmarks: [...] }`
+- Resposta: `{ accessPath: { id, geometryJson, distanceMeters, status } | null, landmarks: [{ id, customerId, type, latitude, longitude, note, createdBy }] }`
 - Como testar: após check-in com Gravar viagem, abrir cliente no mapa
 
 ---
@@ -277,6 +301,21 @@ Formato interno de `plannedStepsJson`:
 - Respostas: **200** `{ route }` (stops vazios) | **404** | **422** `ROUTE_NOT_EDITABLE`
 - Como testar: Rotas de hoje → Gerir → Cancelar rota → visitas livres no planejador
 
+## Endpoint DELETE /api/v1/routes/:id
+
+- Auth: ADMIN (JWT); PLATFORM_ADMIN herda
+- Rate limit: N/A
+- Body: vazio
+- Pré: rota da mesma empresa; status **diferente** de `IN_PROGRESS`
+- Side effects: visitas das paradas ainda `ASSIGNED` → `SCHEDULED` + `employeeId` null; apaga `Route` (cascade `RouteStop` e `TrackingPoint`; `CustomerAccessPath.routeId` e `Customer.recordedFromRouteId` viram null)
+- Respostas:
+  - **204** — sem corpo
+  - **404** `ROUTE_NOT_FOUND`
+  - **422** `ROUTE_IN_PROGRESS`
+  - **403** `AUTH_FORBIDDEN` (EMPLOYEE/MANAGER/SUPERVISOR)
+  - **401** sem cookie
+- Como testar: Rotas de hoje → Ver/Gerir → **Excluir rota**; forçar DELETE em `IN_PROGRESS` → 422
+
 ## Endpoint POST /api/v1/routes/:id/publish
 
 - Auth: ADMIN, MANAGER
@@ -328,3 +367,33 @@ Formato interno de `plannedStepsJson`:
 - Side effects: status terminal; libera Play em outra rota; gestor vê incompletas + trilha em `/map?routeId=`
 - UI: arrastar em `/field/my-route` e `/field/navigate`
 - Como testar: Play → concluir com pendentes longe → `INCOMPLETE`; ≤500 m ou tudo feito → `COMPLETED`
+- Missão `recordNewCustomer`: ignora 500 m e visita aberta; sempre `COMPLETED` se o usuário escolheu encerrar; placeholder da sessão → visita `CANCELLED`; **não** cria cliente neste gesto
+
+## Endpoint POST /api/v1/routes/dispatch-record-mission
+
+- Auth: ADMIN, MANAGER (JWT)
+- Rate limit: mesmo preview/dispatch (Redis)
+- Body:
+
+```json
+{ "date": "2026-09-12", "employeeId": "uuid", "vehicleId": "uuid" }
+```
+
+- Respostas:
+  - **201/200** — `{ route }` `PUBLISHED` com `recordTrip` + `recordNewCustomer`
+  - **422** `EMPLOYEE_NOT_DISPATCHABLE` / `VEHICLE_NOT_AVAILABLE`
+  - **404** `VEHICLE_NOT_FOUND`
+- Side effects: cliente placeholder `recordSessionShell` (nome interno, sem pin); OS “Gravar acesso {data}”; visita no pin da empresa
+- Como testar: `/routes` aba Gravar cliente → Publicar → Minha rota do funcionário mostra **Gravar acesso**
+
+## Endpoint POST /api/v1/field/routes/:id/record-point
+
+- Auth: EMPLOYEE dono da rota
+- Body: `{ latitude, longitude, accuracy?, trailPoints?, completeProfile?, customer: { name, phone?, document?, city?, state?, street?, notes? } }`
+- Pré: rota `IN_PROGRESS` + `recordNewCustomer`; nome ≥ 2 caracteres; GPS válido; teto 25 pontos
+- Respostas:
+  - **201** — `{ customer, accessPath, pointIndex }`
+  - **422** `CUSTOMER_NAME_REQUIRED` / `RECORD_POINT_GPS_REQUIRED` / `ROUTE_NOT_RECORD_MISSION` / `ROUTE_NOT_IN_PROGRESS` / `RECORD_POINT_LIMIT`
+  - **403** `ROUTE_NOT_ASSIGNED` / `RECORD_POINT_EMPLOYEE_ONLY`
+- Side effects: cria cliente (DRAFT se `completeProfile` falso); OS “Acesso gravado”; `CustomerAccessPath` do trecho; audit `RECORD_POINT`; **não** altera status da rota
+- Como testar: Play da missão → Adicionar ponto com nome → pin no mapa; segundo ponto usa trecho novo; Gravar viagem clássica não tem o botão

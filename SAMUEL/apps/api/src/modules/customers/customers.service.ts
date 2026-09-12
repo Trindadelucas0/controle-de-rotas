@@ -1,6 +1,7 @@
 import { Injectable, HttpStatus } from '@nestjs/common';
 import {
   CustomerAccessPathStatus,
+  CustomerStatus,
   LocationStatus,
   Prisma,
   RouteStatus,
@@ -20,12 +21,23 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 import {
   consolidateTrackingToLineString,
   evaluateAccessReadAuth,
-  evaluateLandmarkCreateAuth,
+  evaluateLandmarkWriteAuth,
   isValidLatLng,
+  mapLandmarkPublic,
   normalizeLandmarkNote,
   sanitizeTrailPoints,
   type SanitizedTrailPoint,
 } from './access-path.util';
+
+const landmarkPublicSelect = {
+  id: true,
+  customerId: true,
+  type: true,
+  latitude: true,
+  longitude: true,
+  note: true,
+  createdByEmployee: { select: { id: true, name: true } },
+} as const;
 import { lineStringWkt } from '../routes/routes-geo';
 
 export type AccessPathFinalizeResult =
@@ -91,8 +103,26 @@ export class CustomersService {
 
   async getOne(user: AuthUser, id: string) {
     const customer = await this.customersRepository.findByIdInCompany(id, user.companyId);
-    if (!customer) {
+    if (!customer || customer.recordSessionShell) {
       throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
+    }
+    if (user.role === UserRole.EMPLOYEE) {
+      const employeeId = await this.myEmployeeId(user);
+      if (!employeeId || !customer.recordedFromRouteId) {
+        throw httpError(HttpStatus.FORBIDDEN, 'CUSTOMER_GET_FORBIDDEN', 'Sem acesso a este cliente.');
+      }
+      const mission = await this.prisma.route.findFirst({
+        where: {
+          id: customer.recordedFromRouteId,
+          companyId: user.companyId,
+          employeeId,
+          recordNewCustomer: true,
+        },
+        select: { id: true },
+      });
+      if (!mission) {
+        throw httpError(HttpStatus.FORBIDDEN, 'CUSTOMER_GET_FORBIDDEN', 'Sem acesso a este cliente.');
+      }
     }
     return { customer };
   }
@@ -102,10 +132,61 @@ export class CustomersService {
     if (!existing) {
       throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
     }
+    if (existing.recordSessionShell) {
+      throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
+    }
+
+    if (user.role === UserRole.EMPLOYEE) {
+      const employeeId = await this.myEmployeeId(user);
+      if (!employeeId) {
+        throw httpError(
+          HttpStatus.FORBIDDEN,
+          'EMPLOYEE_PROFILE_REQUIRED',
+          'Seu usuário não está vinculado a um funcionário.',
+        );
+      }
+      if (!existing.profileIncomplete || !existing.recordedFromRouteId) {
+        throw httpError(
+          HttpStatus.FORBIDDEN,
+          'CUSTOMER_PATCH_FORBIDDEN',
+          'Só é possível completar cadastros em aberto da sua missão de gravar.',
+        );
+      }
+      const mission = await this.prisma.route.findFirst({
+        where: {
+          id: existing.recordedFromRouteId,
+          companyId: user.companyId,
+          employeeId,
+          recordNewCustomer: true,
+        },
+        select: { id: true },
+      });
+      if (!mission) {
+        throw httpError(
+          HttpStatus.FORBIDDEN,
+          'CUSTOMER_PATCH_FORBIDDEN',
+          'Só é possível completar cadastros em aberto da sua missão de gravar.',
+        );
+      }
+      if (dto.status === CustomerStatus.INACTIVE) {
+        throw httpError(
+          HttpStatus.FORBIDDEN,
+          'CUSTOMER_PATCH_FORBIDDEN',
+          'Funcionário não pode inativar cliente.',
+        );
+      }
+    }
 
     const latitude = dto.latitude !== undefined ? dto.latitude : existing.latitude;
     const longitude = dto.longitude !== undefined ? dto.longitude : existing.longitude;
     const locationTouched = dto.latitude !== undefined || dto.longitude !== undefined;
+
+    let nextStatus = dto.status;
+    let nextIncomplete = dto.profileIncomplete;
+    if (dto.profileIncomplete === false) {
+      nextStatus = CustomerStatus.ACTIVE;
+      nextIncomplete = false;
+    }
 
     const customer = await this.customersRepository.update(id, user.companyId, {
       ...(dto.name !== undefined ? { name: dto.name } : {}),
@@ -129,7 +210,8 @@ export class CustomersService {
       ...(dto.category !== undefined ? { category: dto.category } : {}),
       ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
       ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-      ...(dto.status !== undefined ? { status: dto.status } : {}),
+      ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+      ...(nextIncomplete !== undefined ? { profileIncomplete: nextIncomplete } : {}),
     });
 
     return { customer };
@@ -197,7 +279,7 @@ export class CustomersService {
           )
         : { onRoute: false, recordTrip: false };
 
-    const auth = evaluateLandmarkCreateAuth({
+    const auth = evaluateLandmarkWriteAuth({
       actorRole: user.role,
       actorEmployeeId,
       customerFoundInTenant: Boolean(customer),
@@ -218,9 +300,48 @@ export class CustomersService {
         note: normalizeLandmarkNote(dto.note),
         createdByEmployeeId: actorEmployeeId,
       },
+      select: landmarkPublicSelect,
     });
 
-    return { landmark };
+    return { landmark: mapLandmarkPublic(landmark) };
+  }
+
+  async deleteLandmark(user: AuthUser, customerId: string, landmarkId: string) {
+    const customer = await this.customersRepository.findByIdInCompany(
+      customerId,
+      user.companyId,
+    );
+    const actorEmployeeId = await this.myEmployeeId(user);
+    const ctx =
+      actorEmployeeId != null
+        ? await this.employeeInProgressLandmarkContext(
+            user.companyId,
+            actorEmployeeId,
+            customerId,
+          )
+        : { onRoute: false, recordTrip: false };
+
+    const auth = evaluateLandmarkWriteAuth({
+      actorRole: user.role,
+      actorEmployeeId,
+      customerFoundInTenant: Boolean(customer),
+      employeeOnInProgressRouteForCustomer: ctx.onRoute,
+      routeHasRecordTrip: ctx.recordTrip,
+    });
+    if (!auth.ok) {
+      throw httpError(auth.statusCode as HttpStatus, auth.code, auth.message);
+    }
+
+    const existing = await this.prisma.customerLandmark.findFirst({
+      where: { id: landmarkId, companyId: user.companyId, customerId },
+      select: { id: true },
+    });
+    if (!existing) {
+      throw httpError(HttpStatus.NOT_FOUND, 'LANDMARK_NOT_FOUND', 'Marco não encontrado.');
+    }
+
+    await this.prisma.customerLandmark.delete({ where: { id: existing.id } });
+    return { ok: true };
   }
 
   async getAccess(user: AuthUser, customerId: string) {
@@ -257,18 +378,11 @@ export class CustomersService {
       this.prisma.customerLandmark.findMany({
         where: { companyId: user.companyId, customerId },
         orderBy: { createdAt: 'asc' },
-        select: {
-          id: true,
-          type: true,
-          latitude: true,
-          longitude: true,
-          note: true,
-          createdAt: true,
-        },
+        select: landmarkPublicSelect,
       }),
     ]);
 
-    return { accessPath, landmarks };
+    return { accessPath, landmarks: landmarks.map(mapLandmarkPublic) };
   }
 
   /**
@@ -282,12 +396,15 @@ export class CustomersService {
     employeeId: string | null;
     destination: { latitude: number; longitude: number };
     extraPoints?: SanitizedTrailPoint[];
+    originOverride?: { latitude: number; longitude: number };
+    sinceRecordedAt?: Date;
   }): Promise<AccessPathFinalizeResult> {
     const route = await this.prisma.route.findFirst({
       where: { id: input.routeId, companyId: input.companyId },
       select: {
         id: true,
         recordTrip: true,
+        recordNewCustomer: true,
         originLatitude: true,
         originLongitude: true,
         startLatitude: true,
@@ -297,14 +414,16 @@ export class CustomersService {
     if (!route) {
       return { saved: false, reason: 'ROUTE_NOT_FOUND' };
     }
-    if (!route.recordTrip) {
+    if (!route.recordTrip && !route.recordNewCustomer) {
       return { saved: false, reason: 'NOT_RECORDING' };
     }
     if (!isValidLatLng(input.destination.latitude, input.destination.longitude)) {
       return { saved: false, reason: 'INVALID_DESTINATION' };
     }
 
-    const extras = input.extraPoints ?? [];
+    const extras = (input.extraPoints ?? []).filter((p) =>
+      input.sinceRecordedAt ? p.recordedAt >= input.sinceRecordedAt : true,
+    );
     if (extras.length && input.employeeId) {
       try {
         await this.prisma.trackingPoint.createMany({
@@ -323,7 +442,11 @@ export class CustomersService {
     }
 
     const dbPoints = await this.prisma.trackingPoint.findMany({
-      where: { companyId: input.companyId, routeId: input.routeId },
+      where: {
+        companyId: input.companyId,
+        routeId: input.routeId,
+        ...(input.sinceRecordedAt ? { recordedAt: { gte: input.sinceRecordedAt } } : {}),
+      },
       orderBy: { recordedAt: 'asc' },
       select: { latitude: true, longitude: true },
     });
@@ -334,9 +457,12 @@ export class CustomersService {
     ];
 
     const origin =
-      route.startLatitude != null && route.startLongitude != null
-        ? { latitude: route.startLatitude, longitude: route.startLongitude }
-        : { latitude: route.originLatitude, longitude: route.originLongitude };
+      input.originOverride &&
+      isValidLatLng(input.originOverride.latitude, input.originOverride.longitude)
+        ? input.originOverride
+        : route.startLatitude != null && route.startLongitude != null
+          ? { latitude: route.startLatitude, longitude: route.startLongitude }
+          : { latitude: route.originLatitude, longitude: route.originLongitude };
 
     const consolidated = consolidateTrackingToLineString({
       points: merged,
@@ -471,28 +597,12 @@ export class CustomersService {
     const rows = await this.prisma.customerLandmark.findMany({
       where: { companyId, customerId: { in: customerIds } },
       orderBy: { createdAt: 'asc' },
-      select: {
-        id: true,
-        customerId: true,
-        type: true,
-        latitude: true,
-        longitude: true,
-        note: true,
-      },
+      select: landmarkPublicSelect,
     });
-    const map = new Map<
-      string,
-      { id: string; type: string; latitude: number; longitude: number; note: string | null }[]
-    >();
+    const map = new Map<string, ReturnType<typeof mapLandmarkPublic>[]>();
     for (const r of rows) {
       const list = map.get(r.customerId) ?? [];
-      list.push({
-        id: r.id,
-        type: r.type,
-        latitude: r.latitude,
-        longitude: r.longitude,
-        note: r.note,
-      });
+      list.push(mapLandmarkPublic(r));
       map.set(r.customerId, list);
     }
     return map;

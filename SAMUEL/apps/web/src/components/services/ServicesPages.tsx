@@ -414,7 +414,7 @@ export function ServiceOrderNewPage() {
             </span>
           </label>
           {withFirstVisit ? (
-            <div className="grid gap-4 rounded-[8px] border border-[var(--border)] bg-[#161618] p-4 sm:grid-cols-2">
+            <div className="grid gap-4 rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] p-4 sm:grid-cols-2">
               <TextField
                 field={{
                   name: 'scheduledStart',

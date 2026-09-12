@@ -20,6 +20,8 @@ AppHeader: marca | UserMenu (nome, role, Alterar senha, Sair)
 main: full-bleed em `/` e `/map`; senão max-w-5xl
 ```
 
+Chrome (header, sidebar, drawer) usa `bg-[var(--surface)]` e segue `data-theme` (claro/escuro). Texto e botões (`text-brand-900`, `ops-btn-secondary`/`ghost`) ficam visíveis nos dois temas. Campo tela cheia (`field-nav`) permanece HUD escuro.
+
 ### 3. Informação
 
 Grupos: **Operação** (Início, Mapa, Agenda, Serviços, Rotas, Campo) · **Recursos** (Clientes, Funcionários, Veículos) · **Administração** (Empresa, Usuários). Labels e papéis: ver PRD UX §1.
@@ -52,6 +54,8 @@ Campo `/field/navigate` usa layout `(field-nav)` sem este chrome.
 
 Drawer + ☰ `aria-label="Abrir menu"`. Overlay fecha o menu.
 
+Página sem zoom (pinch / duplo toque / teclado). Zoom de câmera só no canvas MapLibre das telas de mapa.
+
 ### 11. Fora de escopo
 
 Top-nav horizontal (removida; `AppNav` legado só no mobile antigo).
@@ -62,6 +66,7 @@ Top-nav horizontal (removida; `AppNav` legado só no mobile antigo).
 2. EMPLOYEE: Início, Agenda, Campo; sem Clientes/Mapa/Serviços/Rotas/Empresa.
 3. SUPERVISOR: Mapa/Agenda/Serviços/Rotas/Clientes; sem Funcionários/Veículos/Admin.
 4. `/` e `/map` sem padding `max-w-5xl`.
+5. Tema **Claro**: header mostra nome, **Alterar senha**, **Sair** e o toggle; sidebar mostra **Rotas**; ☰ e **Fechar** no drawer mobile. Voltar a **Escuro** mantém contraste.
 
 ---
 

@@ -76,6 +76,8 @@ Público. Middleware redireciona quem já tem `access_token` para `/`.
 
 AuthCard centralizado; card ~max 400px. Depois do login, o campo (`/field/*`) só segue no PWA instalado.
 
+Página sem zoom (viewport `maximumScale: 1` / `userScalable: false`; campos 16px). Pinch não amplia o login.
+
 ### 11. Fora de escopo desta tela
 
 MFA, SSO, lembrar-me, cadastro self-service.

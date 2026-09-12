@@ -14,6 +14,7 @@ export class CustomersRepository {
   }): Promise<Customer[]> {
     const where: Prisma.CustomerWhereInput = {
       companyId: params.companyId,
+      recordSessionShell: false,
       ...(params.status ? { status: params.status } : {}),
       ...(params.document
         ? { document: { contains: params.document, mode: 'insensitive' } }

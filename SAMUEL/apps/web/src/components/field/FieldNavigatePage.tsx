@@ -6,7 +6,7 @@ import MapGL, { Layer, Marker, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { apiFetch, ApiError } from '@/lib/api-client';
+import { apiFetch, apiUpload, ApiError } from '@/lib/api-client';
 import {
   gpsActiveLabel,
   gpsCatchMessage,
@@ -22,8 +22,12 @@ import {
 } from '@/lib/field-tracking';
 import {
   enqueueLandmark,
+  enqueueLandmarkDelete,
+  peekLandmarkDeleteQueue,
   peekLandmarkQueue,
+  prependLandmarkDeleteQueue,
   prependLandmarkQueue,
+  takeLandmarkDeleteQueue,
   takeLandmarkQueue,
 } from '@/lib/field-landmark-queue';
 import { toDateInputValue } from '@/lib/ops-labels';
@@ -56,11 +60,24 @@ import { LivePositionMarker } from '@/components/map/LivePositionMarker';
 import {
   LandmarkMapMarker,
   LANDMARK_LABELS,
+  landmarkAuthorLine,
+  landmarkStillExistsQuestion,
+  type LandmarkCreatedBy,
   type LandmarkType,
 } from '@/components/map/LandmarkMapMarker';
 import { useSmoothedLngLat, type LngLatTarget } from '@/hooks/useSmoothedLngLat';
 import { SlideToComplete } from '@/components/field/SlideToComplete';
-import { CompleteRouteConfirm } from '@/components/field/CompleteRouteConfirm';
+import { CompleteRouteConfirm, type CompleteRoutePayload } from '@/components/field/CompleteRouteConfirm';
+import {
+  RecordToCustomerSheet,
+  type RecordPointForm,
+} from '@/components/field/RecordToCustomerSheet';
+import {
+  resetTrailSnapshot,
+  trailLengthMeters,
+  trailPointsPayload,
+} from '@/lib/field-track-queue';
+import { formatMeters } from '@/components/routes/routes-planner-shared';
 import {
   canCompleteAsFinished,
   hasOpenVisitOnStops,
@@ -82,10 +99,12 @@ const LANDMARK_COOLDOWN_MS = 5 * 60 * 1000;
 
 type CustomerLandmark = {
   id: string;
+  customerId?: string;
   type: LandmarkType;
   latitude: number;
   longitude: number;
   note: string | null;
+  createdBy?: LandmarkCreatedBy | null;
 };
 
 /** Polyline restante — menta, só no traçado. */
@@ -109,18 +128,31 @@ type RouteStop = {
   };
 };
 
+type RecordedCustomer = {
+  id: string;
+  name: string;
+  profileIncomplete?: boolean;
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceMeters?: number | null;
+};
+
 type NavRoute = {
   id: string;
   status: string;
   date: string;
   startedAt?: string | null;
   recordTrip?: boolean;
+  recordNewCustomer?: boolean;
+  recordedCustomers?: RecordedCustomer[];
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
   plannedGeometryJson?: unknown;
   plannedStepsJson?: unknown;
   originLatitude?: number;
   originLongitude?: number;
+  startOdometerKm?: number | null;
+  startFuelLevel?: string | null;
   vehicle: { id: string; plate: string; brand: string | null; model: string | null } | null;
   employee: { id: string; name: string } | null;
   stops: RouteStop[];
@@ -296,9 +328,16 @@ export function FieldNavigatePage() {
   const [recalculating, setRecalculating] = useState(false);
   const [rerouteError, setRerouteError] = useState<string | null>(null);
   const [proximityLandmark, setProximityLandmark] = useState<CustomerLandmark | null>(null);
+  const [selectedLandmarkId, setSelectedLandmarkId] = useState<string | null>(null);
   const [landmarkBusy, setLandmarkBusy] = useState(false);
+  const [landmarkRemoving, setLandmarkRemoving] = useState(false);
+  const [landmarkRemoveError, setLandmarkRemoveError] = useState<string | null>(null);
   const [landmarkMsg, setLandmarkMsg] = useState<string | null>(null);
   const [trackStats, setTrackStats] = useState({ queued: 0, posted: 0, trail: 0 });
+  const [showRecordPoint, setShowRecordPoint] = useState(false);
+  const [recordPointBusy, setRecordPointBusy] = useState(false);
+  const [recordPointError, setRecordPointError] = useState<string | null>(null);
+  const [recordPointMsg, setRecordPointMsg] = useState<string | null>(null);
   const landmarkCooldownRef = useRef<globalThis.Map<string, number>>(new globalThis.Map());
   const routeFitDoneRef = useRef(false);
 
@@ -336,6 +375,7 @@ export function FieldNavigatePage() {
   }, [gps]);
 
   const nextStop = useMemo(() => {
+    if (route?.recordNewCustomer) return null;
     if (!pendingStops.length) return null;
     if (!gps) return pendingStops[0];
     for (const s of pendingStops) {
@@ -343,7 +383,7 @@ export function FieldNavigatePage() {
       if (d > 40) return s;
     }
     return pendingStops[pendingStops.length - 1];
-  }, [pendingStops, gps]);
+  }, [pendingStops, gps, route?.recordNewCustomer]);
 
   const remainingStops = useMemo(() => {
     if (!pendingStops.length) return [];
@@ -397,7 +437,10 @@ export function FieldNavigatePage() {
     const byId = new globalThis.Map<string, CustomerLandmark>();
     for (const s of stops) {
       for (const lm of s.landmarks ?? []) {
-        byId.set(lm.id, lm);
+        byId.set(lm.id, {
+          ...lm,
+          customerId: lm.customerId ?? s.visit.customer.id,
+        });
       }
     }
     return [...byId.values()];
@@ -425,7 +468,85 @@ export function FieldNavigatePage() {
       landmarkCooldownRef.current.set(proximityLandmark.id, Date.now() + LANDMARK_COOLDOWN_MS);
     }
     setProximityLandmark(null);
+    setLandmarkRemoveError(null);
   }
+
+  function stripLandmarkFromRoute(landmarkId: string) {
+    setRoute((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stops: prev.stops.map((s) => ({
+          ...s,
+          landmarks: (s.landmarks ?? []).filter((lm) => lm.id !== landmarkId),
+        })),
+      };
+    });
+    setSelectedLandmarkId((id) => (id === landmarkId ? null : id));
+    setProximityLandmark((lm) => (lm?.id === landmarkId ? null : lm));
+  }
+
+  async function confirmLandmarkKeep() {
+    await dismissProximity();
+  }
+
+  async function confirmLandmarkRemove() {
+    if (!proximityLandmark || landmarkRemoving) return;
+    const lm = proximityLandmark;
+    const customerId = lm.customerId;
+    if (!customerId) {
+      setLandmarkRemoveError('Não foi possível identificar o cliente deste marco.');
+      return;
+    }
+    setLandmarkRemoving(true);
+    setLandmarkRemoveError(null);
+    try {
+      await apiFetch<{ ok: boolean }>(`/api/v1/customers/${customerId}/landmarks/${lm.id}`, {
+        method: 'DELETE',
+      });
+      landmarkCooldownRef.current.set(lm.id, Date.now() + LANDMARK_COOLDOWN_MS);
+      stripLandmarkFromRoute(lm.id);
+    } catch (e) {
+      const status = e instanceof ApiError ? e.status : 0;
+      if (status === 403 || status === 401) {
+        setLandmarkRemoveError(
+          e instanceof ApiError ? e.message : 'Sem permissão para retirar este marco.',
+        );
+        return;
+      }
+      if (status === 404) {
+        landmarkCooldownRef.current.set(lm.id, Date.now() + LANDMARK_COOLDOWN_MS);
+        stripLandmarkFromRoute(lm.id);
+        return;
+      }
+      enqueueLandmarkDelete({ customerId, landmarkId: lm.id });
+      landmarkCooldownRef.current.set(lm.id, Date.now() + LANDMARK_COOLDOWN_MS);
+      stripLandmarkFromRoute(lm.id);
+      setLandmarkMsg('Retirada guardada para enviar');
+    } finally {
+      setLandmarkRemoving(false);
+    }
+  }
+
+  const flushLandmarkDeletes = useCallback(async () => {
+    const pending = takeLandmarkDeleteQueue();
+    if (!pending.length) return;
+    const failed: typeof pending = [];
+    for (const item of pending) {
+      try {
+        await apiFetch<{ ok: boolean }>(
+          `/api/v1/customers/${item.customerId}/landmarks/${item.landmarkId}`,
+          { method: 'DELETE' },
+        );
+        stripLandmarkFromRoute(item.landmarkId);
+      } catch (e) {
+        const status = e instanceof ApiError ? e.status : 0;
+        if (status === 404) continue;
+        failed.push(item);
+      }
+    }
+    if (failed.length) prependLandmarkDeleteQueue(failed);
+  }, []);
 
   const flushLandmarkQueue = useCallback(async () => {
     const pending = takeLandmarkQueue();
@@ -455,6 +576,7 @@ export function FieldNavigatePage() {
             ),
           };
         });
+        landmarkCooldownRef.current.set(r.landmark.id, Date.now() + LANDMARK_COOLDOWN_MS);
       } catch {
         failed.push(item);
       }
@@ -465,6 +587,7 @@ export function FieldNavigatePage() {
   useEffect(() => {
     const kick = () => {
       if (peekLandmarkQueue().length) void flushLandmarkQueue();
+      if (peekLandmarkDeleteQueue().length) void flushLandmarkDeletes();
     };
     document.addEventListener('visibilitychange', kick);
     window.addEventListener('online', kick);
@@ -473,7 +596,7 @@ export function FieldNavigatePage() {
       document.removeEventListener('visibilitychange', kick);
       window.removeEventListener('online', kick);
     };
-  }, [flushLandmarkQueue]);
+  }, [flushLandmarkQueue, flushLandmarkDeletes]);
 
   async function markLandmark(type: LandmarkType) {
     if (!route?.recordTrip || !gps || !nextStop || landmarkBusy) return;
@@ -504,6 +627,7 @@ export function FieldNavigatePage() {
           ),
         };
       });
+      landmarkCooldownRef.current.set(r.landmark.id, Date.now() + LANDMARK_COOLDOWN_MS);
       setLandmarkMsg(`${LANDMARK_LABELS[type]} marcada`);
       void flushLandmarkQueue();
     } catch (e) {
@@ -552,10 +676,18 @@ export function FieldNavigatePage() {
   );
   const markerHeading = smoothedGps?.heading ?? gps?.heading ?? 0;
 
-  const showManeuverBanner =
-    !recalculating && !rerouteError && !arriving && !effectivelyOffRoute;
+  const isRecordMission = Boolean(route?.recordNewCustomer);
 
-  const bannerText = recalculating
+  const showManeuverBanner =
+    !isRecordMission &&
+    !recalculating &&
+    !rerouteError &&
+    !arriving &&
+    !effectivelyOffRoute;
+
+  const bannerText = isRecordMission
+    ? 'Grave o caminho e marque um ponto em cada fazenda'
+    : recalculating
     ? 'Recalculando a partir da sua posição…'
     : rerouteError
       ? rerouteError
@@ -575,6 +707,7 @@ export function FieldNavigatePage() {
   const requestReroute = useCallback(
     async (routeId: string, pos: GpsState, reorderRemaining: boolean) => {
       if (recalculatingRef.current) return;
+      if (route?.recordNewCustomer) return;
       recalculatingRef.current = true;
       setRecalculating(true);
       setRerouteError(null);
@@ -602,12 +735,16 @@ export function FieldNavigatePage() {
         setRecalculating(false);
       }
     },
-    [],
+    [route?.recordNewCustomer],
   );
 
   // 1º fix GPS: sempre recalcula a partir da posição atual (elimina U-turn da origem publicada).
   useEffect(() => {
     if (!gps || !route || route.status !== 'IN_PROGRESS') return;
+    if (route.recordNewCustomer) {
+      initialRerouteDoneRef.current = true;
+      return;
+    }
     if (initialRerouteDoneRef.current || recalculatingRef.current) return;
 
     initialRerouteDoneRef.current = true;
@@ -617,6 +754,7 @@ export function FieldNavigatePage() {
   // Off-route sustentado: redesenha traçado; reordena só se o 1º recálculo ainda não rodou.
   useEffect(() => {
     if (!gps || !route || route.status !== 'IN_PROGRESS') return;
+    if (route.recordNewCustomer) return;
     if (!initialRerouteDoneRef.current || recalculating) return;
 
     if (!effectivelyOffRoute) {
@@ -1104,9 +1242,61 @@ export function FieldNavigatePage() {
     router.push('/field/my-route');
   }
 
+  async function saveRecordPoint(form: RecordPointForm, completeProfile: boolean) {
+    if (!route || !gps || recordPointBusy) return;
+    setRecordPointBusy(true);
+    setRecordPointError(null);
+    try {
+      const r = await apiFetch<{
+        customer: RecordedCustomer;
+        pointIndex: number;
+        accessPath?: { distanceMeters?: number | null };
+      }>(`/api/v1/field/routes/${route.id}/record-point`, {
+        method: 'POST',
+        body: JSON.stringify({
+          latitude: gps.latitude,
+          longitude: gps.longitude,
+          accuracy: gps.accuracy,
+          trailPoints: trailPointsPayload(route.id),
+          completeProfile,
+          customer: {
+            name: form.name.trim(),
+            phone: form.phone.trim() || null,
+            document: form.document.trim() || null,
+            city: form.city.trim() || null,
+            state: form.state.trim() || null,
+            street: form.street.trim() || null,
+            notes: form.notes.trim() || null,
+          },
+        }),
+      });
+      resetTrailSnapshot(route.id);
+      setRoute((prev) => {
+        if (!prev) return prev;
+        return {
+          ...prev,
+          recordedCustomers: [
+            ...(prev.recordedCustomers ?? []),
+            {
+              ...r.customer,
+              distanceMeters: r.accessPath?.distanceMeters ?? r.customer.distanceMeters ?? null,
+            },
+          ],
+        };
+      });
+      setShowRecordPoint(false);
+      setRecordPointMsg(`Cliente marcado: ${r.customer.name}`);
+      window.setTimeout(() => setRecordPointMsg(null), 4000);
+    } catch (e) {
+      setRecordPointError(e instanceof ApiError ? e.message : 'Não foi possível marcar o ponto');
+    } finally {
+      setRecordPointBusy(false);
+    }
+  }
+
   function openCompleteConfirm() {
     if (!route || completing) return;
-    if (hasOpenVisitOnStops(route.stops)) {
+    if (!route.recordNewCustomer && hasOpenVisitOnStops(route.stops)) {
       setCompleteError('Finalize a visita em andamento antes de concluir a rota.');
       setShowCompleteConfirm(true);
       return;
@@ -1115,23 +1305,31 @@ export function FieldNavigatePage() {
     setShowCompleteConfirm(true);
   }
 
-  async function submitCompleteRoute() {
+  async function submitCompleteRoute(payload: CompleteRoutePayload) {
     if (!route || completing) return;
-    if (hasOpenVisitOnStops(route.stops)) {
+    if (!route.recordNewCustomer && hasOpenVisitOnStops(route.stops)) {
       setCompleteError('Finalize a visita em andamento antes de concluir a rota.');
       return;
     }
     const pending = route.stops.filter((s) => s.status === 'PENDING');
     const remaining = remainingPlannedMeters(route.stops);
-    const asFinished = canCompleteAsFinished(remaining, pending.length);
+    const asFinished = route.recordNewCustomer
+      ? true
+      : canCompleteAsFinished(remaining, pending.length);
     const mode = asFinished ? 'COMPLETED' : 'INCOMPLETE';
     setCompleting(true);
     setCompleteError(null);
     try {
-      await apiFetch(`/api/v1/field/routes/${route.id}/complete`, {
-        method: 'POST',
-        body: JSON.stringify({ mode }),
-      });
+      const form = new FormData();
+      form.append('mode', mode);
+      form.append('endOdometerKm', String(payload.endOdometerKm));
+      form.append('endFuelLevel', payload.endFuelLevel);
+      form.append('file', payload.file);
+      if (gps) {
+        form.append('endLatitude', String(gps.latitude));
+        form.append('endLongitude', String(gps.longitude));
+      }
+      await apiUpload(`/api/v1/field/routes/${route.id}/complete`, form);
       stopWatch();
       void releaseWakeLock();
       setShowCompleteConfirm(false);
@@ -1242,6 +1440,11 @@ export function FieldNavigatePage() {
           onDragEnd={() => {
             userPanningRef.current = false;
           }}
+          onClick={(e) => {
+            const el = e.originalEvent.target as HTMLElement | null;
+            if (el?.closest('[data-landmark-marker]')) return;
+            setSelectedLandmarkId(null);
+          }}
         >
           {mapReady && geojson ? (
             <Source id="nav-route" type="geojson" data={geojson}>
@@ -1266,7 +1469,7 @@ export function FieldNavigatePage() {
             </Source>
           ) : null}
 
-          {mapReady
+          {mapReady && !route?.recordNewCustomer
             ? orderedStops.map((s) => (
                 <Marker
                   key={s.id}
@@ -1288,6 +1491,26 @@ export function FieldNavigatePage() {
               ))
             : null}
 
+          {mapReady && route?.recordNewCustomer
+            ? (route.recordedCustomers ?? [])
+                .filter((c) => c.latitude != null && c.longitude != null)
+                .map((c, i) => (
+                  <Marker
+                    key={c.id}
+                    latitude={c.latitude!}
+                    longitude={c.longitude!}
+                    anchor="bottom"
+                  >
+                    <div
+                      className="relative flex h-7 min-w-7 items-center justify-center rounded-full border-2 border-white bg-amber-500 px-1.5 text-[11px] font-bold text-[#121212]"
+                      aria-label={`Ponto ${i + 1}: ${c.name}${c.profileIncomplete ? ' — cadastro em aberto' : ''}`}
+                    >
+                      {c.profileIncomplete ? '✎' : i + 1}
+                    </div>
+                  </Marker>
+                ))
+            : null}
+
           {mapReady
             ? routeLandmarks.map((lm) => (
                 <LandmarkMapMarker
@@ -1296,6 +1519,11 @@ export function FieldNavigatePage() {
                   longitude={lm.longitude}
                   type={lm.type}
                   variant="field"
+                  createdByName={lm.createdBy?.name}
+                  selected={selectedLandmarkId === lm.id}
+                  onSelect={() =>
+                    setSelectedLandmarkId((id) => (id === lm.id ? null : lm.id))
+                  }
                 />
               ))
             : null}
@@ -1317,7 +1545,7 @@ export function FieldNavigatePage() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto mx-auto mt-3 max-w-md flex items-center justify-between gap-2">
           <p className="text-sm font-semibold tracking-wide text-white/80">
-            ROTAS
+            {route?.recordNewCustomer ? 'GRAVAR' : 'ROTAS'}
           </p>
           <div className="flex items-center gap-2">
             {route?.recordTrip ? (
@@ -1342,6 +1570,7 @@ export function FieldNavigatePage() {
           </div>
         </div>
 
+        {!route?.recordNewCustomer ? (
         <div
           className={`pointer-events-auto mx-auto mt-3 max-w-md rounded-[10px] border px-4 py-3 ${
             recalculating
@@ -1393,26 +1622,72 @@ export function FieldNavigatePage() {
             </div>
           </div>
         </div>
+        ) : null}
 
         {proximityLandmark ? (
           <div
             className="pointer-events-auto mx-auto mt-2 max-w-md rounded-[10px] border border-[var(--warn)]/45 bg-surface px-4 py-3 text-brand-900"
             role="alert"
           >
-            <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--warn)]">
-              Atenção — marco próximo
-            </p>
-            <p className="mt-0.5 text-base font-semibold">
-              {LANDMARK_LABELS[proximityLandmark.type]}
-              {proximityLandmark.note ? ` · ${proximityLandmark.note}` : ''}
-            </p>
-            <button
-              type="button"
-              onClick={() => void dismissProximity()}
-              className="ops-btn ops-btn-primary mt-2 w-full"
-            >
-              OK
-            </button>
+            {route?.recordTrip ? (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--warn)]">
+                  Confirmar marco
+                </p>
+                <p className="mt-0.5 text-base font-semibold">
+                  {landmarkStillExistsQuestion(proximityLandmark.type)}
+                </p>
+                {proximityLandmark.note ? (
+                  <p className="mt-0.5 text-sm text-[var(--muted)]">{proximityLandmark.note}</p>
+                ) : null}
+                <p className="mt-1 text-[11px] text-[var(--muted)]">
+                  {landmarkAuthorLine(proximityLandmark.createdBy?.name)}
+                </p>
+                {landmarkRemoveError ? (
+                  <p className="mt-2 text-sm text-red-600" role="status">
+                    {landmarkRemoveError}
+                  </p>
+                ) : null}
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    disabled={landmarkRemoving}
+                    onClick={() => void confirmLandmarkKeep()}
+                    className="ops-btn ops-btn-primary w-full disabled:opacity-50"
+                  >
+                    Sim, permanece
+                  </button>
+                  <button
+                    type="button"
+                    disabled={landmarkRemoving}
+                    onClick={() => void confirmLandmarkRemove()}
+                    className="ops-btn ops-btn-secondary w-full disabled:opacity-50"
+                  >
+                    {landmarkRemoving ? 'Retirando…' : 'Não, retirar'}
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--warn)]">
+                  Atenção — marco próximo
+                </p>
+                <p className="mt-0.5 text-base font-semibold">
+                  {LANDMARK_LABELS[proximityLandmark.type]}
+                  {proximityLandmark.note ? ` · ${proximityLandmark.note}` : ''}
+                </p>
+                <p className="mt-1 text-[11px] text-[var(--muted)]">
+                  {landmarkAuthorLine(proximityLandmark.createdBy?.name)}
+                </p>
+                <button
+                  type="button"
+                  onClick={() => void dismissProximity()}
+                  className="ops-btn ops-btn-primary mt-2 w-full"
+                >
+                  OK
+                </button>
+              </>
+            )}
           </div>
         ) : null}
 
@@ -1486,20 +1761,42 @@ export function FieldNavigatePage() {
           totalStops={route.stops.length}
           remainingMeters={remainingPlannedMeters(route.stops)}
           asFinished={
-            !hasOpenVisitOnStops(route.stops) &&
-            canCompleteAsFinished(
-              remainingPlannedMeters(route.stops),
-              route.stops.filter((s) => s.status === 'PENDING').length,
-            )
+            route.recordNewCustomer
+              ? true
+              : !hasOpenVisitOnStops(route.stops) &&
+                canCompleteAsFinished(
+                  remainingPlannedMeters(route.stops),
+                  route.stops.filter((s) => s.status === 'PENDING').length,
+                )
+          }
+          recordMission={
+            route.recordNewCustomer
+              ? { pointCount: route.recordedCustomers?.length ?? 0 }
+              : undefined
           }
           busy={completing}
           error={completeError}
+          suggestedOdometerKm={route.startOdometerKm}
+          suggestedFuelLevel={route.startFuelLevel}
           onCancel={() => {
             if (completing) return;
             setShowCompleteConfirm(false);
             setCompleteError(null);
           }}
-          onConfirm={() => void submitCompleteRoute()}
+          onConfirm={(payload) => void submitCompleteRoute(payload)}
+        />
+      ) : null}
+
+      {showRecordPoint ? (
+        <RecordToCustomerSheet
+          busy={recordPointBusy}
+          error={recordPointError}
+          onCancel={() => {
+            if (recordPointBusy) return;
+            setShowRecordPoint(false);
+            setRecordPointError(null);
+          }}
+          onSave={(form, completeProfile) => void saveRecordPoint(form, completeProfile)}
         />
       ) : null}
 
@@ -1522,7 +1819,7 @@ export function FieldNavigatePage() {
               <path d="M12 3v3M12 18v3M3 12h3M18 12h3" stroke="currentColor" strokeWidth="1.8" />
             </svg>
           </button>
-          {route?.recordTrip && nextStop && gps ? (
+          {route?.recordTrip && nextStop && gps && !route.recordNewCustomer ? (
             <div className="mb-2">
               <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
                 {(Object.keys(LANDMARK_LABELS) as LandmarkType[]).map((type) => (
@@ -1542,13 +1839,61 @@ export function FieldNavigatePage() {
               ) : null}
             </div>
           ) : null}
+          {route?.recordNewCustomer ? (
+            <div className="mb-2 space-y-2">
+              {recordPointMsg ? (
+                <p className="rounded-xl bg-emerald-700/90 px-3 py-2 text-center text-xs font-semibold text-white">
+                  {recordPointMsg}
+                </p>
+              ) : null}
+              <p className="rounded-xl bg-black/65 px-3 py-2 text-center text-xs text-white">
+                Trecho {formatMeters(Math.round(trailLengthMeters(route.id)))}
+                {' · '}
+                Total{' '}
+                {formatMeters(
+                  Math.round(
+                    (route.recordedCustomers ?? []).reduce(
+                      (sum, c) => sum + (c.distanceMeters ?? 0),
+                      0,
+                    ) + trailLengthMeters(route.id),
+                  ),
+                )}
+                {' · '}
+                {route.recordedCustomers?.length ?? 0} ponto(s)
+                {route.recordedCustomers?.length
+                  ? `: ${route.recordedCustomers.map((c) => c.name).join(', ')}`
+                  : ''}
+              </p>
+              <button
+                type="button"
+                disabled={!gps || gpsBlocked || recordPointBusy}
+                onClick={() => {
+                  setRecordPointError(null);
+                  setShowRecordPoint(true);
+                }}
+                className="min-h-11 w-full rounded-xl bg-accent px-3 py-3 text-sm font-semibold text-white disabled:opacity-50"
+              >
+                + Adicionar ponto
+              </button>
+            </div>
+          ) : null}
           <div className="mb-2">
             <SlideToComplete
+              label={
+                route?.recordNewCustomer
+                  ? 'Arraste para finalizar por completo'
+                  : undefined
+              }
               busy={completing}
               disabled={showExitConfirm}
               onComplete={openCompleteConfirm}
             />
           </div>
+          {route?.recordNewCustomer ? (
+            <p className="mb-2 rounded-2xl bg-black/70 px-3 py-3 text-center text-sm font-bold tabular-nums shadow-lg backdrop-blur">
+              {speed} km/h
+            </p>
+          ) : (
           <div className="grid grid-cols-4 gap-2 rounded-2xl bg-black/70 px-3 py-3 text-center shadow-lg backdrop-blur">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Tempo</p>
@@ -1581,6 +1926,7 @@ export function FieldNavigatePage() {
               <p className="mt-0.5 text-sm font-bold tabular-nums">{speed} km/h</p>
             </div>
           </div>
+          )}
           <p className="mt-1.5 text-center text-[10px] text-white/45">
             {gps ? gpsHint : 'Aguardando GPS para tempo e km reais'}
           </p>

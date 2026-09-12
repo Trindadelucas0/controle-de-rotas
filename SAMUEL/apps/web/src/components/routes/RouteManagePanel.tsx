@@ -15,6 +15,7 @@ const STATUS_LABEL: Record<string, string> = {
   PUBLISHED: 'Publicada',
   IN_PROGRESS: 'Em andamento',
   COMPLETED: 'Concluída',
+  INCOMPLETE: 'Incompleta',
   CANCELLED: 'Cancelada',
 };
 
@@ -39,6 +40,7 @@ type RouteDetail = {
   date: string;
   roundtrip: boolean;
   recordTrip: boolean;
+  recordNewCustomer?: boolean;
   employeeId: string | null;
   vehicleId: string | null;
   plannedDistanceMeters: number | null;
@@ -88,6 +90,7 @@ type LocalStop = {
 type Props = {
   routeId: string;
   canManage: boolean;
+  canDelete: boolean;
   onClose: () => void;
   onChanged: () => void;
 };
@@ -97,15 +100,17 @@ function routeDateYmd(raw: string) {
   return toDateInputValue(new Date(raw));
 }
 
-export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Props) {
+export function RouteManagePanel({ routeId, canManage, canDelete, onClose, onChanged }: Props) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [cancelling, setCancelling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [status, setStatus] = useState('');
   const [roundtrip, setRoundtrip] = useState(true);
   const [recordTrip, setRecordTrip] = useState(false);
+  const [recordNewCustomer, setRecordNewCustomer] = useState(false);
   const [routeDate, setRouteDate] = useState(toDateInputValue());
   const [employeeId, setEmployeeId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -122,6 +127,7 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
   const previewAbort = useRef<AbortController | null>(null);
 
   const editable = canManage && EDITABLE.has(status);
+  const deletable = canDelete && Boolean(status) && status !== 'IN_PROGRESS';
 
   const loadDetail = useCallback(async () => {
     setLoading(true);
@@ -141,6 +147,7 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
       setStatus(route.status);
       setRoundtrip(route.roundtrip !== false);
       setRecordTrip(route.recordTrip === true);
+      setRecordNewCustomer(route.recordNewCustomer === true);
       setRouteDate(routeDateYmd(route.date));
       setEmployeeId(route.employeeId || route.employee?.id || '');
       setVehicleId(route.vehicleId || route.vehicle?.id || '');
@@ -206,7 +213,7 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
   const visitIdsKey = stops.map((s) => s.visitId).join(',');
 
   useEffect(() => {
-    if (!editable || stops.length === 0) {
+    if (!editable || stops.length === 0 || recordNewCustomer) {
       setPreview(null);
       return;
     }
@@ -236,7 +243,7 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
       window.clearTimeout(timer);
       ac.abort();
     };
-  }, [editable, visitIdsKey, roundtrip, stops]);
+  }, [editable, visitIdsKey, roundtrip, stops, recordNewCustomer]);
 
   const filteredAdd = useMemo(() => {
     const q = addQ.trim().toLowerCase();
@@ -347,6 +354,26 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
     }
   }
 
+  async function deleteRoute() {
+    if (!deletable || deleting || cancelling || saving) return;
+    const ok = window.confirm(
+      'Excluir esta rota? Ela some da lista. Visitas ainda atribuídas voltam a ficar livres. Esta ação não pode ser desfeita.',
+    );
+    if (!ok) return;
+    setDeleting(true);
+    setError(null);
+    setMsg(null);
+    try {
+      await apiFetch(`/api/v1/routes/${routeId}`, { method: 'DELETE' });
+      onChanged();
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Falha ao excluir a rota');
+    } finally {
+      setDeleting(false);
+    }
+  }
+
   return (
     <div
       className="ops-surface fixed inset-x-0 bottom-0 z-40 flex max-h-[92vh] flex-col overflow-hidden rounded-t-[12px] border-t border-[var(--border)] shadow-lg sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[min(420px,100vw)] sm:rounded-none sm:border-l sm:border-t-0"
@@ -381,8 +408,9 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
 
             {!editable ? (
               <p className="text-sm text-[var(--muted)]">
-                Esta rota não pode ser alterada nem cancelada neste status. Só rotas
-                planejadas ou publicadas (antes do Play).
+                {status === 'IN_PROGRESS'
+                  ? 'Rota em andamento: não altera, não cancela e não exclui. Conclua no campo ou no encerramento do gestor.'
+                  : 'Só rotas planejadas ou publicadas (antes do Play) podem ser alteradas ou canceladas.'}
               </p>
             ) : null}
 
@@ -440,6 +468,13 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
             </div>
 
             <div>
+              {recordNewCustomer ? (
+                <p className="rounded-[8px] border border-amber-500/40 bg-[var(--surface-2)] px-3 py-2 text-sm text-brand-900">
+                  Missão de gravar: o funcionário marca clientes no GPS. Não há lista de paradas
+                  para editar aqui.
+                </p>
+              ) : (
+                <>
               <div className="mb-2 flex items-center justify-between gap-2">
                 <p className="text-sm font-medium text-brand-900">Paradas (clientes)</p>
                 {editable ? (
@@ -547,8 +582,11 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
                   ))
                 )}
               </ul>
+                </>
+              )}
             </div>
 
+            {recordNewCustomer ? null : (
             <p className="text-sm text-[var(--muted)]">
               {previewLoading
                 ? 'Recalculando rota…'
@@ -558,28 +596,52 @@ export function RouteManagePanel({ routeId, canManage, onClose, onChanged }: Pro
                     ? 'Sem preview'
                     : '—'}
             </p>
+            )}
           </>
         )}
       </div>
 
-      {editable && !loading ? (
+      {(editable || deletable) && !loading ? (
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border)] px-4 py-3">
-          <button
-            type="button"
-            className="ops-btn ops-btn-secondary text-sm text-red-300"
-            disabled={cancelling || saving}
-            onClick={() => void cancelRoute()}
-          >
-            {cancelling ? 'Cancelando…' : 'Cancelar rota'}
-          </button>
-          <button
-            type="button"
-            className="ops-btn ops-btn-primary text-sm"
-            disabled={saving || cancelling || !preview || stops.length === 0}
-            onClick={() => void saveChanges()}
-          >
-            {saving ? 'Salvando…' : 'Salvar alterações'}
-          </button>
+          <div className="flex flex-wrap gap-2">
+            {editable ? (
+              <button
+                type="button"
+                className="ops-btn ops-btn-secondary text-sm text-red-300"
+                disabled={cancelling || saving || deleting}
+                onClick={() => void cancelRoute()}
+              >
+                {cancelling ? 'Cancelando…' : 'Cancelar rota'}
+              </button>
+            ) : null}
+            {deletable ? (
+              <button
+                type="button"
+                className="ops-btn ops-btn-secondary text-sm text-red-300"
+                disabled={deleting || saving || cancelling}
+                onClick={() => void deleteRoute()}
+              >
+                {deleting ? 'Excluindo…' : 'Excluir rota'}
+              </button>
+            ) : null}
+          </div>
+          {editable ? (
+            <button
+              type="button"
+              className="ops-btn ops-btn-primary text-sm"
+              disabled={
+                saving ||
+                cancelling ||
+                deleting ||
+                recordNewCustomer ||
+                !preview ||
+                stops.length === 0
+              }
+              onClick={() => void saveChanges()}
+            >
+              {saving ? 'Salvando…' : 'Salvar alterações'}
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

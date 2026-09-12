@@ -29,6 +29,7 @@ export class ServiceOrdersService {
   async list(user: AuthUser, query: ListServiceOrdersQueryDto) {
     const where: Prisma.ServiceOrderWhereInput = {
       companyId: user.companyId,
+      customer: { recordSessionShell: false },
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.q?.trim()

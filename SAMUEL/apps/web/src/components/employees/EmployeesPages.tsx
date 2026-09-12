@@ -11,6 +11,7 @@ import {
   OperationalSummaryStrip,
 } from '@/components/ops/OperationalSummaryStrip';
 import { EntityContextPanel, operationalLabel } from '@/components/ops/EntityContextPanel';
+import { EmployeeAuditObservations } from '@/components/employees/EmployeeAuditObservations';
 import { formatMetersKm, type EmployeesSummary, type EntityContextCard } from '@/lib/ops-types';
 
 export type EmployeeLoginUser = {
@@ -272,7 +273,7 @@ function EmployeeForm({
       </FormSection>
       <FormSection title="Acesso ao Rotas">
         {hasLogin ? (
-          <div className="rounded-[8px] border border-[var(--border)] bg-[#161618] p-4">
+          <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] p-4">
             <p className="text-sm font-medium text-brand-900">Login ativo</p>
             <p className="mt-2 text-sm text-brand-800">
               E-mail de login:{' '}
@@ -473,6 +474,7 @@ export function EditEmployeePage({ id }: { id: string }) {
         timeline={card?.timeline ?? []}
         acoes={card?.acoes ?? []}
       />
+      <EmployeeAuditObservations employeeId={id} />
       {msg ? <p className="mb-3 text-sm text-[var(--ok)]">{msg}</p> : null}
       <EditableRecordShell
         mode={mode}

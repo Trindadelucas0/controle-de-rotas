@@ -31,7 +31,7 @@ export default function RoutesPage() {
       <div
         role="tablist"
         aria-label="Contexto de rotas"
-        className="mb-5 inline-flex rounded-[8px] border border-[var(--border)] bg-[#161618] p-1"
+        className="mb-5 inline-flex rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] p-1"
       >
         <button
           type="button"

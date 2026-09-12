@@ -68,6 +68,15 @@ type RouteDetail = {
   stops: RouteStopDetail[];
 };
 
+type AccessLandmark = {
+  id: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  note: string | null;
+  createdBy?: { id: string; name: string } | null;
+};
+
 export function OperationalMap() {
   const user = useSessionUser();
   const { theme } = useTheme();
@@ -120,26 +129,12 @@ export function OperationalMap() {
   const [trailMessage, setTrailMessage] = useState<string | null>(null);
   const [paintedStops, setPaintedStops] = useState<RouteStopDetail[]>([]);
   const [paintedRouteId, setPaintedRouteId] = useState<string | null>(null);
-  const [paintedLandmarks, setPaintedLandmarks] = useState<
-    {
-      id: string;
-      type: string;
-      latitude: number;
-      longitude: number;
-      note: string | null;
-    }[]
-  >([]);
+  const [paintedLandmarks, setPaintedLandmarks] = useState<AccessLandmark[]>([]);
   const accessCacheRef = useRef<
     Map<
       string,
       {
-        landmarks: {
-          id: string;
-          type: string;
-          latitude: number;
-          longitude: number;
-          note: string | null;
-        }[];
+        landmarks: AccessLandmark[];
       }
     >
   >(new globalThis.Map());
@@ -149,14 +144,9 @@ export function OperationalMap() {
       geometryJson: unknown;
       distanceMeters: number | null;
     } | null;
-    landmarks: {
-      id: string;
-      type: string;
-      latitude: number;
-      longitude: number;
-      note: string | null;
-    }[];
+    landmarks: AccessLandmark[];
   } | null>(null);
+  const [selectedLandmarkId, setSelectedLandmarkId] = useState<string | null>(null);
 
   const loadPins = useCallback(async (search: string, status: string) => {
     setLoading(true);
@@ -487,13 +477,7 @@ export function OperationalMap() {
         geometryJson: unknown;
         distanceMeters: number | null;
       } | null;
-      landmarks: {
-        id: string;
-        type: string;
-        latitude: number;
-        longitude: number;
-        note: string | null;
-      }[];
+      landmarks: AccessLandmark[];
     }>(`/api/v1/customers/${selection.pin.id}/access`)
       .then((r) => {
         if (!cancelled) {
@@ -530,29 +514,14 @@ export function OperationalMap() {
     }
     let cancelled = false;
     void (async () => {
-      const byId = new globalThis.Map<
-        string,
-        {
-          id: string;
-          type: string;
-          latitude: number;
-          longitude: number;
-          note: string | null;
-        }
-      >();
+      const byId = new globalThis.Map<string, AccessLandmark>();
       await Promise.all(
         customerIds.map(async (customerId) => {
           let cached = accessCacheRef.current.get(customerId);
           if (!cached) {
             try {
               const r = await apiFetch<{
-                landmarks: {
-                  id: string;
-                  type: string;
-                  latitude: number;
-                  longitude: number;
-                  note: string | null;
-                }[];
+                landmarks: AccessLandmark[];
               }>(`/api/v1/customers/${customerId}/access`);
               cached = { landmarks: r.landmarks ?? [] };
               accessCacheRef.current.set(customerId, cached);
@@ -973,7 +942,16 @@ export function OperationalMap() {
           geocoding={geocoding}
           onGeocode={() => void geocodeSelected()}
           locationStatus={selection.pin.locationStatus}
+          profileIncomplete={selection.pin.profileIncomplete === true}
           access={customerAccess}
+          onProfileSaved={() => {
+            void loadPins(q, statusFilter);
+            setSelection((prev) =>
+              prev?.kind === 'customer'
+                ? { kind: 'customer', pin: { ...prev.pin, profileIncomplete: false, status: 'ACTIVE' } }
+                : prev,
+            );
+          }}
         />
       ) : (
         <div className="space-y-2">
@@ -1041,6 +1019,7 @@ export function OperationalMap() {
           >
             <option value="">Todos</option>
             <option value="ACTIVE">Ativo</option>
+            <option value="DRAFT">Em aberto</option>
             <option value="INACTIVE">Inativo</option>
           </select>
         </label>
@@ -1102,7 +1081,7 @@ export function OperationalMap() {
               <span aria-hidden>☰</span>
               Equipe {snapshot?.team.total ?? ''}
             </button>
-            <span className="ml-auto self-center rounded-[6px] border border-[var(--border)] bg-[#161618] px-2 py-1 text-xs font-semibold text-brand-800">
+            <span className="ml-auto self-center rounded-[6px] border border-[var(--border)] bg-[var(--surface-2)] px-2 py-1 text-xs font-semibold text-brand-800">
               Ao vivo: {showTeamMarkers ? filteredLive.length : 0}
             </span>
           </>
@@ -1136,6 +1115,11 @@ export function OperationalMap() {
             mapStyle={mapStyle}
             style={{ width: '100%', height: '100%' }}
             attributionControl
+            onClick={(e) => {
+              const el = e.originalEvent.target as HTMLElement | null;
+              if (el?.closest('[data-landmark-marker]')) return;
+              setSelectedLandmarkId(null);
+            }}
           >
             <NavigationControl position="bottom-right" />
 
@@ -1209,6 +1193,11 @@ export function OperationalMap() {
                   longitude={lm.longitude}
                   type={lm.type}
                   variant="ops"
+                  createdByName={lm.createdBy?.name}
+                  selected={selectedLandmarkId === lm.id}
+                  onSelect={() =>
+                    setSelectedLandmarkId((id) => (id === lm.id ? null : lm.id))
+                  }
                 />
               ))}
 
@@ -1220,6 +1209,11 @@ export function OperationalMap() {
                     longitude={lm.longitude}
                     type={lm.type}
                     variant="ops"
+                    createdByName={lm.createdBy?.name}
+                    selected={selectedLandmarkId === lm.id}
+                    onSelect={() =>
+                      setSelectedLandmarkId((id) => (id === lm.id ? null : lm.id))
+                    }
                   />
                 ))
               : null}
@@ -1259,13 +1253,23 @@ export function OperationalMap() {
                   >
                     <button
                       type="button"
-                      className={`h-3.5 w-3.5 rounded-full border-2 border-white shadow ${
+                      className={`relative flex h-5 w-5 items-center justify-center rounded-full border-2 border-white shadow ${
                         selection?.kind === 'customer' && selection.pin.id === p.id
                           ? 'bg-amber-500'
-                          : 'bg-brand-600'
+                          : p.profileIncomplete
+                            ? 'bg-amber-600'
+                            : 'bg-brand-600'
                       }`}
-                      aria-label={p.name}
-                    />
+                      aria-label={
+                        p.profileIncomplete ? `${p.name} — cadastro em aberto` : p.name
+                      }
+                    >
+                      {p.profileIncomplete ? (
+                        <span className="text-[9px] font-bold text-white" aria-hidden>
+                          ✎
+                        </span>
+                      ) : null}
+                    </button>
                   </Marker>
                 ))
               : null}
@@ -1467,26 +1471,62 @@ function CustomerDetailPanel({
   geocoding,
   onGeocode,
   locationStatus,
+  profileIncomplete,
   access,
+  onProfileSaved,
 }: {
   ctx: CustomerOpsContext;
   canCreateService: boolean;
   geocoding: boolean;
   onGeocode: () => void;
   locationStatus: string;
+  profileIncomplete: boolean;
   access: {
     accessPath: { id: string; distanceMeters: number | null } | null;
     landmarks: { id: string; type: string }[];
   } | null;
+  onProfileSaved: () => void;
 }) {
   const s = ctx.customer.summary;
   const m = ctx.customer.metrics;
+  const [name, setName] = useState(s.name);
+  const [phone, setPhone] = useState(s.phone ?? '');
+  const [document, setDocument] = useState(s.document ?? '');
+  const [city, setCity] = useState(s.city ?? '');
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
+
+  async function saveDraft() {
+    if (name.trim().length < 2 || saving) return;
+    setSaving(true);
+    setSaveError(null);
+    try {
+      await apiFetch(`/api/v1/customers/${s.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: name.trim(),
+          phone: phone.trim() || null,
+          document: document.trim() || null,
+          city: city.trim() || null,
+          profileIncomplete: false,
+        }),
+      });
+      onProfileSaved();
+    } catch (e) {
+      setSaveError(e instanceof ApiError ? e.message : 'Falha ao salvar cadastro');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   return (
     <div className="space-y-3">
       <div>
         <p className="ops-label mb-0">Cliente</p>
         <p className="text-lg font-semibold text-brand-900">{s.name}</p>
+        {profileIncomplete ? (
+          <p className="mt-1 text-xs font-semibold text-amber-500">Cadastro em aberto — editar</p>
+        ) : null}
         {s.document ? (
           <p className="font-mono text-xs text-[var(--muted)]">{s.document}</p>
         ) : null}
@@ -1495,8 +1535,57 @@ function CustomerDetailPanel({
         </p>
       </div>
 
+      {profileIncomplete ? (
+        <form
+          className="space-y-2 rounded-[8px] border border-amber-500/40 bg-[var(--surface-2)] p-3"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void saveDraft();
+          }}
+        >
+          <p className="text-[10px] font-semibold uppercase tracking-wide text-amber-500">
+            Completar cadastro
+          </p>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full ops-input text-sm"
+            aria-label="Nome"
+          />
+          <input
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full ops-input text-sm"
+            placeholder="Telefone"
+            aria-label="Telefone"
+          />
+          <input
+            value={document}
+            onChange={(e) => setDocument(e.target.value)}
+            className="w-full ops-input text-sm"
+            placeholder="Documento"
+            aria-label="Documento"
+          />
+          <input
+            value={city}
+            onChange={(e) => setCity(e.target.value)}
+            className="w-full ops-input text-sm"
+            placeholder="Cidade"
+            aria-label="Cidade"
+          />
+          {saveError ? (
+            <p className="text-xs text-red-300" role="alert">
+              {saveError}
+            </p>
+          ) : null}
+          <button type="submit" disabled={saving || name.trim().length < 2} className="ops-btn ops-btn-primary w-full text-sm">
+            {saving ? 'Salvando…' : 'Concluir cadastro'}
+          </button>
+        </form>
+      ) : null}
+
       {access ? (
-        <div className="rounded-[8px] border border-[var(--border)] bg-[#161618] px-3 py-2 text-xs">
+        <div className="rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] px-3 py-2 text-xs">
           <p className="text-[10px] font-semibold uppercase tracking-wide text-[var(--muted)]">
             Acesso à fazenda
           </p>

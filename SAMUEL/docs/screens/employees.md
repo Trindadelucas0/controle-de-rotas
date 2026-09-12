@@ -140,7 +140,7 @@ Reset de senha inline (vai em Usuários).
 
 ### 2. Componentes
 
-Abre em **modo leitura** (Identificação / Acesso / Função). **Editar** libera o FormCard; **Cancelar** / **Salvar** voltam à leitura.
+Abre em **modo leitura** (Identificação / Acesso / Função). **Editar** libera o FormCard; **Cancelar** / **Salvar** voltam à leitura. Abaixo do painel operacional: **Observações de auditoria** (`EmployeeAuditObservations`) — só escritório.
 
 Form perfil + bloco Acesso (só no edit):
 

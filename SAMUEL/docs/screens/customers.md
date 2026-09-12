@@ -21,7 +21,7 @@ PageHeader + Novo
 
 ### 3. Informação
 
-Colunas: Nome, Documento, Cidade, OS abertas, Próxima visita, Localização (`locationStatus`), Status, Abrir.
+Colunas: Nome, Documento, Cidade, OS abertas, Próxima visita, Localização (`locationStatus`), Status (`ACTIVE` / `INACTIVE` / `DRAFT` = **Em aberto**), Abrir.
 
 ### 4. KPI / totais
 
@@ -67,7 +67,7 @@ loading | empty “Nenhum cliente.” | error
 
 ### 8. Permissões
 
-Todos autenticados gestores listam. Update: SUPERVISOR+. EMPLOYEE sem acesso (redirect + 403).
+Todos autenticados gestores listam. Update: SUPERVISOR+. EMPLOYEE: sem catálogo; `GET/PATCH /customers/:id` só cadastro em aberto da própria missão de gravar.
 
 ### 9. Navegação
 
@@ -173,7 +173,7 @@ EMPLOYEE: sem catálogo. Update: SUPERVISOR+. Geocode no mapa operacional: ver [
 
 ### 10. Mobile / PWA
 
-Form empilhado; mapa ~280px.
+Form empilhado; mapa alto (~360px no celular; ~56vh / 420–640px no desktop). Empresa (`/settings/company`) permanece mini-mapa 280px.
 
 ### 11. Fora de escopo desta tela
 

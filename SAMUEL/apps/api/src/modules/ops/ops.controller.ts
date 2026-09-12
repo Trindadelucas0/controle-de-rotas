@@ -1,7 +1,12 @@
-import { Controller, Get, Param, ParseUUIDPipe, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseUUIDPipe, Patch, Query, UseGuards } from '@nestjs/common';
 import { UserRole } from '@prisma/client';
 import { OpsService } from './ops.service';
-import { OpsListEnrichedQueryDto, OpsSnapshotQueryDto } from './dto/ops.dto';
+import { EmployeeObservationsService } from './employee-observations.service';
+import {
+  OpsListEnrichedQueryDto,
+  OpsSnapshotQueryDto,
+  PatchEmployeeObservationDto,
+} from './dto/ops.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser, Roles, AuthUser } from '../auth/decorators/auth.decorators';
@@ -9,7 +14,10 @@ import { CurrentUser, Roles, AuthUser } from '../auth/decorators/auth.decorators
 @Controller('ops')
 @UseGuards(JwtAuthGuard, RolesGuard)
 export class OpsController {
-  constructor(private readonly opsService: OpsService) {}
+  constructor(
+    private readonly opsService: OpsService,
+    private readonly observations: EmployeeObservationsService,
+  ) {}
 
   @Get('snapshot')
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
@@ -87,6 +95,26 @@ export class OpsController {
     @Param('id', ParseUUIDPipe) id: string,
   ) {
     return this.opsService.vehicleContext(user, id);
+  }
+
+  @Get('employees/:id/observations')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  listEmployeeObservations(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+  ) {
+    return this.observations.listByEmployee(user, id);
+  }
+
+  @Patch('employees/:id/observations/:oid')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  markObservationSeen(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('oid', ParseUUIDPipe) oid: string,
+    @Body() _dto: PatchEmployeeObservationDto,
+  ) {
+    return this.observations.markSeen(user, id, oid);
   }
 
   @Get('employees/:id')

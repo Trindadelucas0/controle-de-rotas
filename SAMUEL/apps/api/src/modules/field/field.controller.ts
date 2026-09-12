@@ -7,12 +7,15 @@ import {
   ParseUUIDPipe,
   Post,
   Query,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
 import { UserRole } from '@prisma/client';
 import { FieldService } from './field.service';
 import { MyRouteQueryDto, FieldVehiclesQueryDto } from './dto/field.dto';
-import { CompleteRouteDto } from '../routes/dto/routes.dto';
+import { CompleteRouteDto, RecordPointDto } from '../routes/dto/routes.dto';
 import { RoutesService } from '../routes/routes.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
@@ -47,11 +50,27 @@ export class FieldController {
   @Post('routes/:id/complete')
   @HttpCode(200)
   @Roles(UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.MANAGER)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
   complete(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteRouteDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
   ) {
-    return this.routesService.complete(user, id, dto);
+    return this.routesService.complete(user, id, dto, file);
+  }
+
+  @Post('routes/:id/record-point')
+  @Roles(UserRole.EMPLOYEE)
+  recordPoint(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Body() dto: RecordPointDto,
+  ) {
+    return this.routesService.recordPoint(user, id, dto);
   }
 }

@@ -65,10 +65,12 @@ html[data-theme='light'] {
 html,
 body {
   min-height: 100%;
+  overflow-x: hidden;
 }
 
 html {
   color-scheme: dark;
+  touch-action: manipulation;
 }
 
 html[data-theme='light'] {
@@ -257,6 +259,21 @@ textarea {
   details > summary::-webkit-details-marker {
     display: none;
   }
+}
+
+@media (max-width: 1023px) {
+  .ops-input,
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}
+
+.maplibregl-map,
+.maplibregl-canvas-container,
+.maplibregl-canvas {
+  touch-action: none;
 }
 
 .maplibregl-ctrl-attrib,

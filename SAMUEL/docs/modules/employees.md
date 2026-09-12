@@ -8,7 +8,7 @@ CRUD de funcionários (Tema 03) + **login de campo** (Tema 17). Isolamento por `
 
 | Rota | Doc |
 | --- | --- |
-| `/employees`, `/employees/new`, `/employees/[id]` | [screens/employees.md](../screens/employees.md) |
+| `/employees`, `/employees/new`, `/employees/[id]` | [screens/employees.md](../screens/employees.md) · [screens/employee-audit-observations.md](../screens/employee-audit-observations.md) |
 
 ## Endpoints
 
@@ -18,6 +18,8 @@ CRUD de funcionários (Tema 03) + **login de campo** (Tema 17). Isolamento por `
 | POST | `/api/v1/employees` | ADMIN, MANAGER |
 | GET | `/api/v1/employees/:id` | ADMIN, MANAGER |
 | PATCH | `/api/v1/employees/:id` | ADMIN, MANAGER |
+| GET | `/api/v1/ops/employees/:id/observations` | ADMIN, MANAGER |
+| PATCH | `/api/v1/ops/employees/:id/observations/:oid` | ADMIN, MANAGER |
 
 ---
 

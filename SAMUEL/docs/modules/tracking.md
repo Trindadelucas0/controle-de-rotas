@@ -32,36 +32,41 @@ Temas 10–11. Isolamento por `companyId` do JWT. Transporte de localização: *
 ## GET /api/v1/field/vehicles
 
 - Auth: EMPLOYEE
-- Query: `routeId` (UUID) — rota do dia para incluir veículo já atribuído mesmo se não `AVAILABLE`
-- Retorna `{ vehicles: [{ id, plate, brand, model, status }] }` — veículos `AVAILABLE` da empresa + atribuído à rota
+- Query: `routeId` (UUID) — inclui o veículo da rota mesmo se o status não for AVAILABLE
+- Retorna `{ vehicles: [{ id, plate, brand, model, status, odometerKm, lastFuelLevel, inUseByOther }] }`
+- Omite veículos com outra rota `IN_PROGRESS` e status `MAINTENANCE`/`INACTIVE`
 - 403 se sem vínculo User→Employee
 
 ## POST /api/v1/routes/:id/start
 
 - Auth: EMPLOYEE atribuído à rota
 - Pré: status `PUBLISHED`
-- Body: `{ vehicleId, startOdometerKm, startFuelLevel, startNotes?, latitude, longitude }`
+- Body: multipart `file` (foto JPEG/PNG/WebP ≤5 MB) + `vehicleId`, `startOdometerKm`, `startFuelLevel`, `startNotes?`, `latitude`, `longitude`
   - `startFuelLevel`: `EMPTY` | `QUARTER` | `HALF` | `THREE_QUARTERS` | `FULL`
-  - `startOdometerKm` > 0 obrigatório; `latitude`/`longitude` finitos obrigatórios
-- Side effects: `IN_PROGRESS` + `startedAt` + campos de checklist + `startLatitude`/`startLongitude`; atualiza `vehicleId` se diferente; **reordena `route_stops.sequence` da mais perto para a mais longe** a partir do GPS enviado; recalcula geometria/manobras/totais planejados e PostGIS `planned_geometry`; atualiza `originLatitude`/`originLongitude` para o ponto de início do funcionário; se `roundtrip`, o traçado volta ao pin da **empresa**
-- Validações: veículo da empresa e `AVAILABLE` (ou já atribuído à rota)
-- Erro: `ROUTE_ALREADY_ACTIVE` se já houver outra `IN_PROGRESS` (mensagem inclui a data da rota travada; a rota aparece em `GET /field/my-route` mesmo se for de outro dia)
-- Abre sessão de tracking (pontos passam a ser aceitos)
+  - `startOdometerKm` > 0 obrigatório; GPS finito obrigatório; foto obrigatória
+- Side effects: `IN_PROGRESS` + checklist + evidência `START_ODOMETER`; veículo `IN_USE`; lock contra outra `IN_PROGRESS` no mesmo `vehicleId` (409 `VEHICLE_IN_USE`); reordena paradas; se km inicial < último km do veículo (tol. 1 km) cria `ODOMETER_ROLLBACK` (não bloqueia); salto > 50 km cria `ODOMETER_GAP`
+- Erro: `ROUTE_ALREADY_ACTIVE`, `ROUTE_EVIDENCE_REQUIRED`, `VEHICLE_IN_USE`, `VEHICLE_NOT_AVAILABLE`
 - UI: após sucesso no wizard, redirect para `/field/navigate`
 
 ## POST /api/v1/field/routes/:id/complete
 
 - Auth: EMPLOYEE atribuído **ou** ADMIN/MANAGER (PLATFORM_ADMIN herda ADMIN)
 - Mesmas regras que `POST /routes/:id/complete`
-- UI: arrastar em `/field/my-route` e `/field/navigate`
+- UI: arrastar em `/field/my-route` e `/field/navigate` (km final, combustível e foto)
 
 ## POST /api/v1/routes/:id/complete
 
 - Auth: EMPLOYEE atribuído à rota **ou** ADMIN/MANAGER da empresa
-- Body: `{ mode: "COMPLETED" | "INCOMPLETE" }`
-- Pré: status `IN_PROGRESS`; grava `actualDurationSeconds`; PENDING → SKIPPED conforme regras de 500 m / incompleta
-- UI: arrastar em `/field/my-route` e `/field/navigate`
-- Erros: `ROUTE_NOT_IN_PROGRESS`, `ROUTE_HAS_PENDING_STOPS`, `ROUTE_HAS_OPEN_VISIT` (422)
+- Campo (EMPLOYEE): multipart `mode`, `endOdometerKm`, `endFuelLevel`, `file`
+- Escritório: JSON `{ mode }` basta (foto/km opcionais)
+- Pré: status `IN_PROGRESS`; grava `actualDurationSeconds`, `actualDistanceMeters`, `endOdometerKm`; PENDING → SKIPPED; libera veículo `AVAILABLE`; atualiza `Vehicle.odometerKm` / `lastFuelLevel`
+- Discrepância km (delta > max(planejado×1,5, planejado+5 km)) → observação `KM_DISCREPANCY` no funcionário; **não** entra no JSON do campo
+- Erros: `ROUTE_NOT_IN_PROGRESS`, `ROUTE_HAS_PENDING_STOPS`, `ROUTE_HAS_OPEN_VISIT`, `ROUTE_EVIDENCE_REQUIRED`, `END_ODOMETER_BEFORE_START` (422)
+
+## GET /api/v1/routes/:id/evidence/:evidenceId/file
+
+- Auth: escritório da empresa **ou** EMPLOYEE dono da rota
+- Stream da foto do odômetro; outro tenant 404
 
 ## POST /api/v1/tracking/points
 
@@ -71,6 +76,7 @@ Temas 10–11. Isolamento por `companyId` do JWT. Transporte de localização: *
 - Side effects:
   - Redis `tracking:current:{companyId}:{employeeId}` **sempre** (TTL 120s) = posição agora
   - PostGIS `tracking_points` **amostrado** (≥25 m ou ≥15 s desde o último persistido)
+  - Off-route admin: se GPS > **500 m** da linha planejada por ≥ **60 s** contínuos, upsert observação `OFF_ROUTE` (uma por rota; o campo não vê alerta)
 - Resposta: `{ accepted, persisted }`
 - Erro: `TRACKING_ROUTE_NOT_ACTIVE` (422)
 - PWA (`field-tracking.ts`):

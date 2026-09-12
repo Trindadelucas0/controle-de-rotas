@@ -2,6 +2,8 @@ import {
   consolidateTrackingToLineString,
   evaluateAccessReadAuth,
   evaluateLandmarkCreateAuth,
+  evaluateLandmarkWriteAuth,
+  mapLandmarkPublic,
   sanitizeTrailPoints,
   validateRecordTripCustomers,
 } from '../src/modules/customers/access-path.util';
@@ -90,6 +92,42 @@ describe('evaluateLandmarkCreateAuth', () => {
     });
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.code).toBe('AUTH_FORBIDDEN');
+  });
+
+  it('escrita (DELETE) usa o mesmo critério do create', () => {
+    expect(evaluateLandmarkWriteAuth(base)).toEqual(evaluateLandmarkCreateAuth(base));
+    const denied = evaluateLandmarkWriteAuth({ ...base, routeHasRecordTrip: false });
+    expect(denied.ok).toBe(false);
+    if (!denied.ok) expect(denied.code).toBe('LANDMARK_RECORD_TRIP_REQUIRED');
+  });
+});
+
+describe('mapLandmarkPublic', () => {
+  it('expõe só id+name do autor, sem e-mail', () => {
+    const dto = mapLandmarkPublic({
+      id: 'lm-1',
+      customerId: 'c-1',
+      type: 'PORTEIRA',
+      latitude: -23.5,
+      longitude: -46.6,
+      note: null,
+      createdByEmployee: { id: 'emp-1', name: 'João Silva' },
+    });
+    expect(dto.createdBy).toEqual({ id: 'emp-1', name: 'João Silva' });
+    expect(dto.customerId).toBe('c-1');
+  });
+
+  it('sem funcionário → createdBy null', () => {
+    const dto = mapLandmarkPublic({
+      id: 'lm-2',
+      customerId: 'c-1',
+      type: 'PONTE',
+      latitude: -23.5,
+      longitude: -46.6,
+      note: null,
+      createdByEmployee: null,
+    });
+    expect(dto.createdBy).toBeNull();
   });
 });
 

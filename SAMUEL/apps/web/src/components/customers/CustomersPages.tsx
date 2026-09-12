@@ -810,6 +810,7 @@ function CustomerForm({
             onChange={(v) => setForm({ ...form, status: v })}
             options={[
               { value: 'ACTIVE', label: 'Ativo' },
+              { value: 'DRAFT', label: 'Em aberto' },
               { value: 'INACTIVE', label: 'Inativo' },
             ]}
           />
@@ -820,7 +821,7 @@ function CustomerForm({
 }
 
 function CustomerDetailView({ data }: { data: CustomerDto }) {
-  const statusLabel = data.status === 'ACTIVE' ? 'Ativo' : data.status === 'INACTIVE' ? 'Inativo' : data.status;
+  const statusLabel = data.status === 'ACTIVE' ? 'Ativo' : data.status === 'INACTIVE' ? 'Inativo' : data.status === 'DRAFT' ? 'Em aberto' : data.status;
   return (
     <>
       <DetailSection title="Identificação">

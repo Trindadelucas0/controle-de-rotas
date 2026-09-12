@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { apiFetch, ApiError } from '@/lib/api-client';
+import { apiFetch, apiUpload, ApiError } from '@/lib/api-client';
 import {
   gpsActiveLabel,
   geolocationErrorMessage,
@@ -17,7 +17,11 @@ import { toDateInputValue } from '@/lib/ops-labels';
 import { formatDuration, formatMeters } from '@/components/routes/routes-planner-shared';
 import { FieldRoutePreviewMap } from '@/components/field/FieldRoutePreviewMap';
 import { SlideToComplete } from '@/components/field/SlideToComplete';
-import { CompleteRouteConfirm } from '@/components/field/CompleteRouteConfirm';
+import { CompleteRouteConfirm, type CompleteRoutePayload } from '@/components/field/CompleteRouteConfirm';
+import {
+  RecordToCustomerSheet,
+  type RecordPointForm,
+} from '@/components/field/RecordToCustomerSheet';
 import {
   canCompleteAsFinished,
   hasOpenVisitOnStops,
@@ -42,16 +46,32 @@ type RouteStop = {
   };
 };
 
+type RecordedCustomer = {
+  id: string;
+  name: string;
+  phone?: string | null;
+  document?: string | null;
+  city?: string | null;
+  state?: string | null;
+  street?: string | null;
+  notes?: string | null;
+  profileIncomplete?: boolean;
+};
+
 type MyRoute = {
   id: string;
   status: string;
   date: string;
   startedAt?: string | null;
   recordTrip?: boolean;
+  recordNewCustomer?: boolean;
+  recordedCustomers?: RecordedCustomer[];
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
   plannedGeometryJson?: unknown;
   plannedStepsJson?: unknown;
+  startOdometerKm?: number | null;
+  startFuelLevel?: string | null;
   vehicle: { id: string; plate: string; brand: string | null; model: string | null } | null;
   employee: { id: string; name: string } | null;
   stops: RouteStop[];
@@ -81,6 +101,10 @@ export function FieldMyRoutePage() {
   const [completingId, setCompletingId] = useState<string | null>(null);
   const [confirmRoute, setConfirmRoute] = useState<MyRoute | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
+  const [openRecorded, setOpenRecorded] = useState<RecordedCustomer[]>([]);
+  const [editOpen, setEditOpen] = useState<RecordedCustomer | null>(null);
+  const [editBusy, setEditBusy] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
   const [gpsStatus, setGpsStatus] = useState('GPS parado');
   const [lastAccuracy, setLastAccuracy] = useState<number | null>(null);
   const watchRef = useRef<RouteGpsWatchHandle | null>(null);
@@ -148,9 +172,11 @@ export function FieldMyRoutePage() {
           date: string;
           routes: MyRoute[];
           route: MyRoute | null;
+          openRecordedCustomers?: RecordedCustomer[];
         }>(`/api/v1/field/my-route?date=${encodeURIComponent(dateYmd)}`);
         const list = r.routes?.length ? r.routes : r.route ? [r.route] : [];
         setRoutes(list);
+        setOpenRecorded(r.openRecordedCustomers ?? []);
         setSearchedDate(r.date || dateYmd);
         const active = list.find((x) => x.status === 'IN_PROGRESS');
         if (active) {
@@ -186,7 +212,7 @@ export function FieldMyRoutePage() {
 
   async function openCompleteConfirm(route: MyRoute) {
     if (completingId) return;
-    if (hasOpenVisitOnStops(route.stops)) {
+    if (!route.recordNewCustomer && hasOpenVisitOnStops(route.stops)) {
       setError('Finalize a visita em andamento antes de concluir a rota.');
       return;
     }
@@ -195,20 +221,24 @@ export function FieldMyRoutePage() {
     setConfirmRoute(route);
   }
 
-  async function submitComplete() {
+  async function submitComplete(payload: CompleteRoutePayload) {
     if (!confirmRoute || completingId) return;
     const pending = confirmRoute.stops.filter((s) => s.status === 'PENDING');
     const remaining = remainingPlannedMeters(confirmRoute.stops);
-    const asFinished = canCompleteAsFinished(remaining, pending.length);
+    const asFinished = confirmRoute.recordNewCustomer
+      ? true
+      : canCompleteAsFinished(remaining, pending.length);
     const mode = asFinished ? 'COMPLETED' : 'INCOMPLETE';
     setCompletingId(confirmRoute.id);
     setConfirmError(null);
     setError(null);
     try {
-      await apiFetch(`/api/v1/field/routes/${confirmRoute.id}/complete`, {
-        method: 'POST',
-        body: JSON.stringify({ mode }),
-      });
+      const form = new FormData();
+      form.append('mode', mode);
+      form.append('endOdometerKm', String(payload.endOdometerKm));
+      form.append('endFuelLevel', payload.endFuelLevel);
+      form.append('file', payload.file);
+      await apiUpload(`/api/v1/field/routes/${confirmRoute.id}/complete`, form);
       stopWatch();
       setGpsStatus('GPS parado');
       setConfirmRoute(null);
@@ -217,6 +247,33 @@ export function FieldMyRoutePage() {
       setConfirmError(e instanceof ApiError ? e.message : 'Não foi possível concluir a rota');
     } finally {
       setCompletingId(null);
+    }
+  }
+
+  async function saveOpenCustomer(form: RecordPointForm) {
+    if (!editOpen || editBusy) return;
+    setEditBusy(true);
+    setEditError(null);
+    try {
+      await apiFetch(`/api/v1/customers/${editOpen.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          name: form.name.trim(),
+          phone: form.phone.trim() || null,
+          document: form.document.trim() || null,
+          city: form.city.trim() || null,
+          state: form.state.trim() || null,
+          street: form.street.trim() || null,
+          notes: form.notes.trim() || null,
+          profileIncomplete: false,
+        }),
+      });
+      setEditOpen(null);
+      await load({ silent: true });
+    } catch (e) {
+      setEditError(e instanceof ApiError ? e.message : 'Não foi possível salvar o cadastro');
+    } finally {
+      setEditBusy(false);
     }
   }
 
@@ -308,6 +365,29 @@ export function FieldMyRoutePage() {
         </div>
       ) : null}
 
+      {openRecorded.length ? (
+        <div className="rounded-2xl border border-amber-300/50 bg-surface p-4">
+          <p className="text-sm font-semibold text-brand-900">Cadastros em aberto</p>
+          <ul className="mt-2 space-y-2">
+            {openRecorded.map((c) => (
+              <li key={c.id} className="flex items-center justify-between gap-2">
+                <span className="text-sm text-brand-900">{c.name}</span>
+                <button
+                  type="button"
+                  className="ops-btn ops-btn-secondary text-xs"
+                  onClick={() => {
+                    setEditError(null);
+                    setEditOpen(c);
+                  }}
+                >
+                  Editar
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : null}
+
       <div className="space-y-4">
         {routes.map((route, index) => {
           const canPlay = route.status === 'PUBLISHED' && !inProgress;
@@ -324,7 +404,8 @@ export function FieldMyRoutePage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-brand-900">
-                    Rota {index + 1} · {statusLabel(route.status)}
+                    {route.recordNewCustomer ? 'Gravar acesso' : `Rota ${index + 1}`} ·{' '}
+                    {statusLabel(route.status)}
                     {routeDateYmd(route.date) !== searchedDate
                       ? ` · ${formatDateBr(routeDateYmd(route.date))}`
                       : ''}
@@ -337,7 +418,9 @@ export function FieldMyRoutePage() {
                     {route.plannedDistanceMeters != null
                       ? ` · ${formatMeters(route.plannedDistanceMeters)}`
                       : ''}
-                    {` · ${route.stops.length} parada(s)`}
+                    {route.recordNewCustomer
+                      ? ` · ${route.recordedCustomers?.length ?? 0} ponto(s)`
+                      : ` · ${route.stops.length} parada(s)`}
                   </p>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -346,7 +429,7 @@ export function FieldMyRoutePage() {
                       href={`/field/start/${route.id}`}
                       className="ops-btn ops-btn-primary"
                     >
-                      ▶ Iniciar rota
+                      ▶ {route.recordNewCustomer ? 'Iniciar gravação' : 'Iniciar rota'}
                     </Link>
                   ) : null}
                   {route.status === 'PUBLISHED' && inProgress && !isActive ? (
@@ -368,6 +451,11 @@ export function FieldMyRoutePage() {
               {isActive ? (
                 <div className="mt-3">
                   <SlideToComplete
+                    label={
+                      route.recordNewCustomer
+                        ? 'Arraste para finalizar por completo'
+                        : undefined
+                    }
                     busy={completingId === route.id}
                     disabled={completingId != null && completingId !== route.id}
                     onComplete={() => void openCompleteConfirm(route)}
@@ -375,6 +463,7 @@ export function FieldMyRoutePage() {
                 </div>
               ) : null}
 
+              {route.recordNewCustomer ? null : (
               <FieldRoutePreviewMap
                 geometryJson={route.plannedGeometryJson}
                 stops={route.stops.map((s) => ({
@@ -385,11 +474,22 @@ export function FieldMyRoutePage() {
                   label: s.visit.customer.name,
                 }))}
               />
+              )}
 
               <ul className="mt-4 space-y-3">
-                {[...route.stops]
-                  .sort((a, b) => a.sequence - b.sequence)
-                  .map((s) => (
+                {route.recordNewCustomer
+                  ? (route.recordedCustomers ?? []).map((c, i) => (
+                      <li key={c.id} className="rounded-xl border border-brand-50 bg-brand-50/40 p-3">
+                        <p className="ops-label mb-0">Ponto {i + 1}</p>
+                        <p className="mt-1 text-base font-semibold text-brand-900">{c.name}</p>
+                        {c.profileIncomplete ? (
+                          <p className="text-xs text-amber-700">Cadastro em aberto</p>
+                        ) : null}
+                      </li>
+                    ))
+                  : [...route.stops]
+                .sort((a, b) => a.sequence - b.sequence)
+                .map((s) => (
                   <li key={s.id} className="rounded-xl border border-brand-50 bg-brand-50/40 p-3">
                     <p className="ops-label mb-0">
                       Parada {s.sequence}
@@ -420,18 +520,54 @@ export function FieldMyRoutePage() {
           pendingCount={confirmRoute.stops.filter((s) => s.status === 'PENDING').length}
           totalStops={confirmRoute.stops.length}
           remainingMeters={remainingPlannedMeters(confirmRoute.stops)}
-          asFinished={canCompleteAsFinished(
-            remainingPlannedMeters(confirmRoute.stops),
-            confirmRoute.stops.filter((s) => s.status === 'PENDING').length,
-          )}
+          asFinished={
+            confirmRoute.recordNewCustomer
+              ? true
+              : canCompleteAsFinished(
+                  remainingPlannedMeters(confirmRoute.stops),
+                  confirmRoute.stops.filter((s) => s.status === 'PENDING').length,
+                )
+          }
+          recordMission={
+            confirmRoute.recordNewCustomer
+              ? { pointCount: confirmRoute.recordedCustomers?.length ?? 0 }
+              : undefined
+          }
           busy={completingId === confirmRoute.id}
           error={confirmError}
+          suggestedOdometerKm={confirmRoute.startOdometerKm}
+          suggestedFuelLevel={confirmRoute.startFuelLevel}
           onCancel={() => {
             if (completingId) return;
             setConfirmRoute(null);
             setConfirmError(null);
           }}
-          onConfirm={() => void submitComplete()}
+          onConfirm={(payload) => void submitComplete(payload)}
+        />
+      ) : null}
+
+      {editOpen ? (
+        <RecordToCustomerSheet
+          title="Completar cadastro"
+          initial={{
+            name: editOpen.name,
+            phone: editOpen.phone ?? '',
+            document: editOpen.document ?? '',
+            city: editOpen.city ?? '',
+            state: editOpen.state ?? '',
+            street: editOpen.street ?? '',
+            notes: editOpen.notes ?? '',
+          }}
+          busy={editBusy}
+          error={editError}
+          submitLabel="Concluir cadastro"
+          showLater={false}
+          onCancel={() => {
+            if (editBusy) return;
+            setEditOpen(null);
+            setEditError(null);
+          }}
+          onSave={(form) => void saveOpenCustomer(form)}
         />
       ) : null}
     </section>

@@ -1,11 +1,15 @@
-import { Injectable, HttpStatus } from '@nestjs/common';
+import { Injectable, HttpStatus, Logger } from '@nestjs/common';
 import { businessDayYmd } from '../../common/date/business-day';
 import { ConfigService } from '@nestjs/config';
 import {
   CustomerAccessPathStatus,
   CustomerStatus,
+  EmployeeObservationCode,
+  EmployeeObservationSeverity,
   EmployeeStatus,
+  LocationStatus,
   Prisma,
+  RouteEvidenceKind,
   RouteStatus,
   RouteStopStatus,
   ServiceOrderStatus,
@@ -15,18 +19,22 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { LocalStorageService } from '../../common/storage/local-storage.service';
 import { AuthUser } from '../auth/decorators/auth.decorators';
 import { httpError } from '../../common/errors/http-error';
 import { TrackingService } from '../tracking/tracking.service';
+import { EmployeeObservationsService } from '../ops/employee-observations.service';
 import { allocateServiceOrderNumber } from '../service-orders/service-order-seq';
 import { customerHasPin, visitAddressSnapshot } from '../service-orders/visit-snapshot';
 import {
   CompleteRouteDto,
   CreateRouteDto,
   DispatchCustomersRouteDto,
+  DispatchRecordMissionDto,
   ListRoutesQueryDto,
   PreviewCustomersRouteDto,
   PreviewRouteDto,
+  RecordPointDto,
   RerouteRouteDto,
   StartRouteDto,
   UpdateRouteDto,
@@ -52,7 +60,21 @@ import {
   tripFromAccessPath,
   tripFromOsrm,
 } from './routes-geo';
-import { validateRecordTripCustomers } from '../customers/access-path.util';
+import { validateRecordTripCustomers, sanitizeTrailPoints } from '../customers/access-path.util';
+import { CustomersService } from '../customers/customers.service';
+import { validateRouteEvidenceUpload } from './route-evidence.util';
+import {
+  actualDistanceMeters,
+  isOdometerGap,
+  isOdometerKmDiscrepancy,
+  isOdometerRollback,
+  trailLengthMeters,
+} from './route-odometer-audit.util';
+import {
+  MAX_RECORD_POINTS,
+  RECORD_SESSION_SHELL_NAME,
+  normalizeRecordCustomerName,
+} from './record-mission.util';
 import {
   EmployeeSlot,
   pickEmployeeDispatchPosition,
@@ -198,11 +220,16 @@ type PreparedAssignment = {
 
 @Injectable()
 export class RoutesService {
+  private readonly logger = new Logger(RoutesService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
     private readonly config: ConfigService,
     private readonly tracking: TrackingService,
+    private readonly customersService: CustomersService,
+    private readonly storage: LocalStorageService,
+    private readonly observations: EmployeeObservationsService,
   ) {}
 
   async preview(user: AuthUser, dto: PreviewRouteDto): Promise<RoutePreviewResult> {
@@ -243,6 +270,281 @@ export class RoutesService {
       roundtrip: prepared.roundtrip,
       recordTrip: prepared.recordTrip,
       assignments: prepared.assignments.map((a) => this.toCustomerAssignment(a)),
+    };
+  }
+
+  async dispatchRecordMission(user: AuthUser, dto: DispatchRecordMissionDto) {
+    await this.assertRateLimit(user.id);
+    const origin = await this.loadCompanyOrigin(user.companyId);
+    const dateIso = utcDateIso(dto.date);
+    const date = new Date(`${dateIso}T00:00:00.000Z`);
+
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        id: dto.employeeId,
+        companyId: user.companyId,
+        status: EmployeeStatus.ACTIVE,
+      },
+      select: { id: true, userId: true, name: true },
+    });
+    if (!employee?.userId) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'EMPLOYEE_NOT_DISPATCHABLE',
+        'Escolha um funcionário ativo com usuário de campo.',
+      );
+    }
+
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: { id: dto.vehicleId, companyId: user.companyId },
+      select: { id: true, status: true },
+    });
+    if (!vehicle) {
+      throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
+    }
+    if (vehicle.status !== VehicleStatus.AVAILABLE && vehicle.status !== VehicleStatus.IN_USE) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'VEHICLE_NOT_AVAILABLE',
+        'Este veículo não está disponível.',
+      );
+    }
+
+    const createdId = await this.prisma.$transaction(async (tx) => {
+      const shell = await tx.customer.create({
+        data: {
+          companyId: user.companyId,
+          name: RECORD_SESSION_SHELL_NAME,
+          status: CustomerStatus.DRAFT,
+          recordSessionShell: true,
+          locationStatus: LocationStatus.PENDING,
+        },
+      });
+      const number = await allocateServiceOrderNumber(tx, user.companyId);
+      const order = await tx.serviceOrder.create({
+        data: {
+          companyId: user.companyId,
+          customerId: shell.id,
+          number,
+          title: `Gravar acesso ${dateIso}`,
+          status: ServiceOrderStatus.IN_PROGRESS,
+          createdByUserId: user.id,
+        },
+      });
+      const visit = await tx.visit.create({
+        data: {
+          companyId: user.companyId,
+          serviceOrderId: order.id,
+          customerId: shell.id,
+          employeeId: employee.id,
+          scheduledStart: new Date(`${dateIso}T08:00:00.000Z`),
+          status: VisitStatus.ASSIGNED,
+          latitude: origin.latitude,
+          longitude: origin.longitude,
+        },
+      });
+      const route = await tx.route.create({
+        data: {
+          companyId: user.companyId,
+          employeeId: employee.id,
+          vehicleId: vehicle.id,
+          date,
+          status: RouteStatus.PUBLISHED,
+          roundtrip: false,
+          originName: origin.name,
+          originAddress: origin.address,
+          originLatitude: origin.latitude,
+          originLongitude: origin.longitude,
+          recordTrip: true,
+          recordNewCustomer: true,
+          publishedAt: new Date(),
+          stops: {
+            create: {
+              companyId: user.companyId,
+              visitId: visit.id,
+              sequence: 1,
+              latitude: origin.latitude,
+              longitude: origin.longitude,
+            },
+          },
+        },
+      });
+      return route.id;
+    });
+
+    const { route } = await this.getOne(user, createdId);
+    return { route };
+  }
+
+  async recordPoint(user: AuthUser, id: string, dto: RecordPointDto) {
+    if (user.role !== UserRole.EMPLOYEE) {
+      throw httpError(
+        HttpStatus.FORBIDDEN,
+        'RECORD_POINT_EMPLOYEE_ONLY',
+        'Apenas o funcionário da missão pode marcar um ponto.',
+      );
+    }
+    const name = normalizeRecordCustomerName(dto.customer?.name);
+    if (!name) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'CUSTOMER_NAME_REQUIRED',
+        'Informe o nome do cliente (mínimo 2 caracteres).',
+      );
+    }
+    if (!Number.isFinite(dto.latitude) || !Number.isFinite(dto.longitude)) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'RECORD_POINT_GPS_REQUIRED',
+        'Informe a localização atual para marcar o ponto.',
+      );
+    }
+
+    const employee = await this.prisma.employee.findFirst({
+      where: { companyId: user.companyId, userId: user.id },
+      select: { id: true },
+    });
+    if (!employee) {
+      throw httpError(
+        HttpStatus.FORBIDDEN,
+        'EMPLOYEE_PROFILE_REQUIRED',
+        'Seu usuário não está vinculado a um funcionário.',
+      );
+    }
+
+    const route = await this.prisma.route.findFirst({
+      where: { id, companyId: user.companyId },
+      select: {
+        id: true,
+        employeeId: true,
+        status: true,
+        recordNewCustomer: true,
+        startLatitude: true,
+        startLongitude: true,
+        originLatitude: true,
+        originLongitude: true,
+      },
+    });
+    if (!route) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
+    }
+    if (route.employeeId !== employee.id) {
+      throw httpError(
+        HttpStatus.FORBIDDEN,
+        'ROUTE_NOT_ASSIGNED',
+        'Esta rota não está atribuída a você.',
+      );
+    }
+    if (!route.recordNewCustomer) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_NOT_RECORD_MISSION',
+        'Esta rota não é uma missão de gravar cliente.',
+      );
+    }
+    if (route.status !== RouteStatus.IN_PROGRESS) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_NOT_IN_PROGRESS',
+        'Inicie a missão (Play) antes de marcar um ponto.',
+      );
+    }
+
+    const existingCount = await this.prisma.customer.count({
+      where: {
+        companyId: user.companyId,
+        recordedFromRouteId: route.id,
+        recordSessionShell: false,
+      },
+    });
+    if (existingCount >= MAX_RECORD_POINTS) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'RECORD_POINT_LIMIT',
+        `Limite de ${MAX_RECORD_POINTS} pontos nesta missão.`,
+      );
+    }
+
+    const lastPoint = await this.prisma.customer.findFirst({
+      where: {
+        companyId: user.companyId,
+        recordedFromRouteId: route.id,
+        recordSessionShell: false,
+      },
+      orderBy: { createdAt: 'desc' },
+      select: { latitude: true, longitude: true, createdAt: true },
+    });
+
+    const completeProfile = dto.completeProfile === true;
+    const extraPoints = sanitizeTrailPoints(dto.trailPoints);
+
+    const customer = await this.prisma.customer.create({
+      data: {
+        companyId: user.companyId,
+        name,
+        document: dto.customer.document?.trim() || null,
+        phone: dto.customer.phone?.trim() || null,
+        whatsapp: dto.customer.whatsapp?.trim() || null,
+        city: dto.customer.city?.trim() || null,
+        state: dto.customer.state?.trim() || null,
+        street: dto.customer.street?.trim() || null,
+        notes: dto.customer.notes?.trim() || null,
+        latitude: dto.latitude,
+        longitude: dto.longitude,
+        locationStatus: LocationStatus.OK,
+        status: completeProfile ? CustomerStatus.ACTIVE : CustomerStatus.DRAFT,
+        profileIncomplete: !completeProfile,
+        recordedFromRouteId: route.id,
+      },
+    });
+
+    const number = await this.prisma.$transaction((tx) =>
+      allocateServiceOrderNumber(tx, user.companyId),
+    );
+    await this.prisma.serviceOrder.create({
+      data: {
+        companyId: user.companyId,
+        customerId: customer.id,
+        number,
+        title: 'Acesso gravado',
+        status: ServiceOrderStatus.OPEN,
+        createdByUserId: user.id,
+      },
+    });
+
+    const originOverride =
+      lastPoint?.latitude != null && lastPoint.longitude != null
+        ? { latitude: lastPoint.latitude, longitude: lastPoint.longitude }
+        : route.startLatitude != null && route.startLongitude != null
+          ? { latitude: route.startLatitude, longitude: route.startLongitude }
+          : { latitude: route.originLatitude, longitude: route.originLongitude };
+
+    const accessPath = await this.customersService.finalizeAccessPathFromCheckIn({
+      companyId: user.companyId,
+      customerId: customer.id,
+      routeId: route.id,
+      employeeId: employee.id,
+      destination: { latitude: dto.latitude, longitude: dto.longitude },
+      extraPoints,
+      originOverride,
+      sinceRecordedAt: lastPoint?.createdAt,
+    });
+
+    await this.prisma.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        action: 'RECORD_POINT',
+        entity: 'Customer',
+        entityId: customer.id,
+        metadata: { routeId: route.id, accessPath },
+      },
+    });
+
+    return {
+      customer,
+      accessPath,
+      pointIndex: existingCount + 1,
     };
   }
 
@@ -589,6 +891,60 @@ export class RoutesService {
     return this.getOne(user, id);
   }
 
+  async remove(user: AuthUser, id: string) {
+    const route = await this.prisma.route.findFirst({
+      where: { id, companyId: user.companyId },
+      include: { stops: { select: { visitId: true } } },
+    });
+    if (!route) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
+    }
+    if (route.status === RouteStatus.IN_PROGRESS) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_IN_PROGRESS',
+        'Não é possível excluir uma rota em andamento. Conclua ou aguarde o encerramento.',
+      );
+    }
+
+    const visitIds = route.stops.map((s) => s.visitId);
+
+    await this.prisma.$transaction(async (tx) => {
+      if (visitIds.length) {
+        await tx.visit.updateMany({
+          where: {
+            id: { in: visitIds },
+            companyId: user.companyId,
+            status: VisitStatus.ASSIGNED,
+          },
+          data: {
+            status: VisitStatus.SCHEDULED,
+            employeeId: null,
+          },
+        });
+      }
+
+      const deleted = await tx.route.deleteMany({
+        where: {
+          id,
+          companyId: user.companyId,
+          status: { not: RouteStatus.IN_PROGRESS },
+        },
+      });
+      if (deleted.count !== 1) {
+        throw httpError(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          'ROUTE_IN_PROGRESS',
+          'Não é possível excluir uma rota em andamento. Conclua ou aguarde o encerramento.',
+        );
+      }
+    });
+
+    this.logger.log(
+      `route_deleted user=${user.id} company=${user.companyId} route=${id} status=${route.status}`,
+    );
+  }
+
   async update(user: AuthUser, id: string, dto: UpdateRouteDto) {
     const route = await this.prisma.route.findFirst({
       where: { id, companyId: user.companyId },
@@ -735,7 +1091,7 @@ export class RoutesService {
     return this.getOne(user, id);
   }
 
-  async start(user: AuthUser, id: string, dto: StartRouteDto) {
+  async start(user: AuthUser, id: string, dto: StartRouteDto, file?: Express.Multer.File) {
     if (user.role !== UserRole.EMPLOYEE) {
       throw httpError(
         HttpStatus.FORBIDDEN,
@@ -809,18 +1165,90 @@ export class RoutesService {
 
     const vehicle = await this.prisma.vehicle.findFirst({
       where: { id: dto.vehicleId, companyId: user.companyId },
-      select: { id: true, status: true, plate: true },
+      select: { id: true, status: true, plate: true, odometerKm: true },
     });
     if (!vehicle) {
       throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
     }
-    const isAssignedVehicle = route.vehicleId === vehicle.id;
-    if (!isAssignedVehicle && vehicle.status !== VehicleStatus.AVAILABLE) {
+    if (
+      vehicle.status === VehicleStatus.MAINTENANCE ||
+      vehicle.status === VehicleStatus.INACTIVE
+    ) {
       throw httpError(
         HttpStatus.UNPROCESSABLE_ENTITY,
         'VEHICLE_NOT_AVAILABLE',
-        'Este veículo não está disponível. Escolha outro ou o veículo já atribuído à rota.',
+        'Este veículo não está disponível. Escolha outro.',
       );
+    }
+
+    const fileCheck = validateRouteEvidenceUpload(file);
+    if (!fileCheck.ok) {
+      throw httpError(HttpStatus.UNPROCESSABLE_ENTITY, fileCheck.code, fileCheck.message);
+    }
+    const stored = await this.storage.saveBuffer(
+      { companyId: user.companyId, routeId: id },
+      fileCheck.ext,
+      file!.buffer,
+    );
+
+    if (route.recordNewCustomer) {
+      await this.prisma.$transaction(async (tx) => {
+        await this.lockVehicleForStart(tx, user.companyId, dto.vehicleId, id);
+        await tx.route.update({
+          where: { id },
+          data: {
+            status: RouteStatus.IN_PROGRESS,
+            startedAt: new Date(),
+            vehicleId: dto.vehicleId,
+            startOdometerKm: dto.startOdometerKm,
+            startFuelLevel: dto.startFuelLevel,
+            startNotes: dto.startNotes?.trim() || null,
+            startLatitude: dto.latitude,
+            startLongitude: dto.longitude,
+            originName: 'Início da gravação',
+            originLatitude: dto.latitude,
+            originLongitude: dto.longitude,
+          },
+        });
+        await tx.routeEvidence.create({
+          data: {
+            companyId: user.companyId,
+            routeId: id,
+            kind: RouteEvidenceKind.START_ODOMETER,
+            storageKey: stored.storageKey,
+            mimeType: fileCheck.mimeType,
+            sizeBytes: file!.size,
+            originalName: file!.originalname?.slice(0, 255) || null,
+            latitude: dto.latitude,
+            longitude: dto.longitude,
+            actorUserId: user.id,
+          },
+        });
+      });
+      await this.flagStartOdometer(user, {
+        employeeId: employee.id,
+        routeId: id,
+        vehicleId: vehicle.id,
+        plate: vehicle.plate,
+        startKm: dto.startOdometerKm,
+        lastKm: vehicle.odometerKm,
+        startFuel: dto.startFuelLevel,
+      });
+      await this.prisma.auditLog.create({
+        data: {
+          companyId: user.companyId,
+          userId: user.id,
+          action: 'ROUTE_STARTED',
+          entity: 'Route',
+          entityId: id,
+          metadata: {
+            vehicleId: dto.vehicleId,
+            startOdometerKm: dto.startOdometerKm,
+            startFuelLevel: dto.startFuelLevel,
+          },
+        },
+      });
+      return this.getOne(user, id);
     }
 
     const routeWithStops = await this.prisma.route.findFirst({
@@ -878,6 +1306,8 @@ export class RoutesService {
     const stopByVisitId = new Map(routeWithStops.stops.map((s) => [s.visitId, s]));
 
     await this.prisma.$transaction(async (tx) => {
+      await this.lockVehicleForStart(tx, user.companyId, dto.vehicleId, id);
+
       for (const stop of routeWithStops.stops) {
         await tx.routeStop.update({
           where: { id: stop.id },
@@ -928,6 +1358,45 @@ export class RoutesService {
           WHERE id = ${id}::uuid
         `;
       }
+
+      await tx.routeEvidence.create({
+        data: {
+          companyId: user.companyId,
+          routeId: id,
+          kind: RouteEvidenceKind.START_ODOMETER,
+          storageKey: stored.storageKey,
+          mimeType: fileCheck.mimeType,
+          sizeBytes: file!.size,
+          originalName: file!.originalname?.slice(0, 255) || null,
+          latitude: dto.latitude,
+          longitude: dto.longitude,
+          actorUserId: user.id,
+        },
+      });
+    });
+
+    await this.flagStartOdometer(user, {
+      employeeId: employee.id,
+      routeId: id,
+      vehicleId: vehicle.id,
+      plate: vehicle.plate,
+      startKm: dto.startOdometerKm,
+      lastKm: vehicle.odometerKm,
+      startFuel: dto.startFuelLevel,
+    });
+    await this.prisma.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        action: 'ROUTE_STARTED',
+        entity: 'Route',
+        entityId: id,
+        metadata: {
+          vehicleId: dto.vehicleId,
+          startOdometerKm: dto.startOdometerKm,
+          startFuelLevel: dto.startFuelLevel,
+        },
+      },
     });
 
     return this.getOne(user, id);
@@ -1124,7 +1593,12 @@ export class RoutesService {
     return this.getOne(user, id);
   }
 
-  async complete(user: AuthUser, id: string, dto: CompleteRouteDto) {
+  async complete(
+    user: AuthUser,
+    id: string,
+    dto: CompleteRouteDto,
+    file?: Express.Multer.File,
+  ) {
     const canOfficeComplete =
       user.role === UserRole.ADMIN ||
       user.role === UserRole.PLATFORM_ADMIN ||
@@ -1184,6 +1658,138 @@ export class RoutesService {
       );
     }
 
+    const isFieldEmployee = user.role === UserRole.EMPLOYEE;
+    let endEvidence: {
+      storageKey: string;
+      mimeType: string;
+      sizeBytes: number;
+      originalName: string | null;
+    } | null = null;
+    if (isFieldEmployee) {
+      const fileCheck = validateRouteEvidenceUpload(file);
+      if (!fileCheck.ok) {
+        throw httpError(HttpStatus.UNPROCESSABLE_ENTITY, fileCheck.code, fileCheck.message);
+      }
+      if (dto.endOdometerKm == null || !Number.isFinite(dto.endOdometerKm)) {
+        throw httpError(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          'END_ODOMETER_REQUIRED',
+          'Informe o km final do veículo.',
+        );
+      }
+      if (!dto.endFuelLevel) {
+        throw httpError(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          'END_FUEL_REQUIRED',
+          'Informe o combustível ao concluir a rota.',
+        );
+      }
+      const storedEnd = await this.storage.saveBuffer(
+        { companyId: user.companyId, routeId: id },
+        fileCheck.ext,
+        file!.buffer,
+      );
+      endEvidence = {
+        storageKey: storedEnd.storageKey,
+        mimeType: fileCheck.mimeType,
+        sizeBytes: file!.size,
+        originalName: file!.originalname?.slice(0, 255) || null,
+      };
+    } else if (file?.buffer?.length) {
+      const fileCheck = validateRouteEvidenceUpload(file);
+      if (!fileCheck.ok) {
+        throw httpError(HttpStatus.UNPROCESSABLE_ENTITY, fileCheck.code, fileCheck.message);
+      }
+      const storedEnd = await this.storage.saveBuffer(
+        { companyId: user.companyId, routeId: id },
+        fileCheck.ext,
+        file.buffer,
+      );
+      endEvidence = {
+        storageKey: storedEnd.storageKey,
+        mimeType: fileCheck.mimeType,
+        sizeBytes: file.size,
+        originalName: file.originalname?.slice(0, 255) || null,
+      };
+    }
+
+    if (
+      dto.endOdometerKm != null &&
+      route.startOdometerKm != null &&
+      dto.endOdometerKm < route.startOdometerKm
+    ) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'END_ODOMETER_BEFORE_START',
+        'O km final não pode ser menor que o km inicial.',
+      );
+    }
+
+    if (route.recordNewCustomer) {
+      const now = new Date();
+      const actualDurationSeconds =
+        route.startedAt != null
+          ? Math.max(0, Math.round((now.getTime() - route.startedAt.getTime()) / 1000))
+          : null;
+      const pendingIds = route.stops
+        .filter((s) => s.status === RouteStopStatus.PENDING)
+        .map((s) => s.id);
+      await this.prisma.$transaction(async (tx) => {
+        if (pendingIds.length) {
+          await tx.routeStop.updateMany({
+            where: { id: { in: pendingIds }, routeId: id },
+            data: { status: RouteStopStatus.SKIPPED },
+          });
+        }
+        await tx.visit.updateMany({
+          where: {
+            routeStop: { routeId: id },
+            companyId: user.companyId,
+            status: {
+              in: [
+                VisitStatus.SCHEDULED,
+                VisitStatus.ASSIGNED,
+                VisitStatus.IN_ROUTE,
+              ],
+            },
+          },
+          data: { status: VisitStatus.CANCELLED },
+        });
+        await tx.route.update({
+          where: { id },
+          data: {
+            status: RouteStatus.COMPLETED,
+            actualDurationSeconds,
+            endOdometerKm: dto.endOdometerKm ?? null,
+            endFuelLevel: dto.endFuelLevel ?? null,
+            endLatitude: dto.endLatitude ?? null,
+            endLongitude: dto.endLongitude ?? null,
+          },
+        });
+        if (endEvidence) {
+          await tx.routeEvidence.create({
+            data: {
+              companyId: user.companyId,
+              routeId: id,
+              kind: RouteEvidenceKind.END_ODOMETER,
+              storageKey: endEvidence.storageKey,
+              mimeType: endEvidence.mimeType,
+              sizeBytes: endEvidence.sizeBytes,
+              originalName: endEvidence.originalName,
+              latitude: dto.endLatitude ?? null,
+              longitude: dto.endLongitude ?? null,
+              actorUserId: user.id,
+            },
+          });
+        }
+        await this.releaseVehicleIfIdle(tx, user.companyId, route.vehicleId, id);
+      });
+      await this.afterRouteComplete(user, id, dto, {
+        completedByOffice: !isFieldEmployee,
+      });
+      return this.getOne(user, id);
+    }
+
     const openVisit = route.stops.find(
       (s) =>
         s.visit?.status === VisitStatus.ARRIVED ||
@@ -1236,11 +1842,303 @@ export class RoutesService {
         data: {
           status: finalStatus,
           actualDurationSeconds,
+          endOdometerKm: dto.endOdometerKm ?? null,
+          endFuelLevel: dto.endFuelLevel ?? null,
+          endLatitude: dto.endLatitude ?? null,
+          endLongitude: dto.endLongitude ?? null,
         },
       });
+      if (endEvidence) {
+        await tx.routeEvidence.create({
+          data: {
+            companyId: user.companyId,
+            routeId: id,
+            kind: RouteEvidenceKind.END_ODOMETER,
+            storageKey: endEvidence.storageKey,
+            mimeType: endEvidence.mimeType,
+            sizeBytes: endEvidence.sizeBytes,
+            originalName: endEvidence.originalName,
+            latitude: dto.endLatitude ?? null,
+            longitude: dto.endLongitude ?? null,
+            actorUserId: user.id,
+          },
+        });
+      }
+      await this.releaseVehicleIfIdle(tx, user.companyId, route.vehicleId, id);
+    });
+
+    await this.afterRouteComplete(user, id, dto, {
+      completedByOffice: !isFieldEmployee,
     });
 
     return this.getOne(user, id);
+  }
+
+  private async lockVehicleForStart(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    vehicleId: string,
+    routeId: string,
+  ) {
+    const rows = await tx.$queryRaw<{ id: string; status: VehicleStatus }[]>`
+      SELECT id, status FROM vehicles
+      WHERE id = ${vehicleId}::uuid AND company_id = ${companyId}::uuid
+      FOR UPDATE
+    `;
+    const locked = rows[0];
+    if (!locked) {
+      throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
+    }
+    if (
+      locked.status === VehicleStatus.MAINTENANCE ||
+      locked.status === VehicleStatus.INACTIVE
+    ) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'VEHICLE_NOT_AVAILABLE',
+        'Este veículo não está disponível. Escolha outro.',
+      );
+    }
+    const busy = await tx.route.findFirst({
+      where: {
+        companyId,
+        vehicleId,
+        status: RouteStatus.IN_PROGRESS,
+        NOT: { id: routeId },
+      },
+      select: { id: true },
+    });
+    if (busy) {
+      throw httpError(
+        HttpStatus.CONFLICT,
+        'VEHICLE_IN_USE',
+        'Este veículo já está em uma rota.',
+      );
+    }
+    await tx.vehicle.update({
+      where: { id: vehicleId },
+      data: { status: VehicleStatus.IN_USE },
+    });
+  }
+
+  private async releaseVehicleIfIdle(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    vehicleId: string | null,
+    completingRouteId: string,
+  ) {
+    if (!vehicleId) return;
+    const other = await tx.route.findFirst({
+      where: {
+        companyId,
+        vehicleId,
+        status: RouteStatus.IN_PROGRESS,
+        NOT: { id: completingRouteId },
+      },
+      select: { id: true },
+    });
+    if (other) return;
+    const vehicle = await tx.vehicle.findFirst({
+      where: { id: vehicleId, companyId },
+      select: { id: true, status: true },
+    });
+    if (!vehicle) return;
+    if (
+      vehicle.status === VehicleStatus.MAINTENANCE ||
+      vehicle.status === VehicleStatus.INACTIVE
+    ) {
+      return;
+    }
+    await tx.vehicle.update({
+      where: { id: vehicleId },
+      data: { status: VehicleStatus.AVAILABLE },
+    });
+  }
+
+  private async flagStartOdometer(
+    user: AuthUser,
+    input: {
+      employeeId: string;
+      routeId: string;
+      vehicleId: string;
+      plate: string;
+      startKm: number;
+      lastKm: number | null;
+      startFuel: string;
+    },
+  ) {
+    const base = {
+      companyId: user.companyId,
+      employeeId: input.employeeId,
+      routeId: input.routeId,
+      vehicleId: input.vehicleId,
+    };
+    if (isOdometerRollback(input.startKm, input.lastKm)) {
+      await this.observations.upsert({
+        ...base,
+        code: EmployeeObservationCode.ODOMETER_ROLLBACK,
+        severity: EmployeeObservationSeverity.WARNING,
+        summary: `Km inicial ${input.startKm} menor que o último km do veículo ${input.plate} (${input.lastKm}).`,
+        details: {
+          plate: input.plate,
+          startOdometerKm: input.startKm,
+          lastOdometerKm: input.lastKm,
+          startFuel: input.startFuel,
+        },
+      });
+    } else if (isOdometerGap(input.startKm, input.lastKm)) {
+      await this.observations.upsert({
+        ...base,
+        code: EmployeeObservationCode.ODOMETER_GAP,
+        severity: EmployeeObservationSeverity.INFO,
+        summary: `Km inicial ${input.startKm} está ${Math.round(input.startKm - (input.lastKm ?? 0))} km acima do último registro de ${input.plate}.`,
+        details: {
+          plate: input.plate,
+          startOdometerKm: input.startKm,
+          lastOdometerKm: input.lastKm,
+          startFuel: input.startFuel,
+        },
+      });
+    }
+  }
+
+  private async afterRouteComplete(
+    user: AuthUser,
+    routeId: string,
+    dto: CompleteRouteDto,
+    opts: { completedByOffice: boolean },
+  ) {
+    const route = await this.prisma.route.findFirst({
+      where: { id: routeId, companyId: user.companyId },
+      include: {
+        vehicle: { select: { id: true, plate: true } },
+        evidence: { select: { id: true, kind: true } },
+      },
+    });
+    if (!route) return;
+
+    const points = await this.prisma.trackingPoint.findMany({
+      where: { routeId, companyId: user.companyId },
+      orderBy: { recordedAt: 'asc' },
+      select: { latitude: true, longitude: true },
+    });
+    const gpsTrailMeters = trailLengthMeters(points);
+    const odometerDeltaKm =
+      route.startOdometerKm != null && route.endOdometerKm != null
+        ? route.endOdometerKm - route.startOdometerKm
+        : null;
+    const actualM = actualDistanceMeters(odometerDeltaKm, gpsTrailMeters);
+
+    if (route.vehicleId && route.endOdometerKm != null) {
+      await this.prisma.vehicle.update({
+        where: { id: route.vehicleId },
+        data: {
+          odometerKm: route.endOdometerKm,
+          lastFuelLevel: route.endFuelLevel ?? undefined,
+        },
+      });
+    } else if (route.vehicleId && route.endFuelLevel) {
+      await this.prisma.vehicle.update({
+        where: { id: route.vehicleId },
+        data: { lastFuelLevel: route.endFuelLevel },
+      });
+    }
+
+    if (actualM != null) {
+      await this.prisma.route.update({
+        where: { id: routeId },
+        data: { actualDistanceMeters: actualM },
+      });
+    }
+
+    await this.prisma.auditLog.create({
+      data: {
+        companyId: user.companyId,
+        userId: user.id,
+        action: 'ROUTE_COMPLETED',
+        entity: 'Route',
+        entityId: routeId,
+        metadata: {
+          mode: dto.mode,
+          endOdometerKm: route.endOdometerKm,
+          endFuelLevel: route.endFuelLevel,
+          completedByOffice: opts.completedByOffice,
+        },
+      },
+    });
+
+    if (!route.employeeId) return;
+
+    const plannedKm = (route.plannedDistanceMeters ?? 0) / 1000;
+    const deltaForFlag =
+      odometerDeltaKm != null ? odometerDeltaKm : gpsTrailMeters > 0 ? gpsTrailMeters / 1000 : null;
+    if (deltaForFlag != null && isOdometerKmDiscrepancy(route.plannedDistanceMeters, deltaForFlag)) {
+      const extra = Math.round((deltaForFlag - plannedKm) * 10) / 10;
+      await this.observations.upsert({
+        companyId: user.companyId,
+        employeeId: route.employeeId,
+        routeId,
+        vehicleId: route.vehicleId,
+        code: EmployeeObservationCode.KM_DISCREPANCY,
+        severity: EmployeeObservationSeverity.WARNING,
+        summary: `Km rodado ${deltaForFlag.toFixed(1)} vs planejado ${plannedKm.toFixed(1)} (${extra > 0 ? '+' : ''}${extra} km) · ${route.vehicle?.plate ?? 'sem placa'}.`,
+        details: {
+          routeId,
+          plate: route.vehicle?.plate ?? null,
+          plannedKm,
+          odometerDeltaKm,
+          gpsTrailKm: Math.round((gpsTrailMeters / 1000) * 10) / 10,
+          startOdometerKm: route.startOdometerKm,
+          endOdometerKm: route.endOdometerKm,
+          startFuel: route.startFuelLevel,
+          endFuel: route.endFuelLevel,
+          evidenceIds: route.evidence.map((e) => e.id),
+          completedByOffice: opts.completedByOffice,
+        },
+      });
+    }
+  }
+
+  async getEvidenceFile(user: AuthUser, routeId: string, evidenceId: string) {
+    const route = await this.prisma.route.findFirst({
+      where: { id: routeId, companyId: user.companyId },
+      select: { id: true, employeeId: true },
+    });
+    if (!route) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_NOT_FOUND', 'Rota não encontrada.');
+    }
+    if (user.role === UserRole.EMPLOYEE) {
+      const mine = await this.prisma.employee.findFirst({
+        where: { companyId: user.companyId, userId: user.id },
+        select: { id: true },
+      });
+      if (!mine || route.employeeId !== mine.id) {
+        throw httpError(
+          HttpStatus.FORBIDDEN,
+          'ROUTE_NOT_ASSIGNED',
+          'Você não pode ver esta evidência.',
+        );
+      }
+    } else if (
+      user.role !== UserRole.ADMIN &&
+      user.role !== UserRole.MANAGER &&
+      user.role !== UserRole.PLATFORM_ADMIN &&
+      user.role !== UserRole.SUPERVISOR
+    ) {
+      throw httpError(HttpStatus.FORBIDDEN, 'AUTH_FORBIDDEN', 'Sem permissão.');
+    }
+
+    const evidence = await this.prisma.routeEvidence.findFirst({
+      where: { id: evidenceId, routeId, companyId: user.companyId },
+    });
+    if (!evidence) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_EVIDENCE_NOT_FOUND', 'Foto não encontrada.');
+    }
+    const stream = this.storage.openReadStream(evidence.storageKey);
+    if (!stream) {
+      throw httpError(HttpStatus.NOT_FOUND, 'ROUTE_EVIDENCE_NOT_FOUND', 'Arquivo não encontrado.');
+    }
+    return { stream, mimeType: evidence.mimeType, originalName: evidence.originalName };
   }
 
   private async prepareCustomerAssignments(

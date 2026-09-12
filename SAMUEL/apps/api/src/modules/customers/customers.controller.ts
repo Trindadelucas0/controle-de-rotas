@@ -1,7 +1,9 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
+  HttpCode,
   Param,
   ParseUUIDPipe,
   Patch,
@@ -54,6 +56,17 @@ export class CustomersController {
     return this.customersService.createLandmark(user, id, dto);
   }
 
+  @Delete(':id/landmarks/:landmarkId')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.EMPLOYEE)
+  @HttpCode(200)
+  deleteLandmark(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('landmarkId', ParseUUIDPipe) landmarkId: string,
+  ) {
+    return this.customersService.deleteLandmark(user, id, landmarkId);
+  }
+
   @Get(':id/access')
   @Roles(UserRole.ADMIN, UserRole.MANAGER)
   getAccess(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
@@ -61,13 +74,13 @@ export class CustomersController {
   }
 
   @Get(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR, UserRole.EMPLOYEE)
   getOne(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
     return this.customersService.getOne(user, id);
   }
 
   @Patch(':id')
-  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR, UserRole.EMPLOYEE)
   update(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,

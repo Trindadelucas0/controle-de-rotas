@@ -12,6 +12,7 @@ type MapPinRow = {
   longitude: number;
   location_status: string;
   status: string;
+  profile_incomplete: boolean;
   city: string | null;
   street: string | null;
   number: string | null;
@@ -24,6 +25,7 @@ export class MapService {
   async listCustomerPins(user: AuthUser, query: MapCustomersQueryDto) {
     const where: Prisma.CustomerWhereInput = {
       companyId: user.companyId,
+      recordSessionShell: false,
       latitude: { not: null },
       longitude: { not: null },
     };
@@ -46,6 +48,7 @@ export class MapService {
         longitude: true,
         locationStatus: true,
         status: true,
+        profileIncomplete: true,
         city: true,
         street: true,
         number: true,
@@ -62,6 +65,7 @@ export class MapService {
         longitude: c.longitude!,
         locationStatus: c.locationStatus,
         status: c.status,
+        profileIncomplete: c.profileIncomplete,
         city: c.city,
         street: c.street,
         number: c.number,
@@ -79,11 +83,13 @@ export class MapService {
         longitude,
         location_status::text,
         status::text,
+        profile_incomplete,
         city,
         street,
         number
       FROM customers
       WHERE company_id = ${user.companyId}::uuid
+        AND record_session_shell = false
         AND location IS NOT NULL
         AND ST_DWithin(
           location::geography,
@@ -105,6 +111,7 @@ export class MapService {
         longitude: c.longitude,
         locationStatus: c.location_status,
         status: c.status,
+        profileIncomplete: c.profile_incomplete,
         city: c.city,
         street: c.street,
         number: c.number,
@@ -117,7 +124,7 @@ export class MapService {
     const customer = await this.prisma.customer.findFirst({
       where: { id: customerId, companyId: user.companyId },
     });
-    if (!customer) {
+    if (!customer || customer.recordSessionShell) {
       throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
     }
 
@@ -196,6 +203,7 @@ export class MapService {
         longitude: true,
         locationStatus: true,
         status: true,
+        profileIncomplete: true,
         city: true,
         street: true,
         number: true,

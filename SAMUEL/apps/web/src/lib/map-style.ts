@@ -65,6 +65,7 @@ export type MapCustomerPin = {
   longitude: number;
   locationStatus: string;
   status: string;
+  profileIncomplete?: boolean;
   city: string | null;
   street: string | null;
   number: string | null;

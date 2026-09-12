@@ -71,6 +71,7 @@ export class VisitsService {
 
     const where: Prisma.VisitWhereInput = {
       companyId: user.companyId,
+      customer: { recordSessionShell: false },
       ...(employeeId ? { employeeId } : {}),
       ...(query.customerId ? { customerId: query.customerId } : {}),
       ...(query.serviceOrderId ? { serviceOrderId: query.serviceOrderId } : {}),

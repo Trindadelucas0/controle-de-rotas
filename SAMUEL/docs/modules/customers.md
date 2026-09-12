@@ -14,6 +14,7 @@ Formulário web exige pin (mapa ou CEP/endereço/CNPJ). Lookups: [lookups.md](lo
 | PATCH | `/api/v1/customers/:id` | ADMIN, MANAGER, SUPERVISOR |
 | POST | `/api/v1/customers/:id/geocode` | ADMIN, MANAGER |
 | POST | `/api/v1/customers/:id/landmarks` | ADMIN, MANAGER, EMPLOYEE* |
+| DELETE | `/api/v1/customers/:id/landmarks/:landmarkId` | ADMIN, MANAGER, EMPLOYEE* |
 | GET | `/api/v1/customers/:id/access` | ADMIN, MANAGER |
 
 \* EMPLOYEE só com rota `IN_PROGRESS` e parada desse cliente.

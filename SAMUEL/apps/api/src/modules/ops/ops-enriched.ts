@@ -25,6 +25,7 @@ export async function customersListEnriched(
   const customers = await prisma.customer.findMany({
     where: {
       companyId: user.companyId,
+      recordSessionShell: false,
       ...(q?.trim()
         ? {
             OR: [

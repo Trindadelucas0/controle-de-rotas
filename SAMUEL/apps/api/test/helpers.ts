@@ -167,6 +167,8 @@ export async function createRouteInProgress(opts?: {
       brand: 'Test',
       model: 'Van',
       status: VehicleStatus.IN_USE,
+      odometerKm: 100,
+      lastFuelLevel: 'HALF',
     },
   });
 
@@ -181,6 +183,9 @@ export async function createRouteInProgress(opts?: {
       originLongitude: longitude,
       originName: 'Base teste',
       startedAt: new Date(),
+      startOdometerKm: 100,
+      startFuelLevel: 'HALF',
+      plannedDistanceMeters: 10_000,
     },
   });
 
@@ -207,6 +212,9 @@ export async function createRouteInProgress(opts?: {
     longitude,
   };
 }
+
+/** JPEG mínimo (SOI+EOI) para upload de evidência em testes. */
+export const TINY_JPEG = Buffer.from([0xff, 0xd8, 0xff, 0xd9]);
 
 export async function postGps(
   agent: ReturnType<typeof request.agent>,

@@ -18,14 +18,17 @@ div 100dvh (sem chrome do app)
 ├── Map Carto Dark
 │   ├── LineString ativa menta (`#2EE6C7`) — só até a parada-alvo; nasce no carro; atualiza após reroute
 │   ├── Markers paradas (próxima âmbar `#121212`; futuras laranja + branco)
-│   ├── Markers de marcos de **todas** as paradas (ícone por tipo: porteira / ponte / bifurcação / estrada ruim; `title` + aria-label em PT)
+│   ├── Markers de marcos de **todas** as paradas (ícone por tipo; toque abre nome + quem adicionou)
 │   └── Marker GPS = ícone de **carro** (heading + interpolação suave)
 ├── faixa superior: instrução (superfície escura + tinta) / “Chegando…” (âmbar + `#121212`) / “Recalculando…” / “Fora da rota…” / badge Gravando · N pts (âmbar se fila de rede)
-├── banner proximidade de marco (superfície `#1C1C1E` + **OK** laranja legível) — qualquer marco da rota ≤120 m
+├── banner proximidade de marco: **Gravar viagem** → Ainda existe [tipo]? Sim/Não; senão **OK** — qualquer marco da rota ≤120 m
 ├── botões rápidos de marco (Porteira / Ponte / Bifurcação / Estrada ruim) — **só se** `recordTrip` (Gravar viagem)
 ├── HUD inferior: tempo, km, ETA, km/h
+│   missão Gravar: **Adicionar ponto** + Trecho/Total/pontos + slider Finalizar por completo
 └── controles: Encerrar (confirm); botão alvo / Centralizar (follow) **acima do HUD** (`-top-14` / `sm:-top-16`, sobe com marcos)
 ```
+
+Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; pins = pontos marcados (✎ se cadastro em aberto); GPS denso como Gravar viagem. **Gravar viagem** clássica (cliente já cadastrado) **não** ganha Adicionar ponto.
 
 ### 3. Informação
 
@@ -67,7 +70,7 @@ Mapa: tiles CARTO Dark Matter (`dark_all`) com `?key=` via `NEXT_PUBLIC_CARTO_BA
 
 Botão **Centralizar** (alvo): ancorado **acima** do bloco inferior (marcos opcionais + HUD), alinhado à coluna `max-w-md`; sobe junto quando os chips de marco aparecem.
 
-Contraste do HUD: não usar `bg-brand-900` + `text-amber-50` (depois do remap, `brand-900` é tinta clara). Banner de marco = superfície + **OK** `ops-btn-primary`. Cheguei = `#121212` + branco. Texto sobre âmbar = `#121212`.
+Contraste do HUD: não usar `bg-brand-900` + `text-amber-50` (depois do remap, `brand-900` é tinta clara). Banner de marco = superfície + **OK** ou **Sim/Não** `ops-btn-primary`/`secondary`. Cheguei = `#121212` + branco. Texto sobre âmbar = `#121212`.
 
 **Linha menta:** recorte no cliente até a parada corrente (`clipLineToNextStop` em `nav-geometry.ts`). Com GPS, o **primeiro ponto é sempre a posição do carro** (trecho já percorrido some); fim = fim do leg OSRM dessa parada (a linha termina no pin). Pinos das paradas seguintes permanecem. Trilha `CustomerAccessPath`: `start`/`reroute` recortam a geometria a partir do GPS (`tripFromAccessPath` / `clipAccessPathToOrigin`); o HUD de km/tempo segue a posição e a velocidade ao vivo.
 
@@ -80,13 +83,17 @@ N/A.
 | Ação | Efeito |
 | --- | --- |
 | Encerrar | confirma → `/field/my-route` (não cancela rota) |
-| Arrastar para concluir | `POST /field/routes/:id/complete` |
+| Arrastar para concluir | modal km/combustível/foto → `POST /field/routes/:id/complete` |
+| Adicionar ponto | só missão `recordNewCustomer`; sheet nome*; `POST /field/routes/:id/record-point`; GPS não para |
 | Cheguei (banner ~80 m) | abre `/field/visits/[id]` — **não** grava check-in sozinho |
 | Centralizar (alvo) | reativa follow e recentraliza no ícone do carro na hora |
 | Tentar GPS de novo | `requestCurrentPosition` progressivo (fino → coarse) + reinicia watch |
 | Arrastar mapa (pan/drag) | desliga follow; toque simples **não** desliga |
 | GPS watch | seed coarse + `watchPosition` → fila local → `POST /tracking/points` (lote até 50, retry) |
 | Marcos | Só com `recordTrip`; POST imediato; se falhar, fila `samuel:landmark-queue` + retry online/visibility |
+| Toque no ícone de marco | ficha com nome do tipo + “Adicionado por …” (gestor se sem funcionário); toque de novo ou no mapa fecha |
+| Banner ≤120 m + Gravar viagem | **Sim, permanece** (cooldown 5 min) / **Não, retirar** (`DELETE`; fila `samuel:landmark-delete-queue` se a rede falhar). Logo após marcar, não pergunta |
+| Banner ≤120 m sem Gravar | só **OK** (cooldown 5 min); não apaga |
 | 1º GPS / off-route | `POST /routes/:id/reroute` |
 | beforeunload / popstate | aviso sair |
 
@@ -99,7 +106,10 @@ N/A.
 | recalculating | banner sky “Recalculando a partir da sua posição…” |
 | reroute error | banner vermelho com mensagem da API |
 | success | nav ativa |
+| proximity confirm | Gravar viagem: “Ainda existe …?” Sim/Não; sem Gravar: OK |
+| landmark remove error | mensagem no banner; botões de novo |
 | empty | tratado como error |
+| gravando missão | Adicionar ponto + Finalizar; sem GPS o ponto fica desabilitado |
 
 ### 8. Permissões
 
@@ -112,6 +122,8 @@ Entrada: após `/field/start` ou “Continuar navegação”. Saída: Minha rota
 ### 10. Mobile / PWA
 
 `100dvh`, landscape ok; Wake Lock quando possível. HTTP LAN: faixa **NÃO ESTÁ EM HTTPS** no topo; GPS do browser segue bloqueado — **sem GPS não há recálculo**.
+
+Pinch no mapa amplia a câmera MapLibre; HUD/botões ficam no tamanho 1:1 (a página não dá zoom).
 
 **Geolocation:** GPS só em HTTPS ou `localhost`. Em `http://192.168.x.x` a tela **abre** (não bloqueia). Para GPS no celular: túnel HTTPS, instalar o app, permitir localização no aviso do sistema. No PC com GPS, rotas iniciadas em HTTP (origem = 1ª parada) recalculam sozinhas no 1º fix.
 
@@ -130,6 +142,7 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 7. Encerrar → lista ainda IN_PROGRESS.
 8. Abrir navigate sem Play → erro.
 9. Publish/reroute novo → se OSRM mandar `lanes`, ícones de faixa no banner; senão texto “Faixa da esquerda/direita…”.
-10. Rota **Gravar viagem**: badge **Gravando · N pts**; botões de marco visíveis; com rede ruim fica âmbar (`N na fila`); marco com falha de rede reenvia sozinho. Rota **sem** Gravar: sem botões; se o cliente já tem marcos, ícones + banner ≤120 m.
+10. Rota **Gravar viagem**: badge **Gravando · N pts**; botões de marco visíveis; com rede ruim fica âmbar (`N na fila`); marco com falha de rede reenvia sozinho. Perto de um marco já salvo: **Ainda existe …?** — Sim mantém, Não retira. Marcar agora não abre a pergunta na hora. Rota **sem** Gravar: sem botões; se o cliente já tem marcos, ícones + banner ≤120 m só com **OK**. Toque no ícone: nome + quem marcou.
 11. Rota de 1 cliente com trilha ACTIVE (viagem passada): Play → Navegar com GPS. Tempo/Restante/ETA preenchidos após o 1º fix; linha menta nasce no carro (não no início da gravação). Acelerar/reduzir muda Tempo e ETA; Restante só cai com o deslocamento. Parado: VEL. 0; Tempo não volta às horas da viagem original.
-12. Banner de marco: fundo escuro, título âmbar, **OK** laranja com texto branco — legível sobre o mapa; considera marcos de **todas** as paradas da rota.
+12. Banner de marco: fundo escuro, título âmbar, **OK** ou **Sim/Não** — legível sobre o mapa; considera marcos de **todas** as paradas da rota.
+13. Missão **Gravar cliente**: HUD GRAVAR + **Adicionar ponto**; após 2 pontos continua Gravando; Finalizar **não** pede nome; rota clássica com Gravar viagem **não** mostra Adicionar ponto.

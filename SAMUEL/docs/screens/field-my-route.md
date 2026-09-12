@@ -21,12 +21,15 @@ FieldPwaLocationGate (PWA+GPS em HTTPS; HTTP = faixa NÃO ESTÁ EM HTTPS)
     ├── card Tracking HTTP (se IN_PROGRESS)
     └── articles por rota
         ├── status, veículo, km/tempo, paradas
-        ├── ▶ Iniciar rota → /field/start/:id
+        ├── ▶ Iniciar rota / Iniciar gravação → /field/start/:id
         ├── Continuar navegação
-        ├── SlideToComplete (arrastar) + modal CompleteRouteConfirm
-        ├── mini-mapa (~160–176px) Dark Matter + polyline menta (`plannedGeometryJson` ou linha pelas paradas) + pinos numerados
+        ├── SlideToComplete (arrastar) + modal CompleteRouteConfirm (missão: Encerrar gravação?)
+        ├── mini-mapa (~160–176px) — **oculto** em missão Gravar cliente
+        ├── missão: lista de pontos (lápis se cadastro em aberto)
         └── stops: cliente + OS (sem Maps/Waze)
 ```
+
+Bloco **Cadastros em aberto** no topo: clientes `profileIncomplete` da missão do funcionário → **Editar** (sheet).
 
 ### 3. Informação
 
@@ -53,8 +56,9 @@ Data implícita = hoje (`toDateInputValue`); a API também devolve `IN_PROGRESS`
 | Ação | Condição | Efeito |
 | --- | --- | --- |
 | ▶ Iniciar rota | PUBLISHED e nenhuma IN_PROGRESS | `/field/start/:id` |
+| ▶ Iniciar gravação | missão `recordNewCustomer` PUBLISHED | `/field/start/:id` |
 | Continuar navegação | IN_PROGRESS (do dia ou de outro dia) | `/field/navigate` |
-| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | `POST /field/routes/:id/complete` |
+| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | modal km/combustível/foto → `POST /field/routes/:id/complete` |
 | Status GPS | sempre | `/field/tracking-status` |
 | Ver agenda | empty state | `/agenda` |
 

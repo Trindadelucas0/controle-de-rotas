@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { TrackingModule } from '../tracking/tracking.module';
+import { EmployeeObservationsModule } from './employee-observations.module';
 import { OpsController } from './ops.controller';
 import { OpsService } from './ops.service';
 
 @Module({
-  imports: [AuthModule, TrackingModule],
+  imports: [AuthModule, TrackingModule, EmployeeObservationsModule],
   controllers: [OpsController],
   providers: [OpsService],
   exports: [OpsService],

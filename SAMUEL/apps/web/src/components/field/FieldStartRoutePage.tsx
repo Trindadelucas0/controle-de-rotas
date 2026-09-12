@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
-import { apiFetch, ApiError } from '@/lib/api-client';
+import { apiFetch, apiUpload, ApiError } from '@/lib/api-client';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { formatDuration, formatMeters } from '@/components/routes/routes-planner-shared';
 import { haversineMeters } from '@/lib/nav-geometry';
@@ -17,6 +17,8 @@ import {
 import { StartRoutePreviewMap } from './StartRoutePreviewMap';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
+import { OdometerPhotoCapture } from './OdometerPhotoCapture';
+import { FUEL_LEVEL_OPTIONS, type FuelLevel } from '@/lib/field-fuel';
 
 type RouteStop = {
   id: string;
@@ -30,6 +32,7 @@ type RouteDetail = {
   id: string;
   status: string;
   date?: string;
+  recordNewCustomer?: boolean;
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
   vehicle: { id: string; plate: string; brand: string | null; model: string | null } | null;
@@ -42,17 +45,10 @@ type VehicleOption = {
   brand: string | null;
   model: string | null;
   status: string;
+  odometerKm?: number | null;
+  lastFuelLevel?: string | null;
+  inUseByOther?: boolean;
 };
-
-export const FUEL_LEVEL_OPTIONS = [
-  { value: 'EMPTY', label: 'Vazio' },
-  { value: 'QUARTER', label: '1/4' },
-  { value: 'HALF', label: '1/2' },
-  { value: 'THREE_QUARTERS', label: '3/4' },
-  { value: 'FULL', label: 'Cheio' },
-] as const;
-
-type FuelLevel = (typeof FUEL_LEVEL_OPTIONS)[number]['value'];
 
 type Step = 'gps' | 'summary' | 'vehicle' | 'checklist' | 'confirm';
 
@@ -100,6 +96,7 @@ export function FieldStartRoutePage() {
   const [odometerKm, setOdometerKm] = useState('');
   const [fuelLevel, setFuelLevel] = useState<FuelLevel>('HALF');
   const [notes, setNotes] = useState('');
+  const [odometerPhoto, setOdometerPhoto] = useState<File | null>(null);
   const [gps, setGps] = useState<GpsFix | null>(null);
   const [gpsFallback, setGpsFallback] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
@@ -150,6 +147,11 @@ export function FieldStartRoutePage() {
       setVehicles(v.vehicles);
       const pre = found.vehicle?.id ?? v.vehicles[0]?.id ?? '';
       setVehicleId(pre);
+      const chosen = v.vehicles.find((x) => x.id === pre) ?? v.vehicles[0];
+      if (chosen?.odometerKm != null) setOdometerKm(String(chosen.odometerKm));
+      if (chosen?.lastFuelLevel && FUEL_LEVEL_OPTIONS.some((o) => o.value === chosen.lastFuelLevel)) {
+        setFuelLevel(chosen.lastFuelLevel as FuelLevel);
+      }
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Falha ao carregar rota');
       setErrorCode(e instanceof ApiError ? e.code ?? null : null);
@@ -256,6 +258,11 @@ export function FieldStartRoutePage() {
       setErrorCode(null);
       return;
     }
+    if (!odometerPhoto) {
+      setError('Tire uma foto do odômetro para iniciar.');
+      setErrorCode(null);
+      return;
+    }
     setSubmitting(true);
     setError(null);
     setErrorCode(null);
@@ -287,17 +294,15 @@ export function FieldStartRoutePage() {
       return;
     }
     try {
-      await apiFetch(`/api/v1/routes/${route.id}/start`, {
-        method: 'POST',
-        body: JSON.stringify({
-          vehicleId,
-          startOdometerKm: km,
-          startFuelLevel: fuelLevel,
-          startNotes: notes.trim() || undefined,
-          latitude: fix.latitude,
-          longitude: fix.longitude,
-        }),
-      });
+      const form = new FormData();
+      form.append('vehicleId', vehicleId);
+      form.append('startOdometerKm', String(km));
+      form.append('startFuelLevel', fuelLevel);
+      if (notes.trim()) form.append('startNotes', notes.trim());
+      form.append('latitude', String(fix.latitude));
+      form.append('longitude', String(fix.longitude));
+      form.append('file', odometerPhoto);
+      await apiUpload(`/api/v1/routes/${route.id}/start`, form);
       router.push('/field/navigate');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Não foi possível iniciar a rota');
@@ -337,6 +342,8 @@ export function FieldStartRoutePage() {
 
   if (!route) return null;
 
+  const selectedVehicle = vehicles.find((v) => v.id === vehicleId) ?? null;
+
   const previewMap = showMap ? (
     <StartRoutePreviewMap
       gps={gps}
@@ -357,9 +364,13 @@ export function FieldStartRoutePage() {
         <Link href="/field/my-route" className="text-sm ops-link">
           ← Minha rota
         </Link>
-        <h1 className="mt-2 text-2xl font-bold text-brand-900">Iniciar rota</h1>
+        <h1 className="mt-2 text-2xl font-bold text-brand-900">
+          {route.recordNewCustomer ? 'Iniciar gravação' : 'Iniciar rota'}
+        </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          {route.stops.length} parada(s)
+          {route.recordNewCustomer
+            ? 'Grave o caminho e marque pontos (clientes) no GPS. Encerre quando quiser.'
+            : `${route.stops.length} parada(s)`}
           {route.plannedDurationSeconds != null
             ? ` · ~${formatDuration(route.plannedDurationSeconds)}`
             : ''}
@@ -423,11 +434,14 @@ export function FieldStartRoutePage() {
         <div className="space-y-4 rounded-2xl border border-brand-100 bg-surface p-5">
           <h2 className="font-semibold text-brand-900">Resumo</h2>
           <p className="text-sm text-[var(--muted)]">
-            {gpsFallback
+            {route.recordNewCustomer
+              ? 'A gravação começa no seu GPS. Marque um ponto em cada fazenda nova e finalize quando quiser.'
+              : gpsFallback
               ? 'Sem GPS neste endereço HTTP (o celular só libera localização em HTTPS ou o PC em localhost). Ordem = planejada. Origem do Play = 1ª parada.'
               : 'Entregas ordenadas da mais perto para a mais longe a partir de onde você está. A ordem definitiva é gravada ao confirmar o início.'}
           </p>
-          {previewMap}
+          {route.recordNewCustomer ? null : previewMap}
+          {route.recordNewCustomer ? null : (
           <ol className="space-y-2 text-sm">
             {previewStops.map((s, index) => {
               const dist = gps ? haversineMeters(gps, s) : null;
@@ -447,6 +461,7 @@ export function FieldStartRoutePage() {
               );
             })}
           </ol>
+          )}
           <button
             type="button"
             onClick={() => setStep('vehicle')}
@@ -461,22 +476,47 @@ export function FieldStartRoutePage() {
         <div className="space-y-4 rounded-2xl border border-brand-100 bg-surface p-5">
           <h2 className="font-semibold text-brand-900">Veículo</h2>
           {previewMap}
-          <label className="block text-sm">
-            <span className="mb-1 block font-medium">Qual veículo você está usando?</span>
-            <select
-              value={vehicleId}
-              onChange={(e) => setVehicleId(e.target.value)}
-              className="w-full ops-input"
-            >
-              {vehicles.map((v) => (
-                <option key={v.id} value={v.id}>
-                  {v.plate}
-                  {v.brand || v.model ? ` · ${[v.brand, v.model].filter(Boolean).join(' ')}` : ''}
-                  {v.status !== 'AVAILABLE' ? ' (atribuído)' : ''}
-                </option>
-              ))}
-            </select>
-          </label>
+          {vehicles.length === 0 ? (
+            <p className="text-sm text-[var(--muted)]" role="status">
+              Nenhum veículo disponível. Outro funcionário pode estar usando a frota.
+            </p>
+          ) : (
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium">Qual veículo você está usando?</span>
+              <select
+                value={vehicleId}
+                onChange={(e) => {
+                  const next = e.target.value;
+                  setVehicleId(next);
+                  const chosen = vehicles.find((x) => x.id === next);
+                  if (chosen?.odometerKm != null) setOdometerKm(String(chosen.odometerKm));
+                  if (
+                    chosen?.lastFuelLevel &&
+                    FUEL_LEVEL_OPTIONS.some((o) => o.value === chosen.lastFuelLevel)
+                  ) {
+                    setFuelLevel(chosen.lastFuelLevel as FuelLevel);
+                  }
+                }}
+                className="w-full ops-input"
+              >
+                {vehicles.map((v) => (
+                  <option key={v.id} value={v.id}>
+                    {v.plate}
+                    {v.brand || v.model ? ` · ${[v.brand, v.model].filter(Boolean).join(' ')}` : ''}
+                    {v.status !== 'AVAILABLE' ? ' (atribuído)' : ''}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+          {selectedVehicle && (selectedVehicle.odometerKm != null || selectedVehicle.lastFuelLevel) ? (
+            <p className="text-xs text-[var(--muted)]">
+              Último km: {selectedVehicle.odometerKm ?? '—'}
+              {selectedVehicle.lastFuelLevel
+                ? ` · Comb.: ${FUEL_LEVEL_OPTIONS.find((o) => o.value === selectedVehicle.lastFuelLevel)?.label ?? selectedVehicle.lastFuelLevel}`
+                : ''}
+            </p>
+          ) : null}
           <div className="flex gap-2">
             <button
               type="button"
@@ -539,6 +579,13 @@ export function FieldStartRoutePage() {
               placeholder="Opcional"
             />
           </label>
+          <OdometerPhotoCapture
+            id="start-odometer-photo"
+            file={odometerPhoto}
+            onChange={setOdometerPhoto}
+            required
+            disabled={submitting}
+          />
           <div className="flex gap-2">
             <button
               type="button"
@@ -550,7 +597,8 @@ export function FieldStartRoutePage() {
             <button
               type="button"
               onClick={() => setStep('confirm')}
-              className="flex-1 ops-btn ops-btn-primary"
+              disabled={!odometerPhoto || !odometerKm}
+              className="flex-1 ops-btn ops-btn-primary disabled:opacity-60"
             >
               Revisar
             </button>
@@ -578,7 +626,11 @@ export function FieldStartRoutePage() {
                 {FUEL_LEVEL_OPTIONS.find((o) => o.value === fuelLevel)?.label}
               </strong>
             </li>
-            {gps && previewStops[0] ? (
+            <li>
+              Foto do odômetro:{' '}
+              <strong className="text-brand-900">{odometerPhoto ? 'Anexada' : '—'}</strong>
+            </li>
+            {gps && previewStops[0] && !route.recordNewCustomer ? (
               <li>
                 1ª parada:{' '}
                 <strong className="text-brand-900">
@@ -605,7 +657,7 @@ export function FieldStartRoutePage() {
               Voltar
             </button>
             <ActionButton
-              disabled={submitting}
+              disabled={submitting || !odometerPhoto}
               loading={submitting}
               loadingLabel="Iniciando…"
               onClick={() => void onStartRoute()}

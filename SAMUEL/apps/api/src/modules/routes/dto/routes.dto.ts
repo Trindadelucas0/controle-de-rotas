@@ -11,11 +11,14 @@ import {
   IsOptional,
   IsString,
   IsUUID,
+  Max,
   MaxLength,
   Min,
+  MinLength,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { TrailPointDto } from '../../visits/dto/visits.dto';
 
 export const ROUTE_ORIGIN_MODES = ['EMPLOYEE_LAST', 'COMPANY'] as const;
 export type RouteOriginMode = (typeof ROUTE_ORIGIN_MODES)[number];
@@ -209,4 +212,112 @@ export type RouteCompleteMode = (typeof ROUTE_COMPLETE_MODES)[number];
 export class CompleteRouteDto {
   @IsIn([...ROUTE_COMPLETE_MODES])
   mode!: RouteCompleteMode;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  endOdometerKm?: number;
+
+  @IsOptional()
+  @IsString()
+  @IsIn([...ROUTE_START_FUEL_LEVELS])
+  endFuelLevel?: RouteStartFuelLevel;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  endLatitude?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  endLongitude?: number;
+}
+
+export class DispatchRecordMissionDto {
+  @IsDateString()
+  date!: string;
+
+  @IsUUID('4')
+  employeeId!: string;
+
+  @IsUUID('4')
+  vehicleId!: string;
+}
+
+export class RecordPointCustomerDto {
+  @IsString()
+  @MinLength(2)
+  @MaxLength(200)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(32)
+  document?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  phone?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(40)
+  whatsapp?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(120)
+  city?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(2)
+  state?: string | null;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  street?: string | null;
+
+  @IsOptional()
+  @IsString()
+  notes?: string | null;
+}
+
+export class RecordPointDto {
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude!: number;
+
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude!: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  accuracy?: number;
+
+  @IsOptional()
+  @IsBoolean()
+  completeProfile?: boolean;
+
+  @ValidateNested()
+  @Type(() => RecordPointCustomerDto)
+  customer!: RecordPointCustomerDto;
+
+  @IsOptional()
+  @IsArray()
+  @ArrayMaxSize(500)
+  @ValidateNested({ each: true })
+  @Type(() => TrailPointDto)
+  trailPoints?: TrailPointDto[];
 }

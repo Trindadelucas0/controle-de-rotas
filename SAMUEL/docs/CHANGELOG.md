@@ -1,5 +1,74 @@
 # Changelog
 
+## v0.18.0 — 2026-09-12
+
+### Missão Gravar cliente (vários pontos)
+
+- Gestor publica missão sem escolher cliente (`POST /routes/dispatch-record-mission`)
+- Campo, com Play: **Adicionar ponto** cria cliente no GPS atual (nome obrigatório; resto agora ou depois); GPS continua; trecho seguinte começa dali
+- **Finalizar por completo** fecha a sessão com 0..N pontos, sem pedir nome; depois outra rota Publicada pode iniciar
+- Cadastro incompleto: status `DRAFT` + `profileIncomplete` + lápis no `/map`; PATCH pelo dono da missão ou gestor
+- Placeholder interno (`recordSessionShell`) não aparece em mapa, catálogo, agenda nem Serviços
+- **Gravar viagem** em cliente já cadastrado permanece (tema 21)
+- Arquivos: schema/migration `record_mission_customers`, `routes.service.ts`, `field.service.ts`, `FieldNavigatePage.tsx`, `RoutesPlannerRecordMission.tsx`, `OperationalMap.tsx`
+- Como validar: roteiro **10b** em `docs/GUIA-TESTES.md`
+
+## v0.17.0 — 2026-09-12
+
+### Auditoria de veículo, km e desvio de rota
+
+- Campo: foto do odômetro no início e no fim; km/combustível pré-preenchidos com o último registro; um veículo só em uma rota `IN_PROGRESS`
+- Conclusão nunca é bloqueada por km alto; o gestor vê alerta no Início e dossiê no perfil do funcionário (fotos, rota, números). O celular não mostra “fraude”
+- GPS > 500 m da linha por ≥ 60 s gera observação `OFF_ROUTE` (uma por rota)
+- Arquivos: Prisma `route_evidence` / `employee_observations`; `routes.service.ts`; `tracking.service.ts`; `FieldStartRoutePage`; `CompleteRouteConfirm`; `EmployeeAuditObservations`
+- Como validar: dois funcionários não pegam o mesmo carro; próxima rota sugere o km final; 10 km planejado / 30 km no odômetro conclui e aparece só no admin; EMPLOYEE `GET /ops/employees/:id/observations` → 403
+
+## v0.16.25 — 2026-09-12
+
+### Confirmar marcos e identificar ícones
+
+- Sintoma: ícone no mapa sem nome no celular; marco antigo nunca era validado nem removido
+- Agora: toque no pin (navegação e `/map`) mostra **Porteira/Ponte/…** e **Adicionado por [nome]** (ou gestor). Com **Gravar viagem**, proximidade ≤120 m pergunta **Ainda existe …?** — Sim mantém; Não apaga (`DELETE /customers/:id/landmarks/:landmarkId`, fila se a rede falhar)
+- Arquivos: `customers.controller.ts`, `customers.service.ts`, `field.service.ts`, `LandmarkMapMarker.tsx`, `FieldNavigatePage.tsx`, `OperationalMap.tsx`, `field-landmark-queue.ts`
+- Como validar: tocar o ícone lê o tipo; rota com Gravar viagem, passar de novo → Sim/Não; sem Gravar → só OK; EMPLOYEE sem recordTrip no DELETE → 403
+
+## v0.16.24 — 2026-09-12
+
+### Excluir rota (ADMIN)
+
+- Antes: só **Cancelar** em Planejada/Publicada (status `CANCELLED`); rota em andamento, concluída ou incompleta não saía da lista
+- Agora: `DELETE /api/v1/routes/:id` (ADMIN/PLATFORM_ADMIN, mesma empresa) apaga a rota se o status **não** for `IN_PROGRESS`; visitas `ASSIGNED` voltam a `SCHEDULED`; trilhas GPS da rota somem (cascade)
+- Arquivos: `routes.controller.ts`, `routes.service.ts`, `RouteManagePanel.tsx`, `RoutesTodayView.tsx`
+- Como validar: Rotas de hoje → Ver/Gerir → **Excluir rota** (confirmação); Em andamento não mostra o botão e a API devolve 422 `ROUTE_IN_PROGRESS`; EMPLOYEE 403; outro tenant 404
+
+## v0.16.23 — 2026-09-12
+
+### Mapa maior no cadastro de clientes
+
+- Antes: mini-mapa fixo ~280px em `CustomerLocationMap` (cadastro, prontuário e empresa)
+- Agora: cadastro/edição/prontuário (`/customers/new`, `/customers/[id]`) usa mapa alto (~360px no celular; ~56vh no desktop, 420–640px); empresa (`/settings/company`) permanece compacto 280px
+- Arquivos: `CustomerLocationMap.tsx`, `CompanyAndUsers.tsx`
+- Como validar: Novo cliente — mapa ocupa cerca da metade da tela; clique/arraste do pin e CEP/CNPJ iguais; Empresa continua mini-mapa
+
+## v0.16.22 — 2026-09-12
+
+### Fix — zoom da página no celular
+
+- Sintoma: no telefone a UI ficava ampliada (pinch / foco em e-mail e senha) e era preciso ajustar o sistema inteiro
+- Causa: viewport sem `maximumScale`; inputs `text-sm` (14px) disparam auto-zoom do iOS; zoom do navegador misturado com o do mapa
+- Correção: `userScalable: false` + `maximumScale: 1` + `viewportFit: cover`; `touch-action: manipulation` na página; inputs 16px até 1023px; canvas MapLibre `touch-action: none` (pinch só na câmera). Mini-mapa de Minha rota continua sem gesto
+- Arquivos: `layout.tsx`, `globals.css`
+- Como validar: login — focar campo e pinçar não escala a página; `/map` e `/field/navigate` — pinch amplia só o mapa
+
+## v0.16.21 — 2026-09-12
+
+### Fix — botões invisíveis no tema claro
+
+- Sintoma: ao mudar para **Claro**, sumiam **Rotas** na sidebar, o nome no header, **Alterar senha** e **Sair**
+- Causa: header/sidebar ficavam em `#121212` enquanto `--ink` e `--muted` viravam tinta escura (`text-brand-900`, `ops-btn-secondary`/`ghost`); ilhas `#161618` no escritório tinham o mesmo contraste
+- Arquivos: `AppHeader.tsx`, `(app)/layout.tsx`, `OperationalMap.tsx`, `routes/page.tsx`, `OpsHomePage.tsx`, `EmployeesPages.tsx`, `ServicesPages.tsx`
+- Como validar: `/map` no claro mostra nome, Alterar senha, Sair, título Rotas; `/routes` tabs visíveis no hover; voltar ao escuro mantém contraste; ☰ e Fechar no drawer mobile; campo `(field-nav)` continua HUD escuro
+
 ## v0.16.20 — 2026-09-10
 
 ### Fix — “Você não tem permissão” ao concluir rota

@@ -9,6 +9,8 @@ import { useTheme } from '@/components/theme/ThemeProvider';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 3.8 };
 
+type MapSize = 'form' | 'compact';
+
 type Props = {
   latitude: number | null;
   longitude: number | null;
@@ -19,6 +21,13 @@ type Props = {
   pinLabel?: string;
   /** Só leitura: sem clique/arraste para mover o pin. */
   readOnly?: boolean;
+  /** `form` (cadastro de clientes): mapa alto. `compact` (empresa): mini-mapa 280px. */
+  size?: MapSize;
+};
+
+const SIZE_CLASS: Record<MapSize, string> = {
+  compact: 'h-[280px]',
+  form: 'h-[360px] sm:h-[56vh] sm:min-h-[420px] sm:max-h-[640px]',
 };
 
 export function CustomerLocationMap({
@@ -29,12 +38,27 @@ export function CustomerLocationMap({
   title,
   pinLabel = 'Pin do cliente',
   readOnly = false,
+  size = 'form',
 }: Props) {
   const { theme } = useTheme();
   const mapStyle = getRasterStyleForTheme(theme);
   const mapRef = useRef<MapRef>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const hasPin = latitude != null && longitude != null;
   const heading = title ?? (required ? 'Local no mapa *' : 'Local no mapa');
+
+  function resizeMap() {
+    mapRef.current?.getMap()?.resize();
+  }
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => resizeMap());
+    ro.observe(el);
+    resizeMap();
+    return () => ro.disconnect();
+  }, [size]);
 
   useEffect(() => {
     if (!hasPin || !mapRef.current) return;
@@ -84,7 +108,10 @@ export function CustomerLocationMap({
           pin para ajustar.
         </p>
       ) : null}
-      <div className="h-[280px] overflow-hidden rounded-xl border border-brand-100 bg-brand-50">
+      <div
+        ref={containerRef}
+        className={`${SIZE_CLASS[size]} overflow-hidden rounded-xl border border-brand-100 bg-brand-50`}
+      >
         <Map
           ref={mapRef}
           initialViewState={
@@ -95,6 +122,7 @@ export function CustomerLocationMap({
           mapStyle={mapStyle}
           style={{ width: '100%', height: '100%' }}
           attributionControl
+          onLoad={resizeMap}
           onClick={readOnly ? undefined : handleClick}
           cursor={readOnly ? 'default' : 'crosshair'}
         >
@@ -108,7 +136,7 @@ export function CustomerLocationMap({
               onDragEnd={readOnly ? undefined : handleDragEnd}
             >
               <div
-                className="h-4 w-4 rounded-full border-2 border-white bg-brand-600 shadow"
+                className={`${size === 'form' ? 'h-5 w-5' : 'h-4 w-4'} rounded-full border-2 border-white bg-brand-600 shadow`}
                 aria-label={pinLabel}
               />
             </Marker>

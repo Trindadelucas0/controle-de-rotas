@@ -101,6 +101,8 @@ flex min-h-screen
     └── main (full-bleed em / e /map)
 ```
 
+Header, sidebar e drawer: `bg-[var(--surface)]` conforme `data-theme`. No claro, nome / Alterar senha / Sair / marca Rotas permanecem visíveis.
+
 ### 3. Informação — grupos do menu (`AppSidebarNav`)
 
 **Operação**
@@ -433,6 +435,8 @@ Modo Visitas agendadas: inalterado nesta entrega.
 
 Ficha: [routes.md](screens/routes.md)
 
+ADMIN pode **Excluir rota** (`DELETE /routes/:id`) no painel se o status não for Em andamento.
+
 ---
 
 ## 4. Recursos
@@ -469,7 +473,7 @@ Erro sem pin: “Marque o local no mapa…”
 
 **Estados:** skeleton detalhe · saving · invalid pin · lookup hints (Buscando CNPJ…, CNPJ aplicado., não encontrado, rate_limit) · success create → `/customers/:id` · 403 update sem papel.
 
-**Mobile:** form empilhado; mini-mapa ~280px. Tabela da lista: scroll horizontal.
+**Mobile:** form empilhado; mapa alto (~360px no celular; ~56vh / 420–640px no desktop). Tabela da lista: scroll horizontal.
 
 **Fora de escopo:** import CSV, checksum CNPJ, lookup CPF, contatos múltiplos.
 
@@ -617,12 +621,12 @@ Ficha: [field-my-route.md](screens/field-my-route.md)
 | 1 | gps | pedido automático de GPS; em HTTP LAN **pula** (origem = 1ª parada) |
 | 2 | summary | com GPS: pin **pessoa** + mais perto→mais longe + km; em HTTP: ordem planejada |
 | 3 | vehicle | pin **carro**; `GET /field/vehicles?routeId=` |
-| 4 | checklist | pin carro; Km inicial * · Combustível EMPTY…FULL * · Observação max 500 |
-| 5 | confirm | pin carro; resumo placa, km, combustível, 1ª parada |
+| 4 | checklist | pin carro; Km inicial * · Combustível * · Foto do odômetro * · Observação max 500 |
+| 5 | confirm | pin carro; resumo placa, km, combustível, foto, 1ª parada |
 
 **KPI:** N parada(s) · duração planejada · distância planejada (da rota).
 
-**Ações:** Continuar / Voltar · ▶ Iniciar rota → `POST /routes/:id/start` `{ vehicleId, startOdometerKm, startFuelLevel, startNotes?, latitude, longitude }` → `/field/navigate`.
+**Ações:** Continuar / Voltar · ▶ Iniciar rota → `POST /routes/:id/start` multipart (foto do odômetro + veículo/km/combustível/GPS) → `/field/navigate`. Veículo em uso por outra rota: 409 `VEHICLE_IN_USE`.
 
 **Estados:** “Preparando início da rota…” · erro sem rota + voltar · `ROUTE_ALREADY_ACTIVE` com data da rota travada + link “Ir para Minha rota e concluir” · gpsError vermelho · “Informe o km inicial do veículo.” · submitting desde o toque em Iniciar (antes do GPS) + overlay **Iniciando…** · success redirect. Já IN_PROGRESS → erro ao abrir.
 

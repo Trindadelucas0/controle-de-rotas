@@ -43,6 +43,7 @@ enum VehicleStatus {
 enum CustomerStatus {
   ACTIVE
   INACTIVE
+  DRAFT
 }
 
 enum LocationStatus {
@@ -114,6 +115,29 @@ enum VisitEvidenceType {
   PHOTO
 }
 
+enum RouteEvidenceKind {
+  START_ODOMETER
+  END_ODOMETER
+}
+
+enum EmployeeObservationCode {
+  KM_DISCREPANCY
+  ODOMETER_ROLLBACK
+  ODOMETER_GAP
+  OFF_ROUTE
+}
+
+enum EmployeeObservationStatus {
+  OPEN
+  SEEN
+}
+
+enum EmployeeObservationSeverity {
+  INFO
+  WARNING
+  CRITICAL
+}
+
 enum CustomerAccessPathStatus {
   ACTIVE
   SUPERSEDED
@@ -155,6 +179,8 @@ model Company {
   trackingPoints       TrackingPoint[]
   visitEvents          VisitEvent[]
   visitEvidence        VisitEvidence[]
+  routeEvidence        RouteEvidence[]
+  employeeObservations EmployeeObservation[]
   customerAccessPaths  CustomerAccessPath[]
   customerLandmarks    CustomerLandmark[]
 
@@ -181,6 +207,7 @@ model User {
   createdServiceOrders ServiceOrder[]      @relation("ServiceOrderCreatedBy")
   visitEvents          VisitEvent[]        @relation("VisitEventActor")
   visitEvidence        VisitEvidence[]     @relation("VisitEvidenceActor")
+  routeEvidence        RouteEvidence[]     @relation("RouteEvidenceActor")
 
   @@index([companyId])
   @@map("users")
@@ -208,6 +235,7 @@ model Employee {
   trackingPoints        TrackingPoint[]
   recordedAccessPaths   CustomerAccessPath[] @relation("AccessPathRecordedBy")
   createdLandmarks      CustomerLandmark[]   @relation("LandmarkCreatedBy")
+  observations          EmployeeObservation[]
 
   @@index([companyId])
   @@index([status])
@@ -239,19 +267,27 @@ model Customer {
   priority       String?        @db.VarChar(40)
   notes          String?
   status         CustomerStatus @default(ACTIVE)
+  /// Cadastro nascido de ponto gravado ainda incompleto (lápis no mapa).
+  profileIncomplete Boolean     @default(false) @map("profile_incomplete")
+  /// Placeholder interno da missão de gravar — nunca aparece no mapa.
+  recordSessionShell Boolean    @default(false) @map("record_session_shell")
+  recordedFromRouteId String?   @map("recorded_from_route_id") @db.Uuid
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  company       Company        @relation(fields: [companyId], references: [id])
-  serviceOrders ServiceOrder[]
-  visits        Visit[]
-  accessPaths   CustomerAccessPath[]
-  landmarks     CustomerLandmark[]
+  company            Company        @relation(fields: [companyId], references: [id])
+  recordedFromRoute  Route?         @relation("RecordedFromRoute", fields: [recordedFromRouteId], references: [id], onDelete: SetNull)
+  serviceOrders      ServiceOrder[]
+  visits             Visit[]
+  accessPaths        CustomerAccessPath[]
+  landmarks          CustomerLandmark[]
 
   @@index([companyId])
   @@index([name])
   @@index([document])
   @@index([status])
+  @@index([recordedFromRouteId])
+  @@index([profileIncomplete])
   @@map("customers")
 }
 
@@ -266,6 +302,7 @@ model Vehicle {
   avgConsumption  Float?        @map("avg_consumption")
   capacity        Float?
   odometerKm      Float?        @map("odometer_km")
+  lastFuelLevel   String?       @map("last_fuel_level") @db.VarChar(32)
   status          VehicleStatus @default(AVAILABLE)
   createdAt       DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
@@ -273,6 +310,7 @@ model Vehicle {
   company        Company         @relation(fields: [companyId], references: [id])
   routes         Route[]
   trackingPoints TrackingPoint[]
+  observations   EmployeeObservation[]
 
   @@unique([companyId, plate])
   @@index([companyId])
@@ -432,6 +470,8 @@ model Route {
   plannedStepsJson       Json?                       @map("planned_steps_json")
   /// Quando true, densifica GPS e consolida trilha em CustomerAccessPath no check-in
   recordTrip             Boolean                     @default(false) @map("record_trip")
+  /// Missão de gravar: pontos viram clientes novos; concluir fecha a sessão.
+  recordNewCustomer      Boolean                     @default(false) @map("record_new_customer")
   quality                String?                     @db.VarChar(32)
   publishedAt            DateTime?                   @map("published_at") @db.Timestamptz(6)
   startedAt              DateTime?                   @map("started_at") @db.Timestamptz(6)
@@ -440,15 +480,22 @@ model Route {
   startNotes             String?                     @map("start_notes") @db.VarChar(500)
   startLatitude          Float?                      @map("start_latitude")
   startLongitude         Float?                      @map("start_longitude")
+  endOdometerKm          Float?                      @map("end_odometer_km")
+  endFuelLevel           String?                     @map("end_fuel_level") @db.VarChar(32)
+  endLatitude            Float?                      @map("end_latitude")
+  endLongitude           Float?                      @map("end_longitude")
   createdAt              DateTime                    @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt              DateTime                    @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   company         Company              @relation(fields: [companyId], references: [id])
   employee        Employee?            @relation(fields: [employeeId], references: [id])
   vehicle         Vehicle?             @relation(fields: [vehicleId], references: [id])
-  stops           RouteStop[]
-  trackingPoints  TrackingPoint[]
-  accessPaths     CustomerAccessPath[]
+  stops              RouteStop[]
+  trackingPoints     TrackingPoint[]
+  accessPaths        CustomerAccessPath[]
+  recordedCustomers  Customer[]            @relation("RecordedFromRoute")
+  evidence           RouteEvidence[]
+  observations       EmployeeObservation[]
 
   @@index([companyId])
   @@index([employeeId])
@@ -553,6 +600,54 @@ model VisitEvidence {
   @@index([companyId])
   @@index([visitId])
   @@map("visit_evidence")
+}
+
+model RouteEvidence {
+  id           String            @id @default(uuid()) @db.Uuid
+  companyId    String            @map("company_id") @db.Uuid
+  routeId      String            @map("route_id") @db.Uuid
+  kind         RouteEvidenceKind
+  storageKey   String            @map("storage_key") @db.VarChar(500)
+  mimeType     String            @map("mime_type") @db.VarChar(100)
+  sizeBytes    Int               @map("size_bytes")
+  originalName String?           @map("original_name") @db.VarChar(255)
+  latitude     Float?
+  longitude    Float?
+  actorUserId  String?           @map("actor_user_id") @db.Uuid
+  createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company Company @relation(fields: [companyId], references: [id])
+  route   Route   @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  actor   User?   @relation("RouteEvidenceActor", fields: [actorUserId], references: [id])
+
+  @@index([companyId])
+  @@index([routeId])
+  @@map("route_evidence")
+}
+
+model EmployeeObservation {
+  id          String                       @id @default(uuid()) @db.Uuid
+  companyId   String                       @map("company_id") @db.Uuid
+  employeeId  String                       @map("employee_id") @db.Uuid
+  routeId     String                       @map("route_id") @db.Uuid
+  vehicleId   String?                      @map("vehicle_id") @db.Uuid
+  code        EmployeeObservationCode
+  severity    EmployeeObservationSeverity  @default(WARNING)
+  status      EmployeeObservationStatus    @default(OPEN)
+  summary     String                       @db.VarChar(500)
+  details     Json?
+  createdAt   DateTime                     @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime                     @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+  route    Route    @relation(fields: [routeId], references: [id], onDelete: Cascade)
+  vehicle  Vehicle? @relation(fields: [vehicleId], references: [id])
+
+  @@unique([routeId, code])
+  @@index([companyId, employeeId, createdAt])
+  @@index([companyId, status])
+  @@map("employee_observations")
 }
 
 /// Trilha real origem → cliente (fazenda sem CEP). Um ACTIVE por cliente

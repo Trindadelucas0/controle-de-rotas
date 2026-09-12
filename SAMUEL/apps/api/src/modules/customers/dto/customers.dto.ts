@@ -1,5 +1,6 @@
 import { CustomerLandmarkType, CustomerStatus } from '@prisma/client';
 import {
+  IsBoolean,
   IsEmail,
   IsEnum,
   IsNumber,
@@ -199,6 +200,10 @@ export class UpdateCustomerDto {
   @IsOptional()
   @IsEnum(CustomerStatus)
   status?: CustomerStatus;
+
+  @IsOptional()
+  @IsBoolean()
+  profileIncomplete?: boolean;
 }
 
 export class ListCustomersQueryDto {

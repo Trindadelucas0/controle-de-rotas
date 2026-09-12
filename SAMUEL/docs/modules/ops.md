@@ -39,6 +39,11 @@ Componentes web: `apps/web/src/components/ops/OperationalSummaryStrip`, `EntityC
 
 ### GET /api/v1/ops/employees/:id · /vehicles/:id · /service-orders/:id
 
+- Auth: conforme entidade (employees/vehicles ADMIN+MANAGER; SO gestores)
+- `GET /ops/employees/:id/observations` — ADMIN, MANAGER; dossiê de auditoria (km, desvio de rota, fotos). EMPLOYEE 403.
+- `PATCH /ops/employees/:id/observations/:oid` — `{ status: "SEEN" }`
+- Alertas do snapshot: `KM_DISCREPANCY`, `OFF_ROUTE`, `ODOMETER_ROLLBACK` (abertas, 7 dias)
+
 
 
 - Auth: conforme entidade (employees/vehicles ADMIN+MANAGER; SO gestores)

@@ -30,8 +30,9 @@
 | `POST` | `/api/v1/routes/dispatch-customers` | ADMIN, MANAGER | Persiste `recordTrip`; erro `ROUTE_RECORD_TRIP_SINGLE_CUSTOMER` |
 | `POST` | `/api/v1/routes` | ADMIN, MANAGER | Aceita `recordTrip` (1 visita) |
 | `GET` | `/api/v1/field/my-route` | EMPLOYEE | Inclui `recordTrip`, `accessPath`, `landmarks[]` por parada |
-| `POST` | `/api/v1/customers/:id/landmarks` | ADMIN, MANAGER, EMPLOYEE* | *EMPLOYEE só em rota IN_PROGRESS desse cliente |
-| `GET` | `/api/v1/customers/:id/access` | ADMIN, MANAGER | Path ACTIVE + landmarks |
+| `POST` | `/api/v1/customers/:id/landmarks` | ADMIN, MANAGER, EMPLOYEE* | *EMPLOYEE só em rota IN_PROGRESS com `recordTrip`; payload inclui `createdBy` |
+| `DELETE` | `/api/v1/customers/:id/landmarks/:landmarkId` | ADMIN, MANAGER, EMPLOYEE* | mesmas regras do POST; 404 se outro cliente/tenant |
+| `GET` | `/api/v1/customers/:id/access` | ADMIN, MANAGER | Path ACTIVE + landmarks (`createdBy`) |
 | `POST` | `/api/v1/visits/:id/check-in` | EMPLOYEE | Body `trailPoints?`; `accessPath.saved`; audit |
 
 ## Telas

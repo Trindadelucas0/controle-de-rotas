@@ -24,6 +24,7 @@ import {
   serviceOrdersSummary,
   vehiclesSummary,
 } from './ops-summaries';
+import { EmployeeObservationsService } from './employee-observations.service';
 import {
   agendaSummary,
   employeeContext,
@@ -71,6 +72,7 @@ export class OpsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tracking: TrackingService,
+    private readonly observations: EmployeeObservationsService,
   ) {}
 
   async snapshot(user: AuthUser, query: OpsSnapshotQueryDto) {
@@ -398,6 +400,29 @@ export class OpsService {
         code: 'CUSTOMERS_NO_VISIT_30D',
         message: `${customersWithoutVisit.length} cliente(s) sem visita há 30 dias`,
         severity: 'info',
+      });
+    }
+
+    const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    const openObs = await this.observations.openAlertsForSnapshot(user.companyId, since);
+    const byCode = new Map<string, typeof openObs>();
+    for (const row of openObs) {
+      const list = byCode.get(row.code) ?? [];
+      list.push(row);
+      byCode.set(row.code, list);
+    }
+    const obsLabels: Record<string, string> = {
+      KM_DISCREPANCY: 'Km acima do planejado',
+      OFF_ROUTE: 'Saiu da rota',
+      ODOMETER_ROLLBACK: 'Km inicial abaixo do último registro',
+    };
+    for (const [code, rows] of byCode) {
+      const first = rows[0];
+      const extra = rows.length > 1 ? ` e mais ${rows.length - 1}` : '';
+      alerts.push({
+        code,
+        message: `${obsLabels[code] ?? code}: ${first.employee.name}${extra} — abra o perfil do funcionário`,
+        severity: 'warning',
       });
     }
 
@@ -765,8 +790,15 @@ export class OpsService {
     return vehicleContext(this.prisma, this.tracking, user, vehicleId);
   }
 
-  employeeContext(user: AuthUser, employeeId: string) {
-    return employeeContext(this.prisma, this.tracking, user, employeeId);
+  async employeeContext(user: AuthUser, employeeId: string) {
+    const result = await employeeContext(this.prisma, this.tracking, user, employeeId);
+    const open = await this.observations.openSummariesForEmployee(user.companyId, employeeId);
+    result.employee.alertas = open.map((o) => ({
+      code: o.code,
+      message: o.summary,
+      severity: o.severity === 'CRITICAL' ? 'critical' : o.severity === 'INFO' ? 'info' : 'warning',
+    }));
+    return result;
   }
 
   serviceOrderContext(user: AuthUser, serviceOrderId: string) {

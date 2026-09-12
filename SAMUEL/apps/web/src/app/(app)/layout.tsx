@@ -43,7 +43,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <div className="flex min-h-screen bg-[var(--background)]">
         {/* Desktop sidebar */}
         {user ? (
-          <aside className="hidden w-56 shrink-0 border-r border-[var(--border)] bg-[#121212] lg:flex lg:flex-col">
+          <aside className="hidden w-56 shrink-0 border-r border-[var(--border)] bg-[var(--surface)] lg:flex lg:flex-col">
             <div className="border-b border-[var(--border)] px-4 py-4">
               <p className="text-[15px] font-semibold tracking-tight text-brand-900">Rotas</p>
               <p className="truncate text-xs text-[var(--muted)]">{user.company.name}</p>
@@ -63,7 +63,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               aria-label="Fechar menu"
               onClick={() => setMobileOpen(false)}
             />
-            <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-[#121212] shadow-xl">
+            <aside className="absolute inset-y-0 left-0 flex w-64 flex-col bg-[var(--surface)] shadow-xl">
               <div className="flex items-center justify-between border-b border-[var(--border)] px-4 py-3">
                 <p className="text-[15px] font-semibold tracking-tight text-brand-900">Rotas</p>
                 <button

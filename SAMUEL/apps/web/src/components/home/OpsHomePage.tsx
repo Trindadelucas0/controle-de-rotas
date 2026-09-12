@@ -251,7 +251,7 @@ export function OpsHomePage() {
                         ? 'border-[var(--danger)]/40 bg-[var(--danger-bg)] text-[var(--danger)]'
                         : a.severity === 'warning'
                           ? 'border-[var(--warn)]/40 bg-[var(--warn-bg)] text-[var(--warn)]'
-                          : 'border-[var(--border)] bg-[#161618] text-brand-800'
+                          : 'border-[var(--border)] bg-[var(--surface-2)] text-brand-800'
                     }`}
                   >
                     {a.message}

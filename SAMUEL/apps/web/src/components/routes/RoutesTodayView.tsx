@@ -21,6 +21,7 @@ type RouteRow = {
   vehicle: { id: string; plate: string } | null;
   _count?: { stops: number };
   stopsDone?: number;
+  recordNewCustomer?: boolean;
 };
 
 const ROUTE_LIST_STATUS: Record<string, string> = {
@@ -38,6 +39,7 @@ const EDITABLE_STATUSES = new Set(['PLANNED', 'PUBLISHED']);
 export function RoutesTodayView() {
   const user = useSessionUser();
   const canManage = user?.role === 'ADMIN' || user?.role === 'MANAGER';
+  const canDelete = user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN';
   const [date, setDate] = useState(() => toDateInputValue());
   const [summary, setSummary] = useState<RoutesSummary | null>(null);
   const [routes, setRoutes] = useState<RouteRow[]>([]);
@@ -133,7 +135,9 @@ export function RoutesTodayView() {
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <p className="text-base font-semibold text-brand-900">
-                    Rota {String(index + 1).padStart(2, '0')}
+                    {route.recordNewCustomer
+                      ? 'Gravar acesso'
+                      : `Rota ${String(index + 1).padStart(2, '0')}`}
                   </p>
                   <p className="text-sm font-medium text-brand-800">
                     {ROUTE_LIST_STATUS[route.status] ?? route.status}
@@ -144,13 +148,16 @@ export function RoutesTodayView() {
                   {route.vehicle?.plate ? ` · ${route.vehicle.plate}` : ''}
                 </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                {route._count?.stops != null
-                  ? `${route._count.stops} paradas`
-                  : 'Paradas —'}
-                {' · '}
-                {route.stopsDone != null && route._count?.stops != null
-                  ? `Concluídas ${route.stopsDone}/${route._count.stops}`
-                  : 'Concluídas —'}
+                {route.recordNewCustomer
+                  ? 'Missão de gravar — pontos viram clientes'
+                  : [
+                      route._count?.stops != null
+                        ? `${route._count.stops} paradas`
+                        : 'Paradas —',
+                      route.stopsDone != null && route._count?.stops != null
+                        ? `Concluídas ${route.stopsDone}/${route._count.stops}`
+                        : 'Concluídas —',
+                    ].join(' · ')}
                 {' · '}
                 {formatMetersKm(route.plannedDistanceMeters)} plan.
                 {route.actualDistanceMeters != null
@@ -193,6 +200,7 @@ export function RoutesTodayView() {
           <RouteManagePanel
             routeId={manageRouteId}
             canManage={canManage}
+            canDelete={canDelete}
             onClose={() => setManageRouteId(null)}
             onChanged={() => void load(date)}
           />

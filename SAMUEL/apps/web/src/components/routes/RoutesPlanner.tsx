@@ -7,8 +7,9 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import type { CompanyOrigin } from './routes-planner-shared';
 import { RoutesPlannerCustomers } from './RoutesPlannerCustomers';
 import { RoutesPlannerVisits } from './RoutesPlannerVisits';
+import { RoutesPlannerRecordMission } from './RoutesPlannerRecordMission';
 
-type PlannerMode = 'customers' | 'visits';
+type PlannerMode = 'customers' | 'visits' | 'record';
 
 export function RoutesPlanner() {
   const searchParams = useSearchParams();
@@ -80,12 +81,23 @@ export function RoutesPlanner() {
         >
           Visitas agendadas
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'record'}
+          onClick={() => setMode('record')}
+          className="ops-tab"
+        >
+          Gravar cliente
+        </button>
       </div>
 
       {mode === 'customers' ? (
         <RoutesPlannerCustomers company={company} preselectCustomerId={preselectCustomerId} />
-      ) : (
+      ) : mode === 'visits' ? (
         <RoutesPlannerVisits company={company} />
+      ) : (
+        <RoutesPlannerRecordMission companyName={company.tradeName || company.name} />
       )}
     </div>
   );

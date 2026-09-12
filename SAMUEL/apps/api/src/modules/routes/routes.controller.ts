@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -8,14 +9,20 @@ import {
   Patch,
   Post,
   Query,
+  Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { Response } from 'express';
 import { UserRole } from '@prisma/client';
 import { RoutesService } from './routes.service';
 import {
   CompleteRouteDto,
   CreateRouteDto,
   DispatchCustomersRouteDto,
+  DispatchRecordMissionDto,
   ListRoutesQueryDto,
   PreviewCustomersRouteDto,
   PreviewRouteDto,
@@ -50,6 +57,15 @@ export class RoutesController {
     return this.routesService.dispatchCustomers(user, dto);
   }
 
+  @Post('dispatch-record-mission')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  dispatchRecordMission(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: DispatchRecordMissionDto,
+  ) {
+    return this.routesService.dispatchRecordMission(user, dto);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
   list(@CurrentUser() user: AuthUser, @Query() query: ListRoutesQueryDto) {
@@ -76,12 +92,18 @@ export class RoutesController {
 
   @Post(':id/start')
   @Roles(UserRole.EMPLOYEE)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
   start(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: StartRouteDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
   ) {
-    return this.routesService.start(user, id, dto);
+    return this.routesService.start(user, id, dto, file);
   }
 
   @Post(':id/reroute')
@@ -98,12 +120,43 @@ export class RoutesController {
   @Post(':id/complete')
   @HttpCode(200)
   @Roles(UserRole.EMPLOYEE, UserRole.ADMIN, UserRole.MANAGER)
+  @UseInterceptors(
+    FileInterceptor('file', {
+      limits: { fileSize: 5 * 1024 * 1024 },
+    }),
+  )
   complete(
     @CurrentUser() user: AuthUser,
     @Param('id', ParseUUIDPipe) id: string,
     @Body() dto: CompleteRouteDto,
+    @UploadedFile() file: Express.Multer.File | undefined,
   ) {
-    return this.routesService.complete(user, id, dto);
+    return this.routesService.complete(user, id, dto, file);
+  }
+
+  @Get(':id/evidence/:evidenceId/file')
+  @Roles(
+    UserRole.ADMIN,
+    UserRole.MANAGER,
+    UserRole.SUPERVISOR,
+    UserRole.EMPLOYEE,
+    UserRole.PLATFORM_ADMIN,
+  )
+  async getEvidenceFile(
+    @CurrentUser() user: AuthUser,
+    @Param('id', ParseUUIDPipe) id: string,
+    @Param('evidenceId', ParseUUIDPipe) evidenceId: string,
+    @Res() res: Response,
+  ) {
+    const file = await this.routesService.getEvidenceFile(user, id, evidenceId);
+    res.setHeader('Content-Type', file.mimeType);
+    if (file.originalName) {
+      res.setHeader(
+        'Content-Disposition',
+        `inline; filename="${file.originalName.replace(/"/g, '')}"`,
+      );
+    }
+    file.stream.pipe(res);
   }
 
   @Get(':id')
@@ -120,5 +173,12 @@ export class RoutesController {
     @Body() dto: UpdateRouteDto,
   ) {
     return this.routesService.update(user, id, dto);
+  }
+
+  @Delete(':id')
+  @HttpCode(204)
+  @Roles(UserRole.ADMIN)
+  remove(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {
+    return this.routesService.remove(user, id);
   }
 }

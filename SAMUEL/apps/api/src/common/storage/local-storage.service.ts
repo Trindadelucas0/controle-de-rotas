@@ -37,11 +37,12 @@ export class LocalStorageService implements OnModuleInit {
   }
 
   async saveBuffer(
-    parts: { companyId: string; visitId: string },
+    parts: { companyId: string; visitId: string } | { companyId: string; routeId: string },
     ext: string,
     buffer: Buffer,
   ): Promise<StoredObject> {
-    const storageKey = `${parts.companyId}/${parts.visitId}/${randomUUID()}${ext}`;
+    const folder = 'visitId' in parts ? parts.visitId : parts.routeId;
+    const storageKey = `${parts.companyId}/${folder}/${randomUUID()}${ext}`;
     const absolutePath = this.resolveAbsolute(storageKey);
     await fs.mkdir(path.dirname(absolutePath), { recursive: true });
     await fs.writeFile(absolutePath, buffer);

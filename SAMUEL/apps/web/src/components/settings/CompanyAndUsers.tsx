@@ -344,6 +344,7 @@ export function CompanySettingsPage() {
                 longitude={saved.longitude}
                 readOnly
                 required={false}
+                size="compact"
                 title="Origem no mapa (rotas)"
                 pinLabel="Pin da empresa"
               />
@@ -461,6 +462,7 @@ export function CompanySettingsPage() {
                 longitude={longitude}
                 onPinChange={setPin}
                 required={false}
+                size="compact"
                 title="Origem no mapa (rotas)"
                 pinLabel="Pin da empresa"
               />

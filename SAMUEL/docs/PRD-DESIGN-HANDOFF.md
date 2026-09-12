@@ -465,7 +465,7 @@ ROTA 01 — JOÃO
 ### 8.1 Clientes — `/customers` · `/new` · `/[id]`
 
 **Lista:** summary (total, ativos, pin, visita hoje, OS, sem 30d) + tabela enriquecida.  
-**Form:** dados + CEP/CNPJ lookup + **mapa pin obrigatório** (~280px) + categoria/prioridade/status.  
+**Form:** dados + CEP/CNPJ lookup + **mapa pin obrigatório** (alto: ~360px mobile / ~56vh desktop) + categoria/prioridade/status.  
 Hints lookup: texto **amber**. Sem pin: FormError.
 
 **Navega:** → mapa (pin) · context → OS / rota / histórico.

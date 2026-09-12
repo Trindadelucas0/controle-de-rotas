@@ -181,6 +181,28 @@ export type LandmarkAuthResult =
   | { ok: true }
   | { ok: false; statusCode: number; code: string; message: string };
 
+export type LandmarkCreatedByPublic = { id: string; name: string };
+
+export function mapLandmarkPublic(lm: {
+  id: string;
+  customerId: string;
+  type: string;
+  latitude: number;
+  longitude: number;
+  note: string | null;
+  createdByEmployee: LandmarkCreatedByPublic | null;
+}) {
+  return {
+    id: lm.id,
+    customerId: lm.customerId,
+    type: lm.type,
+    latitude: lm.latitude,
+    longitude: lm.longitude,
+    note: lm.note,
+    createdBy: lm.createdByEmployee,
+  };
+}
+
 export function evaluateLandmarkCreateAuth(input: LandmarkAuthInput): LandmarkAuthResult {
   if (!input.customerFoundInTenant) {
     return {
@@ -227,6 +249,9 @@ export function evaluateLandmarkCreateAuth(input: LandmarkAuthInput): LandmarkAu
     message: 'Sem permissão para criar marco.',
   };
 }
+
+/** Mesmas regras do POST: EMPLOYEE só em rota IN_PROGRESS com Gravar viagem. */
+export const evaluateLandmarkWriteAuth = evaluateLandmarkCreateAuth;
 
 export type AccessReadAuthInput = {
   actorRole: string;

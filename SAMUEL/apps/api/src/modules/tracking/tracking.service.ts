@@ -1,14 +1,16 @@
 import { Injectable, HttpStatus } from '@nestjs/common';
-import { RouteStatus, UserRole } from '@prisma/client';
+import { EmployeeObservationCode, EmployeeObservationSeverity, RouteStatus, UserRole } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { AuthUser } from '../auth/decorators/auth.decorators';
 import { httpError } from '../../common/errors/http-error';
+import { EmployeeObservationsService } from '../ops/employee-observations.service';
 import { PostTrackingPointsDto } from './dto/tracking.dto';
 import {
   shouldPersistTrackingSample,
   type HistorySample,
 } from './tracking-sample.util';
+import { OFF_ROUTE_ALERT_M, OFF_ROUTE_ALERT_MS } from '../routes/route-odometer-audit.util';
 
 const LIVE_TTL_SEC = 120;
 const LIVE_SET_TTL_SEC = 3600;
@@ -54,6 +56,7 @@ export class TrackingService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly redis: RedisService,
+    private readonly observations: EmployeeObservationsService,
   ) {}
 
   private currentKey(companyId: string, employeeId: string) {
@@ -182,6 +185,16 @@ export class TrackingService {
       await this.redis.sAdd(this.liveSetKey(user.companyId), employee.id, LIVE_SET_TTL_SEC);
 
       accepted += 1;
+      await this.evaluateOffRoute({
+        companyId: user.companyId,
+        employeeId: employee.id,
+        routeId: route.id,
+        vehicleId: route.vehicleId,
+        plate: route.vehicle?.plate ?? null,
+        latitude: p.latitude,
+        longitude: p.longitude,
+        recordedAtMs: nowMs,
+      });
     }
 
     if (accepted === 0 && skippedInactive > 0) {
@@ -323,5 +336,89 @@ export class TrackingService {
           ? { type: 'LineString' as const, coordinates }
           : null,
     };
+  }
+
+  private offRouteStreakKey(companyId: string, routeId: string) {
+    return `offroute:streak:${companyId}:${routeId}`;
+  }
+
+  private async distanceToPlannedMeters(
+    routeId: string,
+    latitude: number,
+    longitude: number,
+  ): Promise<number | null> {
+    const rows = await this.prisma.$queryRaw<{ meters: number | null }[]>`
+      SELECT ST_Distance(
+        planned_geometry::geography,
+        ST_SetSRID(ST_MakePoint(${longitude}, ${latitude}), 4326)::geography
+      ) AS meters
+      FROM routes
+      WHERE id = ${routeId}::uuid AND planned_geometry IS NOT NULL
+    `;
+    const meters = rows[0]?.meters;
+    return meters != null && Number.isFinite(Number(meters)) ? Number(meters) : null;
+  }
+
+  private async evaluateOffRoute(input: {
+    companyId: string;
+    employeeId: string;
+    routeId: string;
+    vehicleId: string | null;
+    plate: string | null;
+    latitude: number;
+    longitude: number;
+    recordedAtMs: number;
+  }) {
+    const meters = await this.distanceToPlannedMeters(
+      input.routeId,
+      input.latitude,
+      input.longitude,
+    );
+    if (meters == null) return;
+
+    const streakKey = this.offRouteStreakKey(input.companyId, input.routeId);
+    type Streak = { startedAtMs: number; lastAtMs: number; maxMeters: number };
+
+    if (meters <= OFF_ROUTE_ALERT_M) {
+      await this.redis.del(streakKey);
+      return;
+    }
+
+    const prev = await this.redis.getJson<Streak>(streakKey);
+    const streak: Streak = prev
+      ? {
+          startedAtMs: prev.startedAtMs,
+          lastAtMs: input.recordedAtMs,
+          maxMeters: Math.max(prev.maxMeters, meters),
+        }
+      : {
+          startedAtMs: input.recordedAtMs,
+          lastAtMs: input.recordedAtMs,
+          maxMeters: meters,
+        };
+    await this.redis.setJson(streakKey, streak, 2 * 3600);
+
+    const durationMs = streak.lastAtMs - streak.startedAtMs;
+    if (durationMs < OFF_ROUTE_ALERT_MS) return;
+
+    const km = Math.round((streak.maxMeters / 1000) * 10) / 10;
+    const seconds = Math.round(durationMs / 1000);
+    await this.observations.upsert({
+      companyId: input.companyId,
+      employeeId: input.employeeId,
+      routeId: input.routeId,
+      vehicleId: input.vehicleId,
+      code: EmployeeObservationCode.OFF_ROUTE,
+      severity: EmployeeObservationSeverity.WARNING,
+      summary: `Saiu ${km} km da rota planejada por ${seconds}s · ${input.plate ?? 'sem placa'}.`,
+      details: {
+        plate: input.plate,
+        maxOffRouteMeters: Math.round(streak.maxMeters),
+        offRouteSeconds: seconds,
+        sampleAt: new Date(input.recordedAtMs).toISOString(),
+        latitude: input.latitude,
+        longitude: input.longitude,
+      },
+    });
   }
 }
