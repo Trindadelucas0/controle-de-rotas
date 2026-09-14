@@ -51,7 +51,7 @@ Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-mult
 
 ### Como testar
 
-Campo em navegação **com Gravar viagem** + GPS → botão Porteira; gestor em `/map` (pin ou rota pintada) vê o marco. Sem Gravar viagem os botões não aparecem e o POST do EMPLOYEE retorna 403.
+Campo em navegação **ou** visita (após Cheguei) **com Gravar viagem** + GPS → botão Porteira; gestor em `/map` (pin ou rota pintada) vê o marco. Sem Gravar viagem os botões não aparecem e o POST do EMPLOYEE retorna 403.
 
 ---
 

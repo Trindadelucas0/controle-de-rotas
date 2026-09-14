@@ -239,7 +239,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 - [ ] Se pedir localização, **Permitir**.
 - [ ] Passo resumo: confira a ordem (com GPS, a 1ª é a mais perto). Clique **Continuar**.
 - [ ] Escolha o **veículo**. **Continuar**.
-- [ ] Preencha **Km inicial do veículo** e **Combustível**. **Continuar**.
+- [ ] Preencha **Km inicial do veículo** e **Combustível**. No celular, **Tirar foto** (câmera) ou **Galeria**. **Continuar** / **Revisar**.
 - [ ] Clique em **▶ Iniciar rota**.
 
 **O que deve aparecer:** mapa de **navegação**. Card em Minha rota vira **Em andamento**, com **Continuar navegação** e o arraste para concluir.
@@ -265,7 +265,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 - [ ] Clique em **Cheguei**.
 - [ ] Na tela **Visita**, clique em **Cheguei — chegada verificada**.
 
-**O que deve aparecer:** “Chegada verificada” e o formulário. Com **Gravar viagem**: badge **Gravando · N pts**; botões **Porteira**, **Ponte**, **Bifurcação**, **Estrada ruim**. Perto de um marco já salvo: **Ainda existe …?** (Sim/Não). Toque no ícone lê o nome. Poucos pontos GPS: aviso âmbar — toque de novo em Cheguei para confirmar.
+**O que deve aparecer:** “Chegada verificada” e o formulário. Com **Gravar viagem**: badge **Gravando · N pts** na navegação; botões **Porteira**, **Ponte**, **Bifurcação**, **Estrada ruim** no mapa **e** na visita (bloco **Acesso no caminho**). Perto de um marco já salvo na navegação: **Ainda existe …?** (Sim/Não). Toque no ícone lê o nome. Poucos pontos GPS: aviso âmbar — toque de novo em Cheguei para confirmar.
 
 **Se falhar**
 
@@ -281,6 +281,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Quem:** mesmo EMPLOYEE, visita já com chegada verificada.
 
 - [ ] Em **Resultado**, marque **Realizada** (ou outro: Cliente ausente, Sem interesse, Precisa retorno).
+- [ ] Se a rota tiver **Gravar viagem**, use **Acesso no caminho** (ex. **Porteira**) se estiver na porteira/ponte/etc.
 - [ ] Se **não** for Realizada, preencha **Observações**.
 - [ ] Se for **Realizada**, clique em **Adicionar foto** e envie pelo menos uma (JPEG/PNG/WebP).
 - [ ] Se **Precisa retorno**, marque remarcar e escolha data/hora futura.

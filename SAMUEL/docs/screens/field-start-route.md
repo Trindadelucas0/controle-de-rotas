@@ -17,7 +17,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - **Veículo** — pin vira **carro**; select (`GET /field/vehicles`); pré-seleciona veículo da rota se houver; mostra último km/combustível; omite carro em uso por outro
   - **Km inicial** — number, obrigatório, > 0 (pré-preenchido com o último km do veículo)
   - **Combustível** — select: Vazio, 1/4, 1/2, 3/4, Cheio (pré-preenchido)
-  - **Foto do odômetro** — obrigatória (câmera)
+  - **Foto do odômetro** — obrigatória; **Tirar foto** abre a câmera traseira; **Galeria** escolhe arquivo (JPEG/PNG/WebP ≤5 MB)
   - **Observação** — textarea opcional, máx. 500 caracteres
   - Checklist/Confirmar mantêm o mini-mapa com pin carro
 - Ações / botões:
@@ -37,7 +37,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   1. Publicar rota para funcionário → Minha rota → **Iniciar rota**
   2. Negar GPS → botão bloqueado / mensagem; permitir → avança
   3. No passo Resumo, conferir ordem por proximidade (1 = mais perto)
-  4. Escolher veículo, preencher km e combustível → confirmar
+  4. Escolher veículo, preencher km e combustível, **Tirar foto** (câmera) → Revisar → confirmar
   5. Ver redirect para navegação com mapa centralizado na 1ª parada (mais perto)
   6. Tentar abrir wizard de rota já `IN_PROGRESS` → redireciona para `/field/navigate`
   7. Com outra rota `IN_PROGRESS` (mesmo de outro dia) → alerta + “Ir para Minha rota e concluir”

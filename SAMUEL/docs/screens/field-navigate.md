@@ -90,7 +90,7 @@ N/A.
 | Tentar GPS de novo | `requestCurrentPosition` progressivo (fino → coarse) + reinicia watch |
 | Arrastar mapa (pan/drag) | desliga follow; toque simples **não** desliga |
 | GPS watch | seed coarse + `watchPosition` → fila local → `POST /tracking/points` (lote até 50, retry) |
-| Marcos | Só com `recordTrip`; POST imediato; se falhar, fila `samuel:landmark-queue` + retry online/visibility |
+| Marcos | Só com `recordTrip`; POST imediato; se falhar, fila `samuel:landmark-queue` + retry online/visibility; mesmos botões na visita após Cheguei |
 | Toque no ícone de marco | ficha com nome do tipo + “Adicionado por …” (gestor se sem funcionário); toque de novo ou no mapa fecha |
 | Banner ≤120 m + Gravar viagem | **Sim, permanece** (cooldown 5 min) / **Não, retirar** (`DELETE`; fila `samuel:landmark-delete-queue` se a rede falhar). Logo após marcar, não pergunta |
 | Banner ≤120 m sem Gravar | só **OK** (cooldown 5 min); não apaga |

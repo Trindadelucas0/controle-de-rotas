@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { validateOdometerPhoto } from '@/lib/odometer-photo';
 
 type Props = {
   id: string;
@@ -19,8 +20,10 @@ export function OdometerPhotoCapture({
   disabled,
   label = 'Foto do odômetro',
 }: Props) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const cameraRef = useRef<HTMLInputElement>(null);
+  const galleryRef = useRef<HTMLInputElement>(null);
   const [preview, setPreview] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!file) {
@@ -32,6 +35,22 @@ export function OdometerPhotoCapture({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
+  function applyFile(next: File | null) {
+    if (!next) {
+      setError(null);
+      onChange(null);
+      return;
+    }
+    const msg = validateOdometerPhoto(next);
+    if (msg) {
+      setError(msg);
+      onChange(null);
+      return;
+    }
+    setError(null);
+    onChange(next);
+  }
+
   return (
     <div>
       <p className="mb-1 text-sm font-medium text-brand-900">
@@ -40,26 +59,45 @@ export function OdometerPhotoCapture({
       </p>
       <input
         id={id}
-        ref={inputRef}
+        ref={cameraRef}
         type="file"
-        accept="image/jpeg,image/png,image/webp"
+        accept="image/*"
         capture="environment"
         className="sr-only"
         disabled={disabled}
         onChange={(e) => {
-          const next = e.target.files?.[0] ?? null;
-          onChange(next);
+          applyFile(e.target.files?.[0] ?? null);
           e.target.value = '';
         }}
       />
-      <div className="flex items-center gap-3">
+      <input
+        id={`${id}-gallery`}
+        ref={galleryRef}
+        type="file"
+        accept="image/*"
+        className="sr-only"
+        disabled={disabled}
+        onChange={(e) => {
+          applyFile(e.target.files?.[0] ?? null);
+          e.target.value = '';
+        }}
+      />
+      <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
           disabled={disabled}
-          onClick={() => inputRef.current?.click()}
+          onClick={() => cameraRef.current?.click()}
           className="ops-btn ops-btn-secondary text-sm disabled:opacity-60"
         >
           {file ? 'Trocar foto' : 'Tirar foto'}
+        </button>
+        <button
+          type="button"
+          disabled={disabled}
+          onClick={() => galleryRef.current?.click()}
+          className="rounded-xl border border-brand-200 px-3 py-2 text-sm font-semibold text-brand-900 disabled:opacity-60"
+        >
+          Galeria
         </button>
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -72,6 +110,11 @@ export function OdometerPhotoCapture({
           <span className="text-xs text-[var(--muted)]">JPEG, PNG ou WebP · máx. 5 MB</span>
         )}
       </div>
+      {error ? (
+        <p className="mt-2 text-sm text-[var(--danger)]" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }

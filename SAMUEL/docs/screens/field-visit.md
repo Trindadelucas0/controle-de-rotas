@@ -7,7 +7,7 @@
   - Cabeçalho: título “Visita”, link Voltar à navegação
   - Cliente (nome), OS, endereço, status
   - Fase 1: botão **Cheguei — chegada verificada** (GPS)
-  - Fase 2 (após check-in): banner “Chegada verificada”, formulário de resultado, observações, fotos, remarcar próxima, **Finalizar visita**
+  - Fase 2 (após check-in): banner “Chegada verificada”, **Acesso no caminho** (Porteira/Ponte/Bifurcação/Estrada ruim) **só se** a rota tem Gravar viagem, formulário de resultado, observações, fotos, remarcar próxima, **Finalizar visita**
 - Campos (nome, tipo, validação, erro):
   - GPS check-in: obrigatório no Cheguei
 - **Resultado** (radio): `DONE` Realizada | `NO_CONTACT` Cliente ausente | `REFUSED` Sem interesse | `FOLLOW_UP` Precisa retorno
@@ -15,10 +15,11 @@
   - **Fotos** (file, 1–5, JPEG/PNG/WebP, 5 MB): mínimo 1 se Realizada; `capture="environment"`
   - **Remarcar próxima** (checkbox + datetime-local): obrigatório se Precisa retorno; data futura
   - GPS check-out: obrigatório em Finalizar
-  - Se a rota tem Gravar viagem: envia `trailPoints` (fila local) no Cheguei e no Finalizar; aviso âmbar se < 2 pontos (segundo toque confirma)
+  - Se a rota tem Gravar viagem: envia `trailPoints` (fila local) no Cheguei e no Finalizar; aviso âmbar se < 2 pontos (segundo toque confirma); bloco **Acesso no caminho** (mesmos 4 marcos da navegação; GPS do toque, fallback lat/lng do check-in; fila `samuel:landmark-queue`)
 - Ações / botões:
   - **Cheguei — chegada verificada** → `POST /api/v1/visits/:id/check-in` (+ `trailPoints` se gravar viagem)
   - **Adicionar foto** → `POST /api/v1/visits/:id/evidence` (multipart)
+  - **Porteira / Ponte / Bifurcação / Estrada ruim** (só Gravar viagem, após check-in) → `POST /api/v1/customers/:id/landmarks`
   - **Finalizar visita** → `POST /api/v1/visits/:id/check-out` → redirect `/field/navigate`
   - Voltar à navegação
 - Estados: idle | loading | success | error | empty | forbidden
@@ -31,6 +32,7 @@
   - `GET /api/v1/visits/:id` (inclui `routeStop.route.recordTrip`)
   - `POST /api/v1/visits/:id/check-in`
   - `POST /api/v1/visits/:id/evidence`
+  - `POST /api/v1/customers/:id/landmarks` (só Gravar viagem, após check-in)
   - `POST /api/v1/visits/:id/check-out`
 - Redirects: após finalizar → `/field/navigate`. Entrada: banner Cheguei em `/field/navigate`.
 - Mobile / PWA: layout `(field-nav)` tela cheia, ~375px, safe-area.
@@ -42,4 +44,5 @@
   3. Precisa retorno + data futura → nova visita na Agenda (gestor em `/services/[id]`).
   4. Gestor vê relatório e fotos no detalhe da OS.
   5. Sem foto em Realizada → 422; outro EMPLOYEE → 403.
-  6. Rota Gravar viagem: badge na nav com pts; Cheguei com poucos pontos mostra aviso âmbar (segundo toque confirma); após check-in, faixa Trilha gravada (ou tentativa no Finalizar).
+  6. Rota Gravar viagem: badge na nav com pts; Cheguei com poucos pontos mostra aviso âmbar (segundo toque confirma); após check-in, faixa Trilha gravada (ou tentativa no Finalizar) e botões de marco **Acesso no caminho**.
+  7. Rota sem Gravar viagem: visita sem o bloco de marcos.

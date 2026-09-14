@@ -48,7 +48,7 @@ Proxy BrasilAPI + Nominatim ? detalhes em [modules/lookups.md](modules/lookups.m
 - `GET /map/customers/nearby?lat&lng&radiusMeters` — PostGIS `ST_DWithin` (mesma exclusão de placeholder)
 - `POST /customers/:id/geocode` — Nominatim (ADMIN/MANAGER); 404 se placeholder de sessão
 - `PATCH /customers/:id` — ADMIN/MANAGER/SUPERVISOR; EMPLOYEE só cadastro `profileIncomplete` da própria missão `recordNewCustomer` (`CUSTOMER_PATCH_FORBIDDEN` senão)
-- `POST /customers/:id/landmarks` — `{ type: PORTEIRA|PONTE|BIFURCACAO|ESTRADA_RUIM, latitude, longitude, note? }` (ADMIN/MANAGER; EMPLOYEE só se rota IN_PROGRESS desse cliente **com** `recordTrip`; senão 403 `LANDMARK_RECORD_TRIP_REQUIRED`). Resposta `{ landmark }` inclui `customerId` e `createdBy: { id, name } | null`
+- `POST /customers/:id/landmarks` — `{ type: PORTEIRA|PONTE|BIFURCACAO|ESTRADA_RUIM, latitude, longitude, note? }` (ADMIN/MANAGER; EMPLOYEE só se rota IN_PROGRESS desse cliente **com** `recordTrip`; senão 403 `LANDMARK_RECORD_TRIP_REQUIRED`). UI de campo: navegação e visita após Cheguei. Resposta `{ landmark }` inclui `customerId` e `createdBy: { id, name } | null`
 - `DELETE /customers/:id/landmarks/:landmarkId` — mesmas regras do POST; 404 `LANDMARK_NOT_FOUND` se o marco não for desse cliente/tenant; `{ ok: true }`
 - `GET /customers/:id/access` — `{ accessPath, landmarks }` (ADMIN/MANAGER); cada landmark inclui `createdBy`
 - Check-in visita (`POST /visits/:id/check-in`): se a rota tem `recordTrip`, merge `trailPoints` (máx. 500, 24 h) + TrackingPoint → `CustomerAccessPath` ACTIVE; resposta `{ visit, accessPath: { saved, reason? } }`; check-out tenta de novo se ainda não houver path dessa rota

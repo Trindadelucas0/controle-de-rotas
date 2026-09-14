@@ -95,7 +95,7 @@ Cadastros (Cliente, Funcionário, Veículo, Usuário, Empresa) abrem em **leitur
 
 **Pin F** — última localização do funcionário (GPS ao vivo ou último ponto gravado). No planejador, **Origem do cálculo → Última localização** usa o F.
 
-**Gravar viagem** — checkbox no planejador. Densifica o GPS (~2 s), grava a trilha real até cada cliente no **Cheguei**, e na navegação aparecem **Porteira / Ponte / Bifurcação / Estrada ruim**. Sem essa marca, a navegação segue normal, sem esses botões.
+**Gravar viagem** — checkbox no planejador. Densifica o GPS (~2 s), grava a trilha real até cada cliente no **Cheguei**, e na navegação **e na visita** (depois do Cheguei) aparecem **Porteira / Ponte / Bifurcação / Estrada ruim**. Sem essa marca, a navegação e a visita seguem sem esses botões.
 
 **Encerrar ≠ concluir** — na navegação, **Encerrar** só sai do mapa. A rota continua **Em andamento**. Para fechar o dia: arraste **Arraste para concluir a rota** em **Minha rota** ou na própria navegação.
 
@@ -171,7 +171,7 @@ Em cada card: status, veículo, km/tempo, paradas, **mini-mapa** da linha planej
 
 ### 6.2 Iniciar rota (wizard)
 
-Passos: localização → resumo (ordem mais perto → mais longe se houver GPS) → escolher veículo (último km/combustível; carro em uso por outro não aparece) → **Km inicial**, **Combustível** e **foto do odômetro** → confirmar **▶ Iniciar rota** (botão vira **Iniciando…**).
+Passos: localização → resumo (ordem mais perto → mais longe se houver GPS) → escolher veículo (último km/combustível; carro em uso por outro não aparece) → **Km inicial**, **Combustível** e **foto do odômetro** (**Tirar foto** abre a câmera; **Galeria** se precisar de arquivo) → confirmar **▶ Iniciar rota** (botão vira **Iniciando…**).
 
 Ao **concluir**, o modal pede km final, combustível e outra foto. O app **não** avisa fraude; o gestor vê no perfil.
 
@@ -190,11 +190,12 @@ Com **Gravar viagem**: badge **Gravando · N pts** e os quatro botões de marco.
 ### 6.4 Visita
 
 1. **Cheguei — chegada verificada** (GPS).
-2. **Resultado:** Realizada · Cliente ausente · Sem interesse · Precisa retorno.
-3. **Observações** — obrigatório se não for Realizada.
-4. **Fotos** — pelo menos uma se Realizada (**Adicionar foto**).
-5. Opcional **remarcar próxima** (obrigatório se Precisa retorno).
-6. **Finalizar visita** (GPS de novo) → volta à navegação na próxima parada pendente.
+2. Com **Gravar viagem**: bloco **Acesso no caminho** — **Porteira / Ponte / Bifurcação / Estrada ruim** (GPS do toque; se falhar, usa o ponto do Cheguei).
+3. **Resultado:** Realizada · Cliente ausente · Sem interesse · Precisa retorno.
+4. **Observações** — obrigatório se não for Realizada.
+5. **Fotos** — pelo menos uma se Realizada (**Adicionar foto**).
+6. Opcional **remarcar próxima** (obrigatório se Precisa retorno).
+7. **Finalizar visita** (GPS de novo) → volta à navegação na próxima parada pendente.
 
 Visita aberta **bloqueia** concluir a rota.
 
@@ -205,7 +206,7 @@ Arraste até o fim → diálogo **Concluir rota?**
 - Todas as paradas feitas, ou distância restante planejada ≤ **500 m** → **Sim, concluir** (`Concluída`).
 - Ainda falta caminho (> 500 m) → **Sim, incompleta**. Paradas pendentes viram puladas; o gestor vê no painel + trilha no mapa.
 
-Km final, combustível e foto do odômetro são obrigatórios no campo.
+Km final, combustível e foto do odômetro são obrigatórios no campo (**Tirar foto** / **Galeria**, igual no início).
 
 ### 6.6 Missão Gravar cliente
 

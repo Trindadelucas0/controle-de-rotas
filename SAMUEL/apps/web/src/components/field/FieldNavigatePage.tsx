@@ -21,15 +21,18 @@ import {
   type RouteGpsWatchHandle,
 } from '@/lib/field-tracking';
 import {
-  enqueueLandmark,
   enqueueLandmarkDelete,
   peekLandmarkDeleteQueue,
   peekLandmarkQueue,
   prependLandmarkDeleteQueue,
-  prependLandmarkQueue,
   takeLandmarkDeleteQueue,
-  takeLandmarkQueue,
 } from '@/lib/field-landmark-queue';
+import {
+  flushLandmarkCreateQueue,
+  useMarkCustomerLandmark,
+  type CreatedCustomerLandmark,
+} from '@/lib/use-mark-customer-landmark';
+import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { cartoDarkRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import {
@@ -329,10 +332,8 @@ export function FieldNavigatePage() {
   const [rerouteError, setRerouteError] = useState<string | null>(null);
   const [proximityLandmark, setProximityLandmark] = useState<CustomerLandmark | null>(null);
   const [selectedLandmarkId, setSelectedLandmarkId] = useState<string | null>(null);
-  const [landmarkBusy, setLandmarkBusy] = useState(false);
   const [landmarkRemoving, setLandmarkRemoving] = useState(false);
   const [landmarkRemoveError, setLandmarkRemoveError] = useState<string | null>(null);
-  const [landmarkMsg, setLandmarkMsg] = useState<string | null>(null);
   const [trackStats, setTrackStats] = useState({ queued: 0, posted: 0, trail: 0 });
   const [showRecordPoint, setShowRecordPoint] = useState(false);
   const [recordPointBusy, setRecordPointBusy] = useState(false);
@@ -384,6 +385,44 @@ export function FieldNavigatePage() {
     }
     return pendingStops[pendingStops.length - 1];
   }, [pendingStops, gps, route?.recordNewCustomer]);
+
+  const getLandmarkCustomerId = useCallback(
+    () => nextStop?.visit.customer.id ?? null,
+    [nextStop],
+  );
+  const getLandmarkCoords = useCallback(async () => {
+    if (!gps) return null;
+    return { latitude: gps.latitude, longitude: gps.longitude };
+  }, [gps]);
+  const onLandmarkCreated = useCallback((landmark: CreatedCustomerLandmark) => {
+    landmarkCooldownRef.current.set(landmark.id, Date.now() + LANDMARK_COOLDOWN_MS);
+    const cid = landmark.customerId;
+    setRoute((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        stops: prev.stops.map((s) => {
+          const match = cid
+            ? s.visit.customer.id === cid
+            : s.id === nextStop?.id;
+          if (!match) return s;
+          if ((s.landmarks ?? []).some((l) => l.id === landmark.id)) return s;
+          return { ...s, landmarks: [...(s.landmarks ?? []), landmark as CustomerLandmark] };
+        }),
+      };
+    });
+  }, [nextStop?.id]);
+  const {
+    mark: markLandmark,
+    busy: landmarkBusy,
+    message: landmarkMsg,
+    setMessage: setLandmarkMsg,
+  } = useMarkCustomerLandmark({
+    getCustomerId: getLandmarkCustomerId,
+    getCoords: getLandmarkCoords,
+    enabled: Boolean(route?.recordTrip && nextStop && gps && !route.recordNewCustomer),
+    onCreated: onLandmarkCreated,
+  });
 
   const remainingStops = useMemo(() => {
     if (!pendingStops.length) return [];
@@ -549,40 +588,10 @@ export function FieldNavigatePage() {
   }, []);
 
   const flushLandmarkQueue = useCallback(async () => {
-    const pending = takeLandmarkQueue();
-    if (!pending.length) return;
-    const failed: typeof pending = [];
-    for (const item of pending) {
-      try {
-        const r = await apiFetch<{ landmark: CustomerLandmark }>(
-          `/api/v1/customers/${item.customerId}/landmarks`,
-          {
-            method: 'POST',
-            body: JSON.stringify({
-              type: item.type,
-              latitude: item.latitude,
-              longitude: item.longitude,
-            }),
-          },
-        );
-        setRoute((prev) => {
-          if (!prev) return prev;
-          return {
-            ...prev,
-            stops: prev.stops.map((s) =>
-              s.visit.customer.id === item.customerId
-                ? { ...s, landmarks: [...(s.landmarks ?? []), r.landmark] }
-                : s,
-            ),
-          };
-        });
-        landmarkCooldownRef.current.set(r.landmark.id, Date.now() + LANDMARK_COOLDOWN_MS);
-      } catch {
-        failed.push(item);
-      }
-    }
-    if (failed.length) prependLandmarkQueue(failed);
-  }, []);
+    await flushLandmarkCreateQueue((_item, landmark) => {
+      onLandmarkCreated(landmark);
+    });
+  }, [onLandmarkCreated]);
 
   useEffect(() => {
     const kick = () => {
@@ -597,55 +606,6 @@ export function FieldNavigatePage() {
       window.removeEventListener('online', kick);
     };
   }, [flushLandmarkQueue, flushLandmarkDeletes]);
-
-  async function markLandmark(type: LandmarkType) {
-    if (!route?.recordTrip || !gps || !nextStop || landmarkBusy) return;
-    const customerId = nextStop.visit.customer.id;
-    const body = {
-      type,
-      latitude: gps.latitude,
-      longitude: gps.longitude,
-    };
-    setLandmarkBusy(true);
-    setLandmarkMsg(null);
-    try {
-      const r = await apiFetch<{ landmark: CustomerLandmark }>(
-        `/api/v1/customers/${customerId}/landmarks`,
-        {
-          method: 'POST',
-          body: JSON.stringify(body),
-        },
-      );
-      setRoute((prev) => {
-        if (!prev) return prev;
-        return {
-          ...prev,
-          stops: prev.stops.map((s) =>
-            s.id === nextStop.id
-              ? { ...s, landmarks: [...(s.landmarks ?? []), r.landmark] }
-              : s,
-          ),
-        };
-      });
-      landmarkCooldownRef.current.set(r.landmark.id, Date.now() + LANDMARK_COOLDOWN_MS);
-      setLandmarkMsg(`${LANDMARK_LABELS[type]} marcada`);
-      void flushLandmarkQueue();
-    } catch (e) {
-      enqueueLandmark({
-        customerId,
-        type,
-        latitude: gps.latitude,
-        longitude: gps.longitude,
-      });
-      setLandmarkMsg(
-        e instanceof ApiError
-          ? `${e.message} — marco guardado para reenviar`
-          : 'Falha ao marcar marco — guardado para reenviar',
-      );
-    } finally {
-      setLandmarkBusy(false);
-    }
-  }
 
   /** Fix impreciso demais não conta como fora da rota (evita falso positivo). */
   const gpsAccuracyOk =
@@ -1820,24 +1780,13 @@ export function FieldNavigatePage() {
             </svg>
           </button>
           {route?.recordTrip && nextStop && gps && !route.recordNewCustomer ? (
-            <div className="mb-2">
-              <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
-                {(Object.keys(LANDMARK_LABELS) as LandmarkType[]).map((type) => (
-                  <button
-                    key={type}
-                    type="button"
-                    disabled={landmarkBusy || gpsBlocked}
-                    onClick={() => void markLandmark(type)}
-                    className="rounded-xl bg-black/65 px-2 py-2 text-[11px] font-semibold text-white disabled:opacity-50"
-                  >
-                    {LANDMARK_LABELS[type]}
-                  </button>
-                ))}
-              </div>
-              {landmarkMsg ? (
-                <p className="mt-1 text-center text-[10px] text-white/70">{landmarkMsg}</p>
-              ) : null}
-            </div>
+            <FieldLandmarkButtons
+              disabled={gpsBlocked}
+              busy={landmarkBusy}
+              message={landmarkMsg}
+              onMark={(type) => void markLandmark(type)}
+              variant="map"
+            />
           ) : null}
           {route?.recordNewCustomer ? (
             <div className="mb-2 space-y-2">

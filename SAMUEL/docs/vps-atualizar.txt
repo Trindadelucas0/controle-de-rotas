@@ -1,7 +1,13 @@
-# SAMUEL — colar o arquivo INTEIRO no SSH (bash).
+# COMO USAR (na VPS, bash — nao PowerShell):
+# 1. Copie ESTE arquivo do PC ou do GitHub (versao nova). Nao use a copia antiga
+#    da VPS se o script mudou.
+# 2. Cole o arquivo INTEIRO no SSH e aperte Enter.
+# 3. Equivale a git pull: fetch + reset --hard origin/main (pull simples aborta).
+#
 # Git: /opt/analise
 # App: /opt/analise/SAMUEL
 # PM2: analise-api (3469) + analise-web (3468)
+# Nao rode seed. .env da VPS permanece (backup em /root/analise-pre-update-*).
 
 set -e
 cd /opt/analise

@@ -1,5 +1,16 @@
 # Changelog
 
+## v0.18.1 — 2026-09-14
+
+### Câmera do odômetro e marcos na visita
+
+- **Tirar foto** no início e no fim da rota abre a câmera traseira (`accept="image/*"` + `capture="environment"`); **Galeria** continua como fallback (PC / arquivo)
+- Validação no cliente: JPEG/PNG/WebP ≤5 MB (o servidor já recusava)
+- Com **Gravar viagem**, após **Cheguei** a visita ganha **Acesso no caminho** (Porteira / Ponte / Bifurcação / Estrada ruim), mesmo POST e fila da navegação; GPS do toque com fallback no check-in
+- Sem Gravar viagem os botões continuam ocultos; API EMPLOYEE segue 403 `LANDMARK_RECORD_TRIP_REQUIRED`
+- Arquivos: `OdometerPhotoCapture.tsx`, `use-mark-customer-landmark.ts`, `FieldLandmarkButtons.tsx`, `FieldVisitPage.tsx`, `FieldNavigatePage.tsx`
+- Como validar: roteiros **12–14** em `docs/GUIA-TESTES.md`
+
 ## v0.18.0 — 2026-09-12
 
 ### Missão Gravar cliente (vários pontos)

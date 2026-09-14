@@ -20,6 +20,16 @@ import {
 
 } from '@/lib/field-tracking';
 
+import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
+
+import {
+
+  kickLandmarkCreateQueue,
+
+  useMarkCustomerLandmark,
+
+} from '@/lib/use-mark-customer-landmark';
+
 import {
 
   clearTrackStorage,
@@ -327,6 +337,52 @@ export function FieldVisitPage() {
   const photoRequired = outcome === 'DONE';
 
   const nextRequired = outcome === 'FOLLOW_UP' || scheduleNext;
+
+  const recordTrip = Boolean(visit?.routeStop?.route?.recordTrip);
+
+  const visitCustomerId = visit?.customer?.id ?? null;
+
+  const getLandmarkCustomerId = useCallback(() => visitCustomerId, [visitCustomerId]);
+
+  const getLandmarkCoords = useCallback(async () => {
+    try {
+      const pos = await requestCurrentPosition();
+      return { latitude: pos.coords.latitude, longitude: pos.coords.longitude };
+    } catch {
+      if (
+        visit?.checkedInLat != null &&
+        visit?.checkedInLng != null &&
+        Number.isFinite(visit.checkedInLat) &&
+        Number.isFinite(visit.checkedInLng)
+      ) {
+        return { latitude: visit.checkedInLat, longitude: visit.checkedInLng };
+      }
+      return null;
+    }
+  }, [visit?.checkedInLat, visit?.checkedInLng]);
+
+  const {
+    mark: markVisitLandmark,
+    busy: landmarkBusy,
+    message: landmarkMsg,
+  } = useMarkCustomerLandmark({
+    getCustomerId: getLandmarkCustomerId,
+    getCoords: getLandmarkCoords,
+    enabled: Boolean(checkedIn && !finished && recordTrip && visitCustomerId),
+  });
+
+  useEffect(() => {
+    const kick = () => {
+      kickLandmarkCreateQueue();
+    };
+    document.addEventListener('visibilitychange', kick);
+    window.addEventListener('online', kick);
+    kick();
+    return () => {
+      document.removeEventListener('visibilitychange', kick);
+      window.removeEventListener('online', kick);
+    };
+  }, []);
 
 
 
@@ -901,6 +957,18 @@ export function FieldVisitPage() {
               </p>
 
             </div>
+
+            {recordTrip && visitCustomerId ? (
+              <div>
+                <p className="mb-2 text-sm font-semibold text-white">Acesso no caminho</p>
+                <FieldLandmarkButtons
+                  variant="visit"
+                  busy={landmarkBusy}
+                  message={landmarkMsg}
+                  onMark={(type) => void markVisitLandmark(type)}
+                />
+              </div>
+            ) : null}
 
 
 
