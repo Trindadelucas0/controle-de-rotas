@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.18.4 — 2026-09-15
+
+### Fix — foto da visita “Erro interno do servidor”
+
+- Sintoma: após Cheguei, **Tirar foto** / **Galeria** mostrava erro interno; 0/5 fotos
+- Causa raiz: o PWA manda `latitude`/`longitude` do check-in como texto no multipart; Prisma Float rejeita string. O odômetro no Play não quebra porque o DTO converte. O e2e antigo não mandava GPS no upload
+- Correção: `AddVisitEvidenceDto` + `optionalFloat` no service
+- Como validar: Cheguei → Tirar foto → 1/5; e2e `201 foto com lat/lng em string no multipart`
+
 ## v0.18.3 — 2026-09-15
 
 ### Fix — concluir rota com visita aberta e arraste no mapa

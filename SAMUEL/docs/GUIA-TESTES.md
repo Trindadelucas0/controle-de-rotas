@@ -294,7 +294,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Se falhar**
 
 - Realizada sem foto → não finaliza.
-- Foto da visita não deve esperar GPS de novo; se o servidor recusar tamanho, aparece “Foto excede 5 MB.”
+- Foto da visita não deve esperar GPS de novo; após Cheguei a foto anexa (1/5). Se o servidor recusar tamanho, aparece “Foto excede 5 MB.”
 - Precisa retorno sem data futura → bloqueia.
 - Visita já finalizada → erro.
 - Sem GPS no finalizar → não envia.

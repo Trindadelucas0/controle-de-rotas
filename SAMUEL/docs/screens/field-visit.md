@@ -18,7 +18,7 @@
   - Se a rota tem Gravar viagem: envia `trailPoints` (fila local) no Cheguei e no Finalizar; aviso âmbar se < 2 pontos (segundo toque confirma); bloco **Acesso no caminho** (mesmos 4 marcos da navegação; GPS do toque, fallback lat/lng do check-in; fila `samuel:landmark-queue`)
 - Ações / botões:
   - **Cheguei — chegada verificada** → `POST /api/v1/visits/:id/check-in` (+ `trailPoints` se gravar viagem)
-  - **Tirar foto** / **Galeria** → `POST /api/v1/visits/:id/evidence` (multipart JPEG)
+  - **Tirar foto** / **Galeria** → `POST /api/v1/visits/:id/evidence` (multipart JPEG + lat/lng do Cheguei convertidos no servidor)
   - **Porteira / Ponte / Bifurcação / Estrada ruim** (só Gravar viagem, após check-in) → `POST /api/v1/customers/:id/landmarks`
   - **Finalizar visita** → `POST /api/v1/visits/:id/check-out` → redirect `/field/navigate`
   - Voltar à navegação

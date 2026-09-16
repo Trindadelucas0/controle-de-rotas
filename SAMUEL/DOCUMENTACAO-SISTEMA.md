@@ -29,7 +29,7 @@ Ver `PRD.md` §11 e `docs/ARCHITECTURE.md`. Resumo: Next.js 15 (web/PWA) → Nes
 
 ### 2.1 Histórico de versões
 
-Ver `docs/CHANGELOG.md` (atual: **v0.18.3**).
+Ver `docs/CHANGELOG.md` (atual: **v0.18.4**).
 
 ## 3. Mapa de telas / conexões
 
