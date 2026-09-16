@@ -3,8 +3,7 @@
 | Item | Valor |
 |------|--------|
 | Versão do sistema | 0.18.4 — Foto da visita após Cheguei |
-| Última atualização | 15/09/2026 — multipart lat/lng convertido; deixa de dar erro interno |
-| Última atualização | 15/09/2026 — visita aberta bloqueia o arraste; foto de conclusão não grava se a visita estiver aberta |
+| Última atualização | 15/09/2026 — foto da visita: lat/lng do multipart viram número (sem erro interno) |
 | Fonte oficial de comportamento | Este hub aponta as fontes; **não** duplica regras inventadas |
 
 ## 1. Como usar este documento
