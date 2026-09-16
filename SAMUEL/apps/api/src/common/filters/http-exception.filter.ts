@@ -8,6 +8,7 @@ import {
 import { Response } from 'express';
 
 import { MulterError } from 'multer';
+import { Prisma } from '@prisma/client';
 
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
@@ -23,6 +24,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
       code = 'VISIT_EVIDENCE_TOO_LARGE';
       message = 'Foto excede 5 MB.';
+    } else if (exception instanceof Prisma.PrismaClientValidationError) {
+      statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
+      code = 'AUTH_VALIDATION';
+      message = 'Dados inválidos.';
     } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const body = exception.getResponse();
@@ -62,7 +67,8 @@ export class HttpExceptionFilter implements ExceptionFilter {
 
     if (
       !(exception instanceof HttpException) &&
-      !(exception instanceof MulterError)
+      !(exception instanceof MulterError) &&
+      !(exception instanceof Prisma.PrismaClientValidationError)
     ) {
       // eslint-disable-next-line no-console
       console.error('[unhandled]', exception);

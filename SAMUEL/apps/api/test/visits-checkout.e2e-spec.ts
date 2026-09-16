@@ -166,4 +166,17 @@ describe('POST /api/v1/visits/:id/evidence', () => {
     );
     expect(res.status).toBe(404);
   });
+
+  it('201 foto com lat/lng em string no multipart (como o PWA)', async () => {
+    const fixture = await createRouteInProgress();
+    const agent = await loginAs('EMPLOYEE');
+    await checkInVisit(agent, fixture.visitId);
+    const res = await agent
+      .post(`/api/v1/visits/${fixture.visitId}/evidence`)
+      .field('latitude', String(GPS.latitude))
+      .field('longitude', String(GPS.longitude))
+      .attach('file', PNG_BUFFER, { filename: 'proof.png', contentType: 'image/png' });
+    expect(res.status).toBe(201);
+    expect(res.body.evidence?.id).toBeTruthy();
+  });
 });

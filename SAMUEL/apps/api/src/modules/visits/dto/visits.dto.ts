@@ -101,6 +101,34 @@ export class TrailPointDto {
   recordedAt?: string;
 }
 
+/** Multipart da foto da visita: lat/lng vêm como string no form. */
+export class AddVisitEvidenceDto {
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  caption?: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-90)
+  @Max(90)
+  latitude?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(-180)
+  @Max(180)
+  longitude?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(0)
+  accuracy?: number;
+}
+
 export class CheckInVisitDto {
   @Type(() => Number)
   @IsNumber()

@@ -2,7 +2,8 @@
 
 | Item | Valor |
 |------|--------|
-| Versão do sistema | 0.18.3 — Play e foto da visita na VPS |
+| Versão do sistema | 0.18.4 — Foto da visita após Cheguei |
+| Última atualização | 15/09/2026 — multipart lat/lng convertido; deixa de dar erro interno |
 | Última atualização | 15/09/2026 — visita aberta bloqueia o arraste; foto de conclusão não grava se a visita estiver aberta |
 | Fonte oficial de comportamento | Este hub aponta as fontes; **não** duplica regras inventadas |
 

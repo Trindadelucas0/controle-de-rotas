@@ -35,6 +35,13 @@ import type { AccessPathFinalizeResult } from '../customers/customers.service';
 
 const ACTIVE_ROUTE_STATUSES = ['DRAFT', 'PLANNED', 'ASSIGNED', 'PUBLISHED', 'IN_PROGRESS'] as const;
 
+/** Multipart manda número como string; Prisma Float rejeita string e vira 500. */
+function optionalFloat(value: unknown): number | null {
+  if (value == null || value === '') return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
+}
+
 const visitDetailInclude = {
   customer: true,
   employee: { select: { id: true, name: true } },
@@ -332,7 +339,12 @@ export class VisitsService {
     user: AuthUser,
     id: string,
     file: Express.Multer.File | undefined,
-    body: { caption?: string; latitude?: number; longitude?: number; accuracy?: number },
+    body: {
+      caption?: string;
+      latitude?: number | string;
+      longitude?: number | string;
+      accuracy?: number | string;
+    },
     meta?: { ip?: string; userAgent?: string },
   ) {
     if (user.role !== UserRole.EMPLOYEE) {
@@ -401,9 +413,9 @@ export class VisitsService {
           sizeBytes: file!.size,
           originalName: file!.originalname?.slice(0, 255) || null,
           caption: body.caption?.trim()?.slice(0, 500) || null,
-          latitude: body.latitude ?? null,
-          longitude: body.longitude ?? null,
-          accuracy: body.accuracy ?? null,
+          latitude: optionalFloat(body.latitude),
+          longitude: optionalFloat(body.longitude),
+          accuracy: optionalFloat(body.accuracy),
           actorUserId: user.id,
         },
       });
