@@ -592,13 +592,13 @@ Ficha: [field-pwa-gate.md](screens/field-pwa-gate.md)
 | --- | --- | --- |
 | ▶ Iniciar rota | PUBLISHED e nenhuma IN_PROGRESS | `/field/start/:id` |
 | Continuar navegação | IN_PROGRESS (do dia ou de outro dia) | `/field/navigate` |
-| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | `POST /field/routes/:id/complete` (“Concluindo…”) |
+| Concluir rota | IN_PROGRESS (do dia ou de outro dia), sem visita `ARRIVED`/`IN_PROGRESS` | `POST /field/routes/:id/complete` (“Concluindo…”). Visita aberta: banner + arraste desabilitado + link `/field/visits/{id}` (missão Gravar cliente não aplica). |
 | Status GPS | sempre | `/field/tracking-status` |
 | Ver agenda | empty | `/agenda` |
 
 GPS: `watchPosition` + fila local → `POST /tracking/points`. Com Gravar viagem o badge mostra pontos enviados / fila. Card Minha rota: `GPS ativo · HH:MM:SS` ou mensagem da API.
 
-**Estados:** “Carregando suas rotas…” · empty “Nenhuma rota para hoje (dd/mm/aaaa)…” · aviso “Conclua a rota em andamento…” · faixa âmbar se `IN_PROGRESS` de outro dia (card com Concluir visível) · error vermelho.
+**Estados:** “Carregando suas rotas…” · empty “Nenhuma rota para hoje (dd/mm/aaaa)…” · aviso “Conclua a rota em andamento…” · faixa âmbar se `IN_PROGRESS` de outro dia (card com Concluir visível) · visita aberta no card ativo (banner + slider desabilitado) · error vermelho.
 
 **Navegação:** publicar em `/routes` → esta tela → wizard → navigate.
 
@@ -659,9 +659,9 @@ Sem GPS: banner âmbar “Localização necessária” (HTTP inseguro / permiss�
 
 **Recálculo:** no 1º fix GPS (sempre) → `POST /routes/:id/reroute` com `reorderRemaining: true` (origem = GPS; pendentes mais perto → mais longe). Off-route sustentado (~2,5 s / 2 samples, cooldown 8 s) → mesmo endpoint com `reorderRemaining: false` (só redesenha). Banner “Recalculando…” durante a API; geometria velha (U-turn) não fica pintada.
 
-**Ações:** Encerrar → `/field/my-route` (rota **permanece** IN_PROGRESS) · **Cheguei** (banner ~80 m) → `/field/visits/[id]` · arrastar mapa desliga follow (toque simples não) · botão alvo religa follow · GPS watch → tracking · reroute automático. `beforeunload` / popstate avisam.
+**Ações:** Encerrar → `/field/my-route` (rota **permanece** IN_PROGRESS) · **Cheguei** (banner ~80 m) → `/field/visits/[id]` · arrastar para concluir → modal (desabilitado se visita aberta; banner + link) · arrastar mapa desliga follow (toque simples não) · botão alvo religa follow · GPS watch → tracking · reroute automático. `beforeunload` / popstate avisam.
 
-**Estados:** “Abrindo navegação Rotas…” · timeout 20s + “Tentar de novo” · sem IN_PROGRESS + “Voltar para Minha rota” · Recalculando / erro de recálculo.
+**Estados:** “Abrindo navegação Rotas…” · timeout 20s + “Tentar de novo” · sem IN_PROGRESS + “Voltar para Minha rota” · Recalculando / erro de recálculo · visita aberta (banner + slider desabilitado).
 
 **Fora de escopo:** voz, trânsito, Maps/Waze. Check-in na tela da visita.
 

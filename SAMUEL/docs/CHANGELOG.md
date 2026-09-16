@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.18.3 — 2026-09-15
+
+### Fix — concluir rota com visita aberta e arraste no mapa
+
+- Sintoma: campo conseguia abrir o modal de concluir (e a API gravava a foto do odômetro) com visita `ARRIVED`/`IN_PROGRESS`; o arraste resetava no meio do gesto, sobretudo em `/field/navigate` sobre o mapa
+- Causa raiz: `RoutesService.complete` validava visita aberta **depois** de `storage.saveBuffer`; `FieldNavigatePage.openCompleteConfirm` abria o modal mesmo com visita aberta; `SlideToComplete` capturava o ponteiro no thumb, sem `touch-action: none`, e `onComplete` mudava a cada re-render do GPS
+- Arquivos: `routes.service.ts`, `SlideToComplete.tsx`, `FieldNavigatePage.tsx`, `FieldMyRoutePage.tsx`, `route-complete.ts`, `routes-complete.e2e-spec.ts`
+- Como validar: roteiro **15** em `docs/GUIA-TESTES.md`; e2e `EMPLOYEE com visita IN_PROGRESS recebe ROUTE_HAS_OPEN_VISIT`
+
 ## v0.18.2 — 2026-09-15
 
 ### Play e foto da visita na VPS (HTTPS)

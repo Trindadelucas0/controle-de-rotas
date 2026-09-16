@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import MapGL, { Layer, Marker, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
@@ -84,6 +85,7 @@ import { formatMeters } from '@/components/routes/routes-planner-shared';
 import {
   canCompleteAsFinished,
   hasOpenVisitOnStops,
+  openVisitIdOnStops,
   remainingPlannedMeters,
 } from '@/lib/route-complete';
 
@@ -1257,8 +1259,6 @@ export function FieldNavigatePage() {
   function openCompleteConfirm() {
     if (!route || completing) return;
     if (!route.recordNewCustomer && hasOpenVisitOnStops(route.stops)) {
-      setCompleteError('Finalize a visita em andamento antes de concluir a rota.');
-      setShowCompleteConfirm(true);
       return;
     }
     setCompleteError(null);
@@ -1359,6 +1359,11 @@ export function FieldNavigatePage() {
       </div>
     );
   }
+
+  const blockCompleteForOpenVisit = Boolean(
+    route && !route.recordNewCustomer && hasOpenVisitOnStops(route.stops),
+  );
+  const openVisitId = route ? openVisitIdOnStops(route.stops) : null;
 
   return (
     <div className="relative h-full min-h-0 w-full flex-1 overflow-hidden bg-[#121212] text-white">
@@ -1827,6 +1832,19 @@ export function FieldNavigatePage() {
             </div>
           ) : null}
           <div className="mb-2">
+            {blockCompleteForOpenVisit ? (
+              <p
+                className="mb-2 rounded-xl bg-amber-950/90 px-3 py-2 text-center text-xs font-semibold text-amber-50"
+                role="alert"
+              >
+                Finalize a visita em andamento antes de concluir a rota.{' '}
+                {openVisitId ? (
+                  <Link href={`/field/visits/${openVisitId}`} className="underline">
+                    Abrir visita
+                  </Link>
+                ) : null}
+              </p>
+            ) : null}
             <SlideToComplete
               label={
                 route?.recordNewCustomer
@@ -1834,7 +1852,7 @@ export function FieldNavigatePage() {
                   : undefined
               }
               busy={completing}
-              disabled={showExitConfirm}
+              disabled={showExitConfirm || blockCompleteForOpenVisit}
               onComplete={openCompleteConfirm}
             />
           </div>

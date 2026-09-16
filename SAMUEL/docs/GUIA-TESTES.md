@@ -306,8 +306,9 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Objetivo:** sair de Em andamento.  
 **Quem:** EMPLOYEE da rota. (ADMIN/MANAGER da mesma empresa também podem concluir pela API; na UI o arraste está no campo.)
 
-- [ ] Termine as visitas **ou** aceite concluir incompleta.
-- [ ] Em **Minha rota** (topo, inclusive rota de outro dia ainda em andamento) **ou** na navegação, arraste o controle **Arraste para concluir a rota** até o fim.
+- [ ] Se ainda está na visita (chegou e não finalizou): em **Minha rota** ou na **navegação**, leia o aviso **Finalize a visita em andamento** e o link **Abrir visita**. O arraste fica desabilitado — **não** precisa deslizar para ver o erro. Finalize a visita e volte.
+- [ ] Termine as visitas **ou** aceite concluir incompleta (paradas nunca visitadas ainda podem ficar pendentes).
+- [ ] Em **Minha rota** (topo, inclusive rota de outro dia ainda em andamento) **ou** na navegação, arraste o controle **Arraste para concluir a rota** até o fim. No mapa, o polegar **não** deve voltar ao início no meio do gesto.
 - [ ] Leia **Concluir rota?** (N de N paradas, metros restantes).
 - [ ] **Sim, concluir** se todas feitas ou restam ≤ 500 m. **Sim, incompleta** se ainda falta caminho. **Cancelar** aborta.
 
@@ -315,9 +316,10 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 
 **Se falhar**
 
-- Visita ainda aberta (chegou e não finalizou) → bloqueia. Volte e **Finalizar visita**.
+- Visita ainda aberta (chegou e não finalizou) → arraste desabilitado + banner. Volte e **Finalizar visita**. A API devolve 422 `ROUTE_HAS_OPEN_VISIT` se o POST for forçado (sem gravar a foto).
 - Arrastar pouco e soltar → o controle volta; precisa ir quase até o fim.
 - **Encerrar** no mapa não substitui este passo.
+- Missão **Gravar cliente** não usa este bloqueio de visita (não há OS).
 
 ---
 

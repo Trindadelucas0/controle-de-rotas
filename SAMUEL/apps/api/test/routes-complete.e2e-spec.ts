@@ -23,6 +23,25 @@ describe('POST complete rota', () => {
     expect(res.body.code).toBe('ROUTE_EVIDENCE_REQUIRED');
   });
 
+  it('EMPLOYEE com visita IN_PROGRESS recebe ROUTE_HAS_OPEN_VISIT', async () => {
+    const fixture = await createRouteInProgress();
+    const agent = await loginAs('EMPLOYEE');
+    const checkin = await agent
+      .post(`/api/v1/visits/${fixture.visitId}/check-in`)
+      .send({ latitude: -23.5505, longitude: -46.6333, accuracy: 8 });
+    expect(checkin.status).toBe(201);
+    expect(checkin.body.visit.status).toBe('IN_PROGRESS');
+
+    const res = await agent
+      .post(`/api/v1/field/routes/${fixture.routeId}/complete`)
+      .field('mode', 'INCOMPLETE')
+      .field('endOdometerKm', '130')
+      .field('endFuelLevel', 'QUARTER')
+      .attach('file', TINY_JPEG, { filename: 'odo.jpg', contentType: 'image/jpeg' });
+    expect(res.status).toBe(422);
+    expect(res.body.code).toBe('ROUTE_HAS_OPEN_VISIT');
+  });
+
   it('EMPLOYEE atribuído conclui via /field/routes/:id/complete com foto e km', async () => {
     const fixture = await createRouteInProgress();
     const agent = await loginAs('EMPLOYEE');

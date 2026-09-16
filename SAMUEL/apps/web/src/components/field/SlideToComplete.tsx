@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 type Props = {
   label?: string;
@@ -20,8 +20,14 @@ export function SlideToComplete({
   onComplete,
 }: Props) {
   const trackRef = useRef<HTMLDivElement>(null);
-  const [progress, setProgress] = useState(0);
+  const onCompleteRef = useRef(onComplete);
   const dragging = useRef(false);
+  const fired = useRef(false);
+  const [progress, setProgress] = useState(0);
+
+  useEffect(() => {
+    onCompleteRef.current = onComplete;
+  }, [onComplete]);
 
   const reset = useCallback(() => {
     setProgress(0);
@@ -42,24 +48,28 @@ export function SlideToComplete({
     if (!dragging.current) return;
     dragging.current = false;
     setProgress((p) => {
-      if (p >= 0.9) {
-        queueMicrotask(() => onComplete());
-        return 0;
+      if (p >= 0.9 && !fired.current) {
+        fired.current = true;
+        queueMicrotask(() => {
+          onCompleteRef.current();
+          fired.current = false;
+        });
       }
       return 0;
     });
-  }, [onComplete]);
+  }, []);
 
   const locked = disabled || busy;
 
   return (
     <div
       ref={trackRef}
-      className={`relative h-14 w-full select-none overflow-hidden rounded-full border ${
+      className={`relative h-14 w-full touch-none select-none overflow-hidden rounded-full border ${
         locked
           ? 'pointer-events-none border-brand-100 bg-brand-50/50 opacity-60'
           : 'border-brand-200 bg-brand-50'
       }`}
+      style={{ touchAction: 'none' }}
       role="slider"
       aria-valuemin={0}
       aria-valuemax={100}
@@ -68,16 +78,30 @@ export function SlideToComplete({
       aria-disabled={locked || undefined}
       onPointerDown={(e) => {
         if (locked) return;
+        e.preventDefault();
+        e.stopPropagation();
         dragging.current = true;
-        (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+        trackRef.current?.setPointerCapture?.(e.pointerId);
         updateFromClientX(e.clientX);
       }}
       onPointerMove={(e) => {
         if (!dragging.current || locked) return;
+        e.preventDefault();
+        e.stopPropagation();
         updateFromClientX(e.clientX);
       }}
-      onPointerUp={endDrag}
-      onPointerCancel={reset}
+      onPointerUp={(e) => {
+        e.stopPropagation();
+        endDrag();
+      }}
+      onLostPointerCapture={() => {
+        endDrag();
+      }}
+      onPointerCancel={(e) => {
+        e.stopPropagation();
+        if (!dragging.current) return;
+        reset();
+      }}
     >
       <div
         className="pointer-events-none absolute inset-y-0 left-0 rounded-full bg-accent/25"
@@ -87,7 +111,7 @@ export function SlideToComplete({
         {busy ? 'Concluindo…' : label}
       </p>
       <div
-        className="absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow"
+        className="pointer-events-none absolute top-1 flex h-12 w-12 items-center justify-center rounded-full bg-accent text-white shadow"
         style={{ left: `calc(${progress * 100}% - ${progress * 48}px)` }}
         aria-hidden
       >

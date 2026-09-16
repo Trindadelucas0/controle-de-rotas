@@ -25,6 +25,7 @@ div 100dvh (sem chrome do app)
 ├── botões rápidos de marco (Porteira / Ponte / Bifurcação / Estrada ruim) — **só se** `recordTrip` (Gravar viagem)
 ├── HUD inferior: tempo, km, ETA, km/h
 │   missão Gravar: **Adicionar ponto** + Trecho/Total/pontos + slider Finalizar por completo
+│   visita aberta (ARRIVED/IN_PROGRESS): banner + slider desabilitado (não abre modal)
 └── controles: Encerrar (confirm); botão alvo / Centralizar (follow) **acima do HUD** (`-top-14` / `sm:-top-16`, sobe com marcos)
 ```
 
@@ -83,7 +84,7 @@ N/A.
 | Ação | Efeito |
 | --- | --- |
 | Encerrar | confirma → `/field/my-route` (não cancela rota) |
-| Arrastar para concluir | modal km/combustível/foto → `POST /field/routes/:id/complete` |
+| Arrastar para concluir | modal km/combustível/foto → `POST /field/routes/:id/complete`. Visita `ARRIVED`/`IN_PROGRESS`: slider **desabilitado**, banner com link `/field/visits/{id}`; não abre modal. Missão `recordNewCustomer` não aplica este bloqueio. |
 | Adicionar ponto | só missão `recordNewCustomer`; sheet nome*; `POST /field/routes/:id/record-point`; GPS não para |
 | Cheguei (banner ~80 m) | abre `/field/visits/[id]` — **não** grava check-in sozinho |
 | Centralizar (alvo) | reativa follow e recentraliza no ícone do carro na hora |
@@ -110,6 +111,7 @@ N/A.
 | landmark remove error | mensagem no banner; botões de novo |
 | empty | tratado como error |
 | gravando missão | Adicionar ponto + Finalizar; sem GPS o ponto fica desabilitado |
+| visita aberta | banner “Finalize a visita…” + **Abrir visita**; arraste desabilitado |
 
 ### 8. Permissões
 
@@ -146,3 +148,4 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 11. Rota de 1 cliente com trilha ACTIVE (viagem passada): Play → Navegar com GPS. Tempo/Restante/ETA preenchidos após o 1º fix; linha menta nasce no carro (não no início da gravação). Acelerar/reduzir muda Tempo e ETA; Restante só cai com o deslocamento. Parado: VEL. 0; Tempo não volta às horas da viagem original.
 12. Banner de marco: fundo escuro, título âmbar, **OK** ou **Sim/Não** — legível sobre o mapa; considera marcos de **todas** as paradas da rota.
 13. Missão **Gravar cliente**: HUD GRAVAR + **Adicionar ponto**; após 2 pontos continua Gravando; Finalizar **não** pede nome; rota clássica com Gravar viagem **não** mostra Adicionar ponto.
+14. Cheguei sem **Finalizar visita**: banner no HUD + arraste opaco; **Abrir visita** vai para `/field/visits/{id}`; o modal de km/foto **não** abre. Arraste até o fim sobre o mapa **não** volta ao início no meio do gesto.

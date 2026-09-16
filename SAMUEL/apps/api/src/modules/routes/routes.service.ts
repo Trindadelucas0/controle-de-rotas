@@ -1658,6 +1658,21 @@ export class RoutesService {
       );
     }
 
+    if (!route.recordNewCustomer) {
+      const openVisit = route.stops.find(
+        (s) =>
+          s.visit?.status === VisitStatus.ARRIVED ||
+          s.visit?.status === VisitStatus.IN_PROGRESS,
+      );
+      if (openVisit) {
+        throw httpError(
+          HttpStatus.UNPROCESSABLE_ENTITY,
+          'ROUTE_HAS_OPEN_VISIT',
+          'Finalize a visita em andamento antes de concluir a rota.',
+        );
+      }
+    }
+
     const isFieldEmployee = user.role === UserRole.EMPLOYEE;
     let endEvidence: {
       storageKey: string;
@@ -1788,19 +1803,6 @@ export class RoutesService {
         completedByOffice: !isFieldEmployee,
       });
       return this.getOne(user, id);
-    }
-
-    const openVisit = route.stops.find(
-      (s) =>
-        s.visit?.status === VisitStatus.ARRIVED ||
-        s.visit?.status === VisitStatus.IN_PROGRESS,
-    );
-    if (openVisit) {
-      throw httpError(
-        HttpStatus.UNPROCESSABLE_ENTITY,
-        'ROUTE_HAS_OPEN_VISIT',
-        'Finalize a visita em andamento antes de concluir a rota.',
-      );
     }
 
     const pendingStops = route.stops.filter((s) => s.status === RouteStopStatus.PENDING);

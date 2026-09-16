@@ -70,7 +70,14 @@ export function canCompleteAsFinished(
 export function hasOpenVisitOnStops(
   stops: { visit?: { status?: string } | null }[],
 ): boolean {
-  return stops.some(
+  return openVisitIdOnStops(stops) != null;
+}
+
+export function openVisitIdOnStops(
+  stops: { visit?: { id?: string; status?: string } | null }[],
+): string | null {
+  const stop = stops.find(
     (s) => s.visit?.status === 'ARRIVED' || s.visit?.status === 'IN_PROGRESS',
   );
+  return stop?.visit?.id ?? null;
 }

@@ -24,6 +24,7 @@ FieldPwaLocationGate (PWA+GPS em HTTPS; HTTP = faixa NÃO ESTÁ EM HTTPS)
         ├── ▶ Iniciar rota / Iniciar gravação → /field/start/:id
         ├── Continuar navegação
         ├── SlideToComplete (arrastar) + modal CompleteRouteConfirm (missão: Encerrar gravação?)
+        │   visita aberta no card ativo: banner + slider desabilitado (sem precisar arrastar)
         ├── mini-mapa (~160–176px) — **oculto** em missão Gravar cliente
         ├── missão: lista de pontos (lápis se cadastro em aberto)
         └── stops: cliente + OS (sem Maps/Waze)
@@ -34,7 +35,7 @@ Bloco **Cadastros em aberto** no topo: clientes `profileIncomplete` da missão d
 ### 3. Informação
 
 Por rota: índice, status (Publicada / Em andamento), **data se não for hoje**, placa, duração/distância planejadas, N paradas.
-Conclusão: arrastar → modal. `COMPLETED` se 0 pendentes ou restante ≤ 500 m; senão `INCOMPLETE`. Visita aberta bloqueia. Encerrar navegação **não** conclui.
+Conclusão: arrastar → modal. `COMPLETED` se 0 pendentes ou restante ≤ 500 m; senão `INCOMPLETE`. Visita aberta (`ARRIVED`/`IN_PROGRESS`) **desabilita** o arraste no card ativo e mostra banner com link para `/field/visits/{id}` (não espera o gesto para o erro). Missão `recordNewCustomer` não aplica este bloqueio. Encerrar navegação **não** conclui.
 Mini-mapa: traçado planejado (OSRM se `plannedGeometryJson` existir; senão LineString pelas coordenadas das paradas). Sem zoom por scroll. Pinos = sequência. Nome do cliente no card é tinta (não laranja).
 Por parada: sequência publicada = mais perto do funcionário (GPS live ou empresa); após Play = ordem pelo GPS real. Navegação só pelo Rotas (`/field/navigate`).
 
@@ -58,7 +59,8 @@ Data implícita = hoje (`toDateInputValue`); a API também devolve `IN_PROGRESS`
 | ▶ Iniciar rota | PUBLISHED e nenhuma IN_PROGRESS | `/field/start/:id` |
 | ▶ Iniciar gravação | missão `recordNewCustomer` PUBLISHED | `/field/start/:id` |
 | Continuar navegação | IN_PROGRESS (do dia ou de outro dia) | `/field/navigate` |
-| Concluir rota | IN_PROGRESS (do dia ou de outro dia) | modal km/combustível/foto → `POST /field/routes/:id/complete` |
+| Concluir rota | IN_PROGRESS (do dia ou de outro dia) e sem visita aberta | modal km/combustível/foto → `POST /field/routes/:id/complete` |
+| Abrir visita | visita `ARRIVED`/`IN_PROGRESS` no card ativo | `/field/visits/{id}` |
 | Status GPS | sempre | `/field/tracking-status` |
 | Ver agenda | empty state | `/agenda` |
 
@@ -74,6 +76,7 @@ Status do card: sucesso → `GPS ativo · HH:MM:SS`; falha → **mensagem da API
 | published / in_progress | cards |
 | aviso | “Conclua a rota em andamento…” nas rotas PUBLISHED |
 | leftover | faixa âmbar “Rota de dd/mm ainda em andamento” + card com **Concluir rota** (IN_PROGRESS de outro dia) |
+| visita aberta | no card ativo: banner + arraste desabilitado |
 | error | alert vermelho |
 | forbidden | N/A — API filtra |
 
@@ -103,3 +106,4 @@ Check-in visita, fotos, WebSocket; cancelar rota ao Encerrar da nav; deep-links 
 3. Iniciar → wizard → navigate → Encerrar → Concluir → iniciar 2ª.
 4. Com IN_PROGRESS: card Tracking → `GPS ativo · HH:MM:SS`; Network 200 em `POST /tracking/points`; pin no `/map` do gestor.
 5. Deixar uma rota IN_PROGRESS de ontem sem concluir → Minha rota de hoje mostra o card âmbar com **Concluir rota**; Play das rotas de hoje fica bloqueado até concluir.
+6. Cheguei sem finalizar: no card em andamento o arraste fica opaco, o aviso aparece **sem** arrastar, e **Abrir visita** leva à tela da visita.

@@ -25,6 +25,7 @@ import {
 import {
   canCompleteAsFinished,
   hasOpenVisitOnStops,
+  openVisitIdOnStops,
   remainingPlannedMeters,
 } from '@/lib/route-complete';
 
@@ -392,6 +393,9 @@ export function FieldMyRoutePage() {
         {routes.map((route, index) => {
           const canPlay = route.status === 'PUBLISHED' && !inProgress;
           const isActive = route.status === 'IN_PROGRESS';
+          const blockCompleteForOpenVisit =
+            !route.recordNewCustomer && hasOpenVisitOnStops(route.stops);
+          const openVisitId = openVisitIdOnStops(route.stops);
           return (
             <article
               key={route.id}
@@ -450,6 +454,22 @@ export function FieldMyRoutePage() {
 
               {isActive ? (
                 <div className="mt-3">
+                  {blockCompleteForOpenVisit ? (
+                    <p
+                      className="mb-2 rounded-[6px] border border-[var(--warn)]/40 bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn)]"
+                      role="alert"
+                    >
+                      Finalize a visita em andamento antes de concluir a rota.{' '}
+                      {openVisitId ? (
+                        <Link
+                          href={`/field/visits/${openVisitId}`}
+                          className="font-semibold underline"
+                        >
+                          Abrir visita
+                        </Link>
+                      ) : null}
+                    </p>
+                  ) : null}
                   <SlideToComplete
                     label={
                       route.recordNewCustomer
@@ -457,7 +477,10 @@ export function FieldMyRoutePage() {
                         : undefined
                     }
                     busy={completingId === route.id}
-                    disabled={completingId != null && completingId !== route.id}
+                    disabled={
+                      (completingId != null && completingId !== route.id) ||
+                      blockCompleteForOpenVisit
+                    }
                     onComplete={() => void openCompleteConfirm(route)}
                   />
                 </div>
