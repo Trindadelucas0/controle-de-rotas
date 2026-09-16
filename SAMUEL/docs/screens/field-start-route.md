@@ -12,7 +12,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - Stepper (5 passos numerados)
   - Card do passo atual
 - Campos:
-  - **GPS** — pedido automático ao abrir o passo; botão se o sistema exigir toque; erro se negado (obrigatório)
+  - **GPS** — pedido rápido (rede/Wi‑Fi ~8 s, depois GPS fino ~15 s). No iPhone **não** dispara sozinho (só no toque). Se falhar: **Continuar com origem planejada** (1ª parada ou pin da missão)
   - **Resumo** — mini-mapa Dark Matter com polyline menta + pin **pessoa**; paradas da mais perto para a mais longe + km (preview local; ordem definitiva no Play)
   - **Veículo** — pin vira **carro**; select (`GET /field/vehicles`); pré-seleciona veículo da rota se houver; mostra último km/combustível; omite carro em uso por outro
   - **Km inicial** — number, obrigatório, > 0 (pré-preenchido com o último km do veículo)
@@ -21,21 +21,22 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - **Observação** — textarea opcional, máx. 500 caracteres
   - Checklist/Confirmar mantêm o mini-mapa com pin carro
 - Ações / botões:
-  - Permitir localização → passo Resumo (solicita câmera/microfone em best-effort, não bloqueia)
+  - Permitir localização e continuar → passo Resumo (solicita câmera/microfone em best-effort, não bloqueia); botão **Obtendo GPS…** enquanto espera
+  - **Continuar com origem planejada** se o GPS falhar ou o iPhone não pedir sozinho
   - Continuar / Voltar entre passos
-  - **▶ Iniciar rota** (confirmar) → `POST /routes/:id/start` multipart (foto + km + veículo) → `/field/navigate`
-- Estados: loading | error (rota não encontrada) | already_active (link Minha rota) | wizard steps | submitting (botão disabled + overlay **Iniciando…** desde o toque, antes do GPS; trava de reentrada)
+  - **▶ Iniciar rota** (confirmar) → tenta GPS de novo; se falhar, usa origem planejada → `POST /routes/:id/start` multipart (foto + km + veículo) → `/field/navigate`
+- Estados: loading | error (rota não encontrada) | already_active (link Minha rota) | wizard steps | gpsBusy | submitting (botão disabled + overlay **Iniciando…** desde o toque, antes do GPS; trava de reentrada)
 - Chamadas de API:
   - `GET /field/my-route?date=` — valida rota `PUBLISHED`
   - `GET /field/vehicles?routeId=`
   - `POST /routes/:id/start` — multipart `file` + `{ vehicleId, startOdometerKm, startFuelLevel, startNotes?, latitude, longitude }`
 - Redirects: sucesso → `/field/navigate`; `ROUTE_ALREADY_ACTIVE` → link Minha rota para concluir; erro fatal → link Minha rota
-- Mobile / PWA: HTTPS pede GPS; HTTP LAN abre com faixa **NÃO ESTÁ EM HTTPS** e inicia sem GPS (1ª parada)
+- Mobile / PWA: HTTPS pede GPS (timeout curto; fallback de origem); HTTP LAN abre com faixa **NÃO ESTÁ EM HTTPS** e inicia sem GPS (1ª parada)
 - Acessibilidade: erros com `role="alert"`; labels nos campos
 - Fora de escopo desta tela: edição de paradas, cancelamento da rota, OCR do km
 - Como testar:
   1. Publicar rota para funcionário → Minha rota → **Iniciar rota**
-  2. Negar GPS → botão bloqueado / mensagem; permitir → avança
+  2. Negar GPS → mensagem; permitir ou **Continuar com origem planejada** → avança
   3. No passo Resumo, conferir ordem por proximidade (1 = mais perto)
   4. Escolher veículo, preencher km e combustível, **Tirar foto** (câmera) → Revisar → confirmar
   5. Ver redirect para navegação com mapa centralizado na 1ª parada (mais perto)

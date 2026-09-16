@@ -618,7 +618,7 @@ Ficha: [field-my-route.md](screens/field-my-route.md)
 
 | # | id | Conteúdo |
 | --- | --- | --- |
-| 1 | gps | pedido automático de GPS; em HTTP LAN **pula** (origem = 1ª parada) |
+| 1 | gps | pedido rápido de GPS (iOS só no toque); HTTP LAN **pula**; fallback **Continuar com origem planejada** |
 | 2 | summary | com GPS: pin **pessoa** + mais perto→mais longe + km; em HTTP: ordem planejada |
 | 3 | vehicle | pin **carro**; `GET /field/vehicles?routeId=` |
 | 4 | checklist | pin carro; Km inicial * · Combustível * · Foto do odômetro * · Observação max 500 |
@@ -626,7 +626,7 @@ Ficha: [field-my-route.md](screens/field-my-route.md)
 
 **KPI:** N parada(s) · duração planejada · distância planejada (da rota).
 
-**Ações:** Continuar / Voltar · ▶ Iniciar rota → `POST /routes/:id/start` multipart (foto do odômetro + veículo/km/combustível/GPS) → `/field/navigate`. Veículo em uso por outra rota: 409 `VEHICLE_IN_USE`.
+**Ações:** Permitir localização / Continuar com origem planejada · Continuar / Voltar · ▶ Iniciar rota → `POST /routes/:id/start` multipart (foto do odômetro + veículo/km/combustível/GPS ou origem planejada) → `/field/navigate`. Veículo em uso por outra rota: 409 `VEHICLE_IN_USE`.
 
 **Estados:** “Preparando início da rota…” · erro sem rota + voltar · `ROUTE_ALREADY_ACTIVE` com data da rota travada + link “Ir para Minha rota e concluir” · gpsError vermelho · “Informe o km inicial do veículo.” · submitting desde o toque em Iniciar (antes do GPS) + overlay **Iniciando…** · success redirect. Já IN_PROGRESS → erro ao abrir.
 

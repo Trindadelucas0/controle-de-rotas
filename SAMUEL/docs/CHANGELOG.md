@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.18.2 — 2026-09-15
+
+### Play e foto da visita na VPS (HTTPS)
+
+- GPS do campo pede rede/Wi‑Fi primeiro (~8 s), não 45 s de GPS fino; no iPhone o Play não dispara localização sozinho (só no toque)
+- Se o GPS falhar, **Continuar com origem planejada** (1ª parada ou pin da missão) e o Play segue
+- Foto da visita: **Tirar foto** / **Galeria**, comprime JPEG no celular, não espera GPS; coords do Cheguei; Multer >5 MB vira 422 “Foto excede 5 MB”
+- Arquivos: `field-tracking.ts`, `FieldStartRoutePage.tsx`, `FieldPwaLocationGate.tsx`, `FieldVisitPage.tsx`, `field-photo.ts`, `http-exception.filter.ts`
+- Como validar: HTTPS/PWA Iniciar rota e Iniciar gravação passam de Permissões; após Cheguei a foto anexa
+
 ## v0.18.1 — 2026-09-14
 
 ### Câmera do odômetro e marcos na visita

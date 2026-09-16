@@ -76,6 +76,7 @@ function publicApiErrorMessage(
     return 'Não foi possível concluir a solicitação. Recarregue a página e tente de novo.';
   }
   if (body.message) return body.message;
+  if (status === 413) return 'Foto excede 5 MB.';
   if (status === 429) return 'Muitas tentativas. Aguarde e tente de novo.';
   return 'Não foi possível concluir a solicitação.';
 }

@@ -7,6 +7,8 @@ import {
 } from '@nestjs/common';
 import { Response } from 'express';
 
+import { MulterError } from 'multer';
+
 @Catch()
 export class HttpExceptionFilter implements ExceptionFilter {
   catch(exception: unknown, host: ArgumentsHost) {
@@ -17,7 +19,11 @@ export class HttpExceptionFilter implements ExceptionFilter {
     let code = 'INTERNAL_ERROR';
     let message = 'Erro interno do servidor.';
 
-    if (exception instanceof HttpException) {
+    if (exception instanceof MulterError && exception.code === 'LIMIT_FILE_SIZE') {
+      statusCode = HttpStatus.UNPROCESSABLE_ENTITY;
+      code = 'VISIT_EVIDENCE_TOO_LARGE';
+      message = 'Foto excede 5 MB.';
+    } else if (exception instanceof HttpException) {
       statusCode = exception.getStatus();
       const body = exception.getResponse();
       if (typeof body === 'string') {
@@ -54,7 +60,10 @@ export class HttpExceptionFilter implements ExceptionFilter {
       message = 'Recurso não encontrado.';
     }
 
-    if (!(exception instanceof HttpException)) {
+    if (
+      !(exception instanceof HttpException) &&
+      !(exception instanceof MulterError)
+    ) {
       // eslint-disable-next-line no-console
       console.error('[unhandled]', exception);
     }

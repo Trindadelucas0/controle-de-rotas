@@ -12,13 +12,13 @@
   - GPS check-in: obrigatório no Cheguei
 - **Resultado** (radio): `DONE` Realizada | `NO_CONTACT` Cliente ausente | `REFUSED` Sem interesse | `FOLLOW_UP` Precisa retorno
   - **Observações** (textarea, máx. 2000): obrigatório se resultado ≠ Realizada
-  - **Fotos** (file, 1–5, JPEG/PNG/WebP, 5 MB): mínimo 1 se Realizada; `capture="environment"`
+  - **Fotos** (1–5): **Tirar foto** (câmera) / **Galeria**; JPEG comprimido no celular (lado ≤1600 px); coords do Cheguei (não espera GPS de novo); mínimo 1 se Realizada; HEIC vira erro de formato; >5 MB após compressão: “Foto excede 5 MB.”
   - **Remarcar próxima** (checkbox + datetime-local): obrigatório se Precisa retorno; data futura
   - GPS check-out: obrigatório em Finalizar
   - Se a rota tem Gravar viagem: envia `trailPoints` (fila local) no Cheguei e no Finalizar; aviso âmbar se < 2 pontos (segundo toque confirma); bloco **Acesso no caminho** (mesmos 4 marcos da navegação; GPS do toque, fallback lat/lng do check-in; fila `samuel:landmark-queue`)
 - Ações / botões:
   - **Cheguei — chegada verificada** → `POST /api/v1/visits/:id/check-in` (+ `trailPoints` se gravar viagem)
-  - **Adicionar foto** → `POST /api/v1/visits/:id/evidence` (multipart)
+  - **Tirar foto** / **Galeria** → `POST /api/v1/visits/:id/evidence` (multipart JPEG)
   - **Porteira / Ponte / Bifurcação / Estrada ruim** (só Gravar viagem, após check-in) → `POST /api/v1/customers/:id/landmarks`
   - **Finalizar visita** → `POST /api/v1/visits/:id/check-out` → redirect `/field/navigate`
   - Voltar à navegação
@@ -43,6 +43,6 @@
   2. Realizada + foto + Finalizar → redirect navegação; próxima parada pendente.
   3. Precisa retorno + data futura → nova visita na Agenda (gestor em `/services/[id]`).
   4. Gestor vê relatório e fotos no detalhe da OS.
-  5. Sem foto em Realizada → 422; outro EMPLOYEE → 403.
+  5. Sem foto em Realizada → 422; outro EMPLOYEE → 403. Foto grande: comprime; se ainda >5 MB, mensagem clara (não 500).
   6. Rota Gravar viagem: badge na nav com pts; Cheguei com poucos pontos mostra aviso âmbar (segundo toque confirma); após check-in, faixa Trilha gravada (ou tentativa no Finalizar) e botões de marco **Acesso no caminho**.
   7. Rota sem Gravar viagem: visita sem o bloco de marcos.

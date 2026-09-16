@@ -34,14 +34,14 @@ export function gpsActiveLabel(d = new Date()) {
 /** Rede/Wi‑Fi — rápido para o pin aparecer. */
 export const GEO_COARSE: PositionOptions = {
   enableHighAccuracy: false,
-  timeout: 12_000,
+  timeout: 8_000,
   maximumAge: 60_000,
 };
 
-/** GPS fino (satélite). */
+/** GPS fino (satélite). Timeout curto: 45s travava o Play na VPS. */
 export const GEO_HIGH_ACCURACY: PositionOptions = {
   enableHighAccuracy: true,
-  timeout: 45_000,
+  timeout: 15_000,
   maximumAge: 15_000,
 };
 
@@ -112,14 +112,16 @@ export function isTransientGeolocationError(
 }
 
 /**
- * Posição atual: tenta GPS fino; se timeout/indisponível, cai para rede/Wi‑Fi.
+ * Posição atual: rede/Wi‑Fi primeiro (~8 s). Se falhar, tenta GPS fino (~15 s).
  * Rejeita de verdade em permissão negada ou se as duas tentativas falharem.
  */
 export async function requestCurrentPosition(
-  options: PositionOptions = GEO_HIGH_ACCURACY,
+  options: PositionOptions = GEO_COARSE,
 ): Promise<GeolocationPosition> {
+  const coarseFirst = options.enableHighAccuracy !== true;
+  const first = coarseFirst ? { ...GEO_COARSE, ...options, enableHighAccuracy: false } : GEO_COARSE;
   try {
-    return await getPositionOnce(options);
+    return await getPositionOnce(first);
   } catch (err) {
     if (!isGeolocationPositionError(err) || err.code === 1) {
       throw err;
@@ -127,11 +129,10 @@ export async function requestCurrentPosition(
     if (!isTransientGeolocationError(err)) {
       throw err;
     }
-    // Já pediu coarse explicitamente — não re-tenta o mesmo.
-    if (options === GEO_COARSE || options.enableHighAccuracy === false) {
-      throw err;
+    if (!coarseFirst) {
+      return getPositionOnce(GEO_COARSE);
     }
-    return getPositionOnce(GEO_COARSE);
+    return getPositionOnce(GEO_HIGH_ACCURACY);
   }
 }
 

@@ -171,7 +171,7 @@ Em cada card: status, veículo, km/tempo, paradas, **mini-mapa** da linha planej
 
 ### 6.2 Iniciar rota (wizard)
 
-Passos: localização → resumo (ordem mais perto → mais longe se houver GPS) → escolher veículo (último km/combustível; carro em uso por outro não aparece) → **Km inicial**, **Combustível** e **foto do odômetro** (**Tirar foto** abre a câmera; **Galeria** se precisar de arquivo) → confirmar **▶ Iniciar rota** (botão vira **Iniciando…**).
+Passos: localização (**Permitir localização** — no iPhone só depois do toque; se o GPS falhar, **Continuar com origem planejada**) → resumo (ordem mais perto → mais longe se houver GPS) → escolher veículo (último km/combustível; carro em uso por outro não aparece) → **Km inicial**, **Combustível** e **foto do odômetro** (**Tirar foto** abre a câmera; **Galeria** se precisar de arquivo; a foto é comprimida) → confirmar **▶ Iniciar rota** (botão vira **Iniciando…**).
 
 Ao **concluir**, o modal pede km final, combustível e outra foto. O app **não** avisa fraude; o gestor vê no perfil.
 
@@ -196,6 +196,8 @@ Com **Gravar viagem**: badge **Gravando · N pts** e os quatro botões de marco.
 5. **Fotos** — pelo menos uma se Realizada (**Adicionar foto**).
 6. Opcional **remarcar próxima** (obrigatório se Precisa retorno).
 7. **Finalizar visita** (GPS de novo) → volta à navegação na próxima parada pendente.
+
+Fotos da visita: **Tirar foto** ou **Galeria**; o app comprime JPEG e usa a posição do Cheguei (não espera GPS de novo). HEIC da galeria do iPhone não entra — use a câmera do app.
 
 Visita aberta **bloqueia** concluir a rota.
 

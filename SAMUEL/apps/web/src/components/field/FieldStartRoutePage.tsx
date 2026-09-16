@@ -19,6 +19,7 @@ import { ActionButton } from '@/components/ui/ActionButton';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { OdometerPhotoCapture } from './OdometerPhotoCapture';
 import { FUEL_LEVEL_OPTIONS, type FuelLevel } from '@/lib/field-fuel';
+import { isIosDevice } from '@/lib/pwa';
 
 type RouteStop = {
   id: string;
@@ -33,6 +34,8 @@ type RouteDetail = {
   status: string;
   date?: string;
   recordNewCustomer?: boolean;
+  originLatitude?: number | null;
+  originLongitude?: number | null;
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
   vehicle: { id: string; plate: string; brand: string | null; model: string | null } | null;
@@ -68,8 +71,18 @@ async function requestGps(): Promise<GpsFix> {
 
 function fallbackGpsFromRoute(route: RouteDetail): GpsFix | null {
   const first = [...route.stops].sort((a, b) => a.sequence - b.sequence)[0];
-  if (!first) return null;
-  return { latitude: first.latitude, longitude: first.longitude };
+  if (first) {
+    return { latitude: first.latitude, longitude: first.longitude };
+  }
+  if (
+    route.originLatitude != null &&
+    route.originLongitude != null &&
+    Number.isFinite(route.originLatitude) &&
+    Number.isFinite(route.originLongitude)
+  ) {
+    return { latitude: route.originLatitude, longitude: route.originLongitude };
+  }
+  return null;
 }
 
 async function requestOptionalMedia() {
@@ -100,6 +113,7 @@ export function FieldStartRoutePage() {
   const [gps, setGps] = useState<GpsFix | null>(null);
   const [gpsFallback, setGpsFallback] = useState(false);
   const [gpsError, setGpsError] = useState<string | null>(null);
+  const [gpsBusy, setGpsBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -170,7 +184,7 @@ export function FieldStartRoutePage() {
     if (isInsecureGeolocationContext()) {
       const fallback = fallbackGpsFromRoute(route);
       if (!fallback) {
-        setGpsError('Sem GPS neste HTTP e a rota não tem paradas.');
+        setGpsError('Sem GPS neste HTTP e a rota não tem origem.');
         return;
       }
       setGps(fallback);
@@ -179,6 +193,8 @@ export function FieldStartRoutePage() {
       setStep('summary');
       return;
     }
+
+    if (isIosDevice()) return;
 
     let cancelled = false;
     void requestGps()
@@ -237,8 +253,24 @@ export function FieldStartRoutePage() {
   const markerKind = step === 'summary' || !vehicleId ? 'person' : 'car';
   const showMap = Boolean(gps) && step !== 'gps';
 
+  async function applyPlannedOrigin() {
+    if (!route) return;
+    const fallback = fallbackGpsFromRoute(route);
+    if (!fallback) {
+      setGpsError(
+        'Sem GPS e sem origem planejada. Em Ajustes → Localização, permita o Rotas e tente de novo.',
+      );
+      return;
+    }
+    setGps(fallback);
+    setGpsFallback(true);
+    setGpsError(null);
+    setStep('summary');
+  }
+
   async function onEnableGps() {
     setGpsError(null);
+    setGpsBusy(true);
     try {
       const fix = await requestGps();
       setGps(fix);
@@ -247,6 +279,8 @@ export function FieldStartRoutePage() {
       setStep('summary');
     } catch (e) {
       setGpsError(gpsCatchMessage(e));
+    } finally {
+      setGpsBusy(false);
     }
   }
 
@@ -268,22 +302,15 @@ export function FieldStartRoutePage() {
     setErrorCode(null);
     let fix = gps;
     if (!fix) {
-      if (isInsecureGeolocationContext()) {
+      try {
+        fix = await requestGps();
+        setGps(fix);
+        setGpsFallback(false);
+      } catch {
         fix = fallbackGpsFromRoute(route);
         if (fix) {
           setGps(fix);
           setGpsFallback(true);
-        }
-      } else {
-        try {
-          fix = await requestGps();
-          setGps(fix);
-          setGpsFallback(false);
-        } catch (e) {
-          setError(e instanceof Error ? e.message : 'GPS obrigatório para iniciar');
-          setErrorCode(null);
-          setSubmitting(false);
-          return;
         }
       }
     }
@@ -416,17 +443,32 @@ export function FieldStartRoutePage() {
         <div className="space-y-4 rounded-2xl border border-brand-100 bg-surface p-5">
           <h2 className="font-semibold text-brand-900">Permissões</h2>
           <p className="text-sm text-[var(--muted)]">
-            A <strong>localização</strong> é pedida automaticamente ao abrir o app. Se o aviso do
-            celular não apareceu, toque no botão abaixo e escolha <strong>Permitir</strong>.
+            A <strong>localização</strong> é pedida ao toque (no iPhone o aviso só aparece assim).
+            Se o GPS falhar, dá para continuar com a origem planejada.
           </p>
-          {gpsError ? <p className="text-sm text-[var(--danger)]">{gpsError}</p> : null}
+          {gpsError ? (
+            <p className="text-sm text-[var(--danger)]" role="alert">
+              {gpsError}
+            </p>
+          ) : null}
           <button
             type="button"
+            disabled={gpsBusy}
             onClick={() => void onEnableGps()}
-            className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white"
+            className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white disabled:opacity-60"
           >
-            Permitir localização e continuar
+            {gpsBusy ? 'Obtendo GPS…' : 'Permitir localização e continuar'}
           </button>
+          {gpsError && fallbackGpsFromRoute(route) ? (
+            <button
+              type="button"
+              disabled={gpsBusy}
+              onClick={() => void applyPlannedOrigin()}
+              className="w-full rounded-xl border border-brand-200 px-4 py-3 text-sm font-semibold disabled:opacity-60"
+            >
+              Continuar com origem planejada
+            </button>
+          ) : null}
         </div>
       ) : null}
 

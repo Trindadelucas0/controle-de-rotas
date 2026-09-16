@@ -26,7 +26,7 @@ section max-w-lg
 
 | Passo | Conteúdo |
 | --- | --- |
-| gps | pedido automático de GPS; em HTTP LAN o passo é **pulado** (origem = 1ª parada) |
+| gps | pedido rápido de GPS (iOS só no toque); HTTP LAN **pula**; fallback origem planejada |
 | summary | com GPS: pin **pessoa** + mais perto→mais longe + km; em HTTP: ordem planejada |
 | vehicle | pin vira **carro**; select veículos (`GET /field/vehicles?routeId=`) |
 | checklist | pin carro; Km inicial * (number); Combustível * (EMPTY…FULL); Observação (max 500) |
@@ -81,6 +81,6 @@ Upload de foto no checklist; check-in de visita; voz.
   1. Publicar rota com 3+ clientes → Iniciar → permitir GPS → no Resumo a 1ª linha é o cliente mais perto
   2. Confirmar Play → navigate: destino = parada 1 (mais perto); linha sai do GPS atual
   3. Celular `http://IP` → Iniciar → Resumo sem pedir Permitir → Play funciona; pin ao vivo não aparece
-  4. Negar GPS no PC/HTTPS → não avança
+  4. Negar GPS no PC/HTTPS → mensagem; **Continuar com origem planejada** avança
   5. Km vazio no confirm → erro
   6. Rota já IN_PROGRESS → erro ao abrir start

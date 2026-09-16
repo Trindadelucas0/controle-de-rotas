@@ -22,6 +22,8 @@ import {
 
 import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
 
+import { compressFieldPhoto } from '@/lib/field-photo';
+
 import {
 
   kickLandmarkCreateQueue,
@@ -207,6 +209,8 @@ export function FieldVisitPage() {
   const visitId = params?.id;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
 
 
@@ -532,19 +536,27 @@ export function FieldVisitPage() {
 
     try {
 
-      const pos = await requestCurrentPosition().catch(() => null);
+      const compressed = await compressFieldPhoto(file);
 
       const form = new FormData();
 
-      form.append('file', file);
+      form.append('file', compressed);
 
-      if (pos) {
+      if (
 
-        form.append('latitude', String(pos.coords.latitude));
+        visit?.checkedInLat != null &&
 
-        form.append('longitude', String(pos.coords.longitude));
+        visit?.checkedInLng != null &&
 
-        form.append('accuracy', String(pos.coords.accuracy ?? 0));
+        Number.isFinite(visit.checkedInLat) &&
+
+        Number.isFinite(visit.checkedInLng)
+
+      ) {
+
+        form.append('latitude', String(visit.checkedInLat));
+
+        form.append('longitude', String(visit.checkedInLng));
 
       }
 
@@ -554,7 +566,19 @@ export function FieldVisitPage() {
 
     } catch (e) {
 
-      setUploadError(e instanceof ApiError ? e.message : 'Falha ao enviar foto.');
+      setUploadError(
+
+        e instanceof ApiError
+
+          ? e.message
+
+          : e instanceof Error
+
+            ? e.message
+
+            : 'Falha ao enviar foto.',
+
+      );
 
     } finally {
 
@@ -1050,6 +1074,8 @@ export function FieldVisitPage() {
 
                 </p>
 
+                <div className="flex flex-wrap gap-2">
+
                 <button
 
                   type="button"
@@ -1062,9 +1088,27 @@ export function FieldVisitPage() {
 
                 >
 
-                  {uploading ? 'Enviando…' : 'Adicionar foto'}
+                  {uploading ? 'Enviando…' : 'Tirar foto'}
 
                 </button>
+
+                <button
+
+                  type="button"
+
+                  disabled={uploading || evidence.length >= 5}
+
+                  onClick={() => galleryInputRef.current?.click()}
+
+                  className="rounded-lg border border-white/25 px-3 py-1.5 text-xs font-semibold text-white disabled:opacity-50"
+
+                >
+
+                  Galeria
+
+                </button>
+
+                </div>
 
               </div>
 
@@ -1074,9 +1118,31 @@ export function FieldVisitPage() {
 
                 type="file"
 
-                accept="image/jpeg,image/png,image/webp"
+                accept="image/*"
 
                 capture="environment"
+
+                className="sr-only"
+
+                onChange={(e) => {
+
+                  const file = e.target.files?.[0];
+
+                  if (file) void handleUploadPhoto(file);
+
+                  e.target.value = '';
+
+                }}
+
+              />
+
+              <input
+
+                ref={galleryInputRef}
+
+                type="file"
+
+                accept="image/*"
 
                 className="sr-only"
 

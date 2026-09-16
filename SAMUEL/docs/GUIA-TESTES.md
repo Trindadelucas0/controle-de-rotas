@@ -236,7 +236,8 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 
 - [ ] Menu **Campo** (ou no Início clique **Minha rota**).
 - [ ] No card da rota publicada, clique em **▶ Iniciar rota**.
-- [ ] Se pedir localização, **Permitir**.
+- [ ] Se pedir localização, **Permitir**. No iPhone, toque em **Permitir localização e continuar** (não espera sozinho).
+- [ ] Se ficar em “Obtendo GPS…” ou der timeout, toque **Continuar com origem planejada**.
 - [ ] Passo resumo: confira a ordem (com GPS, a 1ª é a mais perto). Clique **Continuar**.
 - [ ] Escolha o **veículo**. **Continuar**.
 - [ ] Preencha **Km inicial do veículo** e **Combustível**. No celular, **Tirar foto** (câmera) ou **Galeria**. **Continuar** / **Revisar**.
@@ -250,7 +251,8 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 - Já existe rota em andamento → volte a Minha rota e **conclua** a outra primeiro (“Ir para Minha rota e concluir”).
 - Km vazio no confirm → “Informe o km inicial do veículo.”
 - HTTP no celular: faixa **NÃO ESTÁ EM HTTPS**; o wizard **não** espera GPS; ordem = planejada; pin ao vivo pode não aparecer.
-- Negar GPS no computador / HTTPS → não avança o passo de localização.
+- Negar GPS no computador / HTTPS → mensagem; dá para **Continuar com origem planejada**.
+- HTTPS na VPS não deve ficar preso em “Pedindo permissão ao sistema…” sem botão.
 
 ---
 
@@ -283,7 +285,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 - [ ] Em **Resultado**, marque **Realizada** (ou outro: Cliente ausente, Sem interesse, Precisa retorno).
 - [ ] Se a rota tiver **Gravar viagem**, use **Acesso no caminho** (ex. **Porteira**) se estiver na porteira/ponte/etc.
 - [ ] Se **não** for Realizada, preencha **Observações**.
-- [ ] Se for **Realizada**, clique em **Adicionar foto** e envie pelo menos uma (JPEG/PNG/WebP).
+- [ ] Se for **Realizada**, **Tirar foto** (câmera) ou **Galeria** e envie pelo menos uma (JPEG/PNG/WebP; o app comprime).
 - [ ] Se **Precisa retorno**, marque remarcar e escolha data/hora futura.
 - [ ] Clique em **Finalizar visita**.
 
@@ -292,6 +294,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Se falhar**
 
 - Realizada sem foto → não finaliza.
+- Foto da visita não deve esperar GPS de novo; se o servidor recusar tamanho, aparece “Foto excede 5 MB.”
 - Precisa retorno sem data futura → bloqueia.
 - Visita já finalizada → erro.
 - Sem GPS no finalizar → não envia.

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { validateOdometerPhoto } from '@/lib/odometer-photo';
+import { compressFieldPhoto } from '@/lib/field-photo';
 
 type Props = {
   id: string;
@@ -35,20 +35,20 @@ export function OdometerPhotoCapture({
     return () => URL.revokeObjectURL(url);
   }, [file]);
 
-  function applyFile(next: File | null) {
+  async function applyFile(next: File | null) {
     if (!next) {
       setError(null);
       onChange(null);
       return;
     }
-    const msg = validateOdometerPhoto(next);
-    if (msg) {
-      setError(msg);
+    try {
+      const compressed = await compressFieldPhoto(next);
+      setError(null);
+      onChange(compressed);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Formato inválido. Use JPEG, PNG ou WebP.');
       onChange(null);
-      return;
     }
-    setError(null);
-    onChange(next);
   }
 
   return (
@@ -66,7 +66,7 @@ export function OdometerPhotoCapture({
         className="sr-only"
         disabled={disabled}
         onChange={(e) => {
-          applyFile(e.target.files?.[0] ?? null);
+          void applyFile(e.target.files?.[0] ?? null);
           e.target.value = '';
         }}
       />
@@ -78,7 +78,7 @@ export function OdometerPhotoCapture({
         className="sr-only"
         disabled={disabled}
         onChange={(e) => {
-          applyFile(e.target.files?.[0] ?? null);
+          void applyFile(e.target.files?.[0] ?? null);
           e.target.value = '';
         }}
       />

@@ -32,7 +32,7 @@ N/A.
 | Ação | Efeito |
 | --- | --- |
 | Instalar e usar localização | `beforeinstallprompt` nativo |
-| Permitir localização agora | `getCurrentPosition` / permissão |
+| Permitir localização agora | `requestCurrentPosition` (rede primeiro); timeout/indisponível **não** trava o PWA |
 | (nenhum) | sem API |
 
 ### 7. Estados
@@ -41,7 +41,7 @@ N/A.
 | --- | --- |
 | checking | “Verificando instalação e localização…” |
 | need-pwa | não está `display-mode: standalone` (só em HTTPS, fora de localhost) |
-| need-location | PWA sem GPS; erro `role=alert` se negar |
+| need-location | PWA pede GPS de verdade (não basta `permissions.granted`); TIMEOUT/UNAVAILABLE liberam o app; erro `role=alert` só se negar |
 | ready | libera a tela |
 | HTTP LAN | entra em `ready` + faixa **NÃO ESTÁ EM HTTPS** (GPS do browser segue bloqueado) |
 | localhost | não trava instalação |

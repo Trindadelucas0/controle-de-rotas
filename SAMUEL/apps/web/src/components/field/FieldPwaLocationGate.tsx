@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState, type ReactNode } from 'react';
 import {
   geolocationErrorMessage,
   isInsecureGeolocationContext,
+  isTransientGeolocationError,
   requestCurrentPosition,
 } from '@/lib/field-tracking';
 import { InsecureHttpBanner } from '@/components/field/InsecureHttpBanner';
@@ -60,20 +61,13 @@ export function FieldPwaLocationGate({ children }: { children: ReactNode }) {
         setLocationError('Geolocation indisponível neste dispositivo');
         return false;
       }
-      if (typeof navigator.permissions?.query === 'function') {
-        try {
-          const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-          if (perm.state === 'granted') return true;
-        } catch {
-          // Safari antigo: segue para getCurrentPosition
-        }
-      }
       await requestCurrentPosition();
       return true;
     } catch (err) {
-      setLocationError(
-        geolocationErrorMessage(err as GeolocationPositionError),
-      );
+      if (isTransientGeolocationError(err as { code?: number })) {
+        return true;
+      }
+      setLocationError(geolocationErrorMessage(err as GeolocationPositionError));
       return false;
     } finally {
       setRequestingLocation(false);
@@ -97,20 +91,6 @@ export function FieldPwaLocationGate({ children }: { children: ReactNode }) {
         return deferred ? 'android-prompt' : 'android-manual';
       });
       setPhase('need-pwa');
-      return;
-    }
-
-    let alreadyGranted = false;
-    try {
-      if (typeof navigator.permissions?.query === 'function') {
-        const perm = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
-        alreadyGranted = perm.state === 'granted';
-      }
-    } catch {
-      alreadyGranted = false;
-    }
-    if (alreadyGranted) {
-      setPhase('ready');
       return;
     }
 
