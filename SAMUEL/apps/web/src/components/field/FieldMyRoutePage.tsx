@@ -16,6 +16,8 @@ import {
 import { toDateInputValue } from '@/lib/ops-labels';
 import { formatDuration, formatMeters } from '@/components/routes/routes-planner-shared';
 import { FieldRoutePreviewMap } from '@/components/field/FieldRoutePreviewMap';
+import { FieldRegionPreviewMap } from '@/components/field/FieldRegionPreviewMap';
+import { formatRegionKm, isRegionMission } from '@/lib/region-circle';
 import { SlideToComplete } from '@/components/field/SlideToComplete';
 import { CompleteRouteConfirm, type CompleteRoutePayload } from '@/components/field/CompleteRouteConfirm';
 import {
@@ -66,6 +68,10 @@ type MyRoute = {
   startedAt?: string | null;
   recordTrip?: boolean;
   recordNewCustomer?: boolean;
+  assignmentRegionLatitude?: number | null;
+  assignmentRegionLongitude?: number | null;
+  assignmentRegionRadiusMeters?: number | null;
+  assignmentRegionName?: string | null;
   recordedCustomers?: RecordedCustomer[];
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
@@ -322,12 +328,20 @@ export function FieldMyRoutePage() {
             {dayDistance > 0 ? ` · ${formatMeters(dayDistance)}` : ''}
           </p>
         </div>
+        <div className="flex flex-wrap gap-2">
+        <Link
+          href="/field/fuel-new"
+          className="ops-btn ops-btn-secondary"
+        >
+          Abastecer
+        </Link>
         <Link
           href="/field/tracking-status"
           className="ops-btn ops-btn-secondary"
         >
           Status GPS
         </Link>
+        </div>
       </div>
 
       {leftoverFromOtherDay && inProgressYmd ? (
@@ -408,8 +422,12 @@ export function FieldMyRoutePage() {
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <p className="text-sm font-semibold text-brand-900">
-                    {route.recordNewCustomer ? 'Gravar acesso' : `Rota ${index + 1}`} ·{' '}
-                    {statusLabel(route.status)}
+                    {isRegionMission(route)
+                      ? 'Gravar região'
+                      : route.recordNewCustomer
+                        ? 'Gravar acesso'
+                        : `Rota ${index + 1}`}{' '}
+                    · {statusLabel(route.status)}
                     {routeDateYmd(route.date) !== searchedDate
                       ? ` · ${formatDateBr(routeDateYmd(route.date))}`
                       : ''}
@@ -426,6 +444,13 @@ export function FieldMyRoutePage() {
                       ? ` · ${route.recordedCustomers?.length ?? 0} ponto(s)`
                       : ` · ${route.stops.length} parada(s)`}
                   </p>
+                  {isRegionMission(route) && route.assignmentRegionRadiusMeters != null ? (
+                    <p className="mt-2 text-sm text-brand-800">
+                      Você foi designado para{' '}
+                      {route.assignmentRegionName || 'esta região'} · raio{' '}
+                      {formatRegionKm(route.assignmentRegionRadiusMeters)}
+                    </p>
+                  ) : null}
                 </div>
                 <div className="flex flex-wrap gap-2">
                   {canPlay ? (
@@ -486,7 +511,16 @@ export function FieldMyRoutePage() {
                 </div>
               ) : null}
 
-              {route.recordNewCustomer ? null : (
+              {isRegionMission(route) &&
+              route.assignmentRegionLatitude != null &&
+              route.assignmentRegionLongitude != null &&
+              route.assignmentRegionRadiusMeters != null ? (
+                <FieldRegionPreviewMap
+                  latitude={route.assignmentRegionLatitude}
+                  longitude={route.assignmentRegionLongitude}
+                  radiusMeters={route.assignmentRegionRadiusMeters}
+                />
+              ) : route.recordNewCustomer ? null : (
               <FieldRoutePreviewMap
                 geometryJson={route.plannedGeometryJson}
                 stops={route.stops.map((s) => ({

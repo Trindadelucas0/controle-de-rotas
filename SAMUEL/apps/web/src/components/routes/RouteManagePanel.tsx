@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { addDaysYmd, toDateInputValue } from '@/lib/ops-labels';
 import { formatDuration, formatMeters } from './routes-planner-shared';
+import { RouteCostCard } from '@/components/costs/RouteCostCard';
 
 const EDITABLE = new Set(['PLANNED', 'PUBLISHED']);
 const PLAN_STATUSES = new Set(['SCHEDULED', 'RESCHEDULED', 'ASSIGNED']);
@@ -41,6 +42,10 @@ type RouteDetail = {
   roundtrip: boolean;
   recordTrip: boolean;
   recordNewCustomer?: boolean;
+  assignmentRegionLatitude?: number | null;
+  assignmentRegionLongitude?: number | null;
+  assignmentRegionRadiusMeters?: number | null;
+  assignmentRegionName?: string | null;
   employeeId: string | null;
   vehicleId: string | null;
   plannedDistanceMeters: number | null;
@@ -111,6 +116,7 @@ export function RouteManagePanel({ routeId, canManage, canDelete, onClose, onCha
   const [roundtrip, setRoundtrip] = useState(true);
   const [recordTrip, setRecordTrip] = useState(false);
   const [recordNewCustomer, setRecordNewCustomer] = useState(false);
+  const [regionLabel, setRegionLabel] = useState<string | null>(null);
   const [routeDate, setRouteDate] = useState(toDateInputValue());
   const [employeeId, setEmployeeId] = useState('');
   const [vehicleId, setVehicleId] = useState('');
@@ -148,6 +154,19 @@ export function RouteManagePanel({ routeId, canManage, canDelete, onClose, onCha
       setRoundtrip(route.roundtrip !== false);
       setRecordTrip(route.recordTrip === true);
       setRecordNewCustomer(route.recordNewCustomer === true);
+      if (
+        route.recordNewCustomer &&
+        route.assignmentRegionRadiusMeters != null
+      ) {
+        const km = `${(route.assignmentRegionRadiusMeters / 1000).toString().replace(/\.0$/, '')} km`;
+        setRegionLabel(
+          route.assignmentRegionName
+            ? `${route.assignmentRegionName} · raio ${km}`
+            : `Raio ${km}`,
+        );
+      } else {
+        setRegionLabel(null);
+      }
       setRouteDate(routeDateYmd(route.date));
       setEmployeeId(route.employeeId || route.employee?.id || '');
       setVehicleId(route.vehicleId || route.vehicle?.id || '');
@@ -467,11 +486,14 @@ export function RouteManagePanel({ routeId, canManage, canDelete, onClose, onCha
               </label>
             </div>
 
+            <RouteCostCard routeId={routeId} status={status} />
+
             <div>
               {recordNewCustomer ? (
                 <p className="rounded-[8px] border border-amber-500/40 bg-[var(--surface-2)] px-3 py-2 text-sm text-brand-900">
-                  Missão de gravar: o funcionário marca clientes no GPS. Não há lista de paradas
-                  para editar aqui.
+                  {regionLabel
+                    ? `Missão de gravar região: ${regionLabel}. O funcionário marca clientes no GPS. Não há lista de paradas para editar aqui.`
+                    : 'Missão de gravar: o funcionário marca clientes no GPS. Não há lista de paradas para editar aqui.'}
                 </p>
               ) : (
                 <>

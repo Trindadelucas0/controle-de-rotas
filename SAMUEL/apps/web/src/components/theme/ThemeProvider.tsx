@@ -24,6 +24,7 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 function applyTheme(theme: ThemeMode) {
   if (typeof document === 'undefined') return;
   document.documentElement.setAttribute('data-theme', theme);
+  document.documentElement.classList.toggle('dark', theme === 'dark');
   document.documentElement.style.colorScheme = theme;
 }
 

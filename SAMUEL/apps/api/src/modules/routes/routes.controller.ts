@@ -23,6 +23,7 @@ import {
   CreateRouteDto,
   DispatchCustomersRouteDto,
   DispatchRecordMissionDto,
+  DispatchRegionMissionDto,
   ListRoutesQueryDto,
   PreviewCustomersRouteDto,
   PreviewRouteDto,
@@ -64,6 +65,15 @@ export class RoutesController {
     @Body() dto: DispatchRecordMissionDto,
   ) {
     return this.routesService.dispatchRecordMission(user, dto);
+  }
+
+  @Post('dispatch-region-mission')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  dispatchRegionMission(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: DispatchRegionMissionDto,
+  ) {
+    return this.routesService.dispatchRegionMission(user, dto);
   }
 
   @Get()

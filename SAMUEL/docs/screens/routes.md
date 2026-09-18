@@ -15,9 +15,11 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §3.
 
 **Rotas de hoje:** summary + lista `Rota NN`, status, N paradas, km. Em cada card: **Gerir** (ADMIN/MANAGER em `PLANNED`|`PUBLISHED`) ou **Ver** (demais / status não editável). Abre painel lateral/bottom sheet. ADMIN: **Excluir rota** no painel se não estiver Em andamento.
 
-**Planejador:** modos Clientes | Visitas agendadas | **Gravar cliente**. No modo Clientes: checkbox **Gravar viagem** (`recordTrip`) — aplica a todas as rotas do lote (1+ clientes); densifica GPS, fila local e grava trilha no check-in de cada cliente (retry no finalizar). Seletor **Origem do cálculo**: última localização do funcionário (padrão) ou pin da empresa.
+**Planejador:** modos Clientes | Visitas agendadas | **Gravar cliente** | **Região**. No modo Clientes: checkbox **Gravar viagem** (`recordTrip`) — aplica a todas as rotas do lote (1+ clientes); densifica GPS, fila local e grava trilha no check-in de cada cliente (retry no finalizar). Seletor **Origem do cálculo**: última localização do funcionário (padrão) ou pin da empresa.
 
 **Gravar cliente:** funcionário + data + veículo → **Publicar missão de gravar**. Sem lista de clientes. Rotas de hoje mostram o card **Gravar acesso**. Painel Gerir não edita paradas dessa missão (placeholder interno).
+
+**Região:** mapa clicável (pin arrastável) = centro; raio padrão 5 km (slider 0,5–50 km); nome opcional (vazio → “Raio 5 km”); busca de endereço opcional; pins cinza = clientes já no raio (não viram paradas). **Publicar missão** (ADMIN/MANAGER). Origem da rota = centro. Rotas de hoje: **Gravar região · {nome}**. Campo identifica região por `assignmentRegionRadiusMeters != null`.
 
 ### 3. Painel Gerir rota
 
@@ -59,7 +61,7 @@ azul `#1d4ed8` preview estrada; âmbar `#d97706` reta; E verde/laranja empresa; 
 
 ### 6. Ações / estados / permissões
 
-Iguais à ficha anterior: preview-customers, dispatch-customers (`originMode`); SUPERVISOR sem Publicar; origem sem pin → aviso Empresa. Sem GPS no modo última loc. → aviso + fallback E. Gestão: `PATCH` / `cancel` só ADMIN/MANAGER. Excluir: `DELETE` só ADMIN (não `IN_PROGRESS`).
+Iguais à ficha anterior: preview-customers, dispatch-customers (`originMode`); dispatch-record-mission; dispatch-region-mission; SUPERVISOR sem Publicar; origem sem pin → aviso Empresa. Sem GPS no modo última loc. → aviso + fallback E. Gestão: `PATCH` / `cancel` só ADMIN/MANAGER. Excluir: `DELETE` só ADMIN (não `IN_PROGRESS`).
 
 ### 7. Fora de escopo
 
@@ -75,3 +77,4 @@ Play/GPS nesta tela; editar/cancelar/excluir rota `IN_PROGRESS`; criar OS no PAT
 6. SUPERVISOR: Ver sem Salvar/Cancelar/Excluir.
 7. ADMIN: **Excluir rota** em Planejada/Publicada/Concluída/Incompleta/Cancelada → some da lista; visitas ASSIGNED ficam livres.
 8. Aba **Gravar cliente** → funcionário + data + veículo → Publicar → Rotas de hoje mostra **Gravar acesso** (sem “Sessão de gravação”).
+9. Aba **Região** → clique no mapa + raio 5 km + funcionário/veículo → Publicar → Rotas de hoje **Gravar região**. SUPERVISOR sem botão Publicar.

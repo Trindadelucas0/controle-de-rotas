@@ -8,8 +8,9 @@ import type { CompanyOrigin } from './routes-planner-shared';
 import { RoutesPlannerCustomers } from './RoutesPlannerCustomers';
 import { RoutesPlannerVisits } from './RoutesPlannerVisits';
 import { RoutesPlannerRecordMission } from './RoutesPlannerRecordMission';
+import { RoutesPlannerRegionMission } from './RoutesPlannerRegionMission';
 
-type PlannerMode = 'customers' | 'visits' | 'record';
+type PlannerMode = 'customers' | 'visits' | 'record' | 'region';
 
 export function RoutesPlanner() {
   const searchParams = useSearchParams();
@@ -90,14 +91,25 @@ export function RoutesPlanner() {
         >
           Gravar cliente
         </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mode === 'region'}
+          onClick={() => setMode('region')}
+          className="ops-tab"
+        >
+          Região
+        </button>
       </div>
 
       {mode === 'customers' ? (
         <RoutesPlannerCustomers company={company} preselectCustomerId={preselectCustomerId} />
       ) : mode === 'visits' ? (
         <RoutesPlannerVisits company={company} />
-      ) : (
+      ) : mode === 'record' ? (
         <RoutesPlannerRecordMission companyName={company.tradeName || company.name} />
+      ) : (
+        <RoutesPlannerRegionMission />
       )}
     </div>
   );

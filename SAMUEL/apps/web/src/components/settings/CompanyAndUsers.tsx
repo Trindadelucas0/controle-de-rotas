@@ -1,5 +1,6 @@
 'use client';
 
+import { Landmark } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import {
@@ -295,6 +296,7 @@ export function CompanySettingsPage() {
       <PageHeader
         title="Empresa"
         subtitle="Dados cadastrais e origem no mapa para cálculo de rotas"
+        icon={<Landmark />}
       />
       {ok ? <p className="mb-4 text-sm text-[var(--ok)]">Salvo com sucesso.</p> : null}
       <EditableRecordShell
@@ -482,6 +484,78 @@ export function CompanySettingsPage() {
           </FormCard>
         }
       />
+      <CompanyCostSettings />
     </div>
+  );
+}
+
+function CompanyCostSettings() {
+  const [price, setPrice] = useState('');
+  const [required, setRequired] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  useEffect(() => {
+    apiFetch<{ settings: { referenceFuelPricePerLiter: number | null; fuelReceiptRequired: boolean } }>(
+      '/api/v1/companies/me/cost-settings',
+    )
+      .then((r) => {
+        setPrice(
+          r.settings.referenceFuelPricePerLiter != null
+            ? String(r.settings.referenceFuelPricePerLiter)
+            : '',
+        );
+        setRequired(r.settings.fuelReceiptRequired);
+      })
+      .catch((e) => setError(e instanceof ApiError ? e.message : 'Falha ao carregar custos'))
+      .finally(() => setLoading(false));
+  }, []);
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    setOk(false);
+    try {
+      const n = price.trim() ? Number(price.replace(',', '.')) : null;
+      await apiFetch('/api/v1/companies/me/cost-settings', {
+        method: 'PATCH',
+        body: JSON.stringify({
+          referenceFuelPricePerLiter: n,
+          fuelReceiptRequired: required,
+        }),
+      });
+      setOk(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao salvar');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) return <div className="mt-6 h-24 animate-pulse rounded-2xl bg-surface" />;
+
+  return (
+    <form onSubmit={(e) => void save(e)} className="mt-6 space-y-3 rounded-2xl border border-brand-100 bg-surface p-5">
+      <h2 className="text-lg font-semibold text-brand-900">Custos de combustível</h2>
+      <p className="text-xs text-[var(--muted)]">
+        Preço de referência só para ESTIMATIVA. Não entra no custo real dos abastecimentos.
+      </p>
+      {error ? <p className="text-sm text-[var(--danger)]">{error}</p> : null}
+      {ok ? <p className="text-sm text-[var(--ok)]">Configuração salva.</p> : null}
+      <label className="block text-sm">
+        <span className="mb-1 block font-medium">Preço de referência (R$/L)</span>
+        <input className="ops-input" value={price} onChange={(e) => setPrice(e.target.value)} placeholder="Ex.: 6,19" />
+      </label>
+      <label className="flex items-center gap-2 text-sm">
+        <input type="checkbox" checked={required} onChange={(e) => setRequired(e.target.checked)} />
+        Exigir foto do comprovante no abastecimento
+      </label>
+      <button type="submit" disabled={saving} className="ops-btn ops-btn-primary">
+        {saving ? 'Salvando…' : 'Salvar custos'}
+      </button>
+    </form>
   );
 }

@@ -211,6 +211,29 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 
 ---
 
+## Roteiro 10c — Missão Gravar região
+
+**Objetivo:** o gestor designa um círculo no mapa; o funcionário vê a região e grava pontos como na missão Gravar cliente.  
+**Quem:** ADMIN/MANAGER publica; EMPLOYEE executa.
+
+- [ ] **Rotas → Planejador → Região**.
+- [ ] Clique no mapa (centro). Confira o círculo **5 km**. Ajuste o slider se quiser.
+- [ ] Data, funcionário com login, veículo. **Publicar missão**.
+- [ ] SUPERVISOR: sem botão Publicar (API 403 se forçar).
+- [ ] Aba **Rotas de hoje**: card **Gravar região** + nome/km.
+- [ ] Login EMPLOYEE → **Campo**: texto “Você foi designado para…” + mini-mapa com círculo **antes** do Play.
+- [ ] **▶ Iniciar gravação** → Resumo com mapa do círculo → Play.
+- [ ] Navegação: círculo visível; HUD dentro ou fora + km até o centro.
+- [ ] **Adicionar ponto** com GPS fora do raio: aviso, ponto **grava**.
+- [ ] **Finalizar por completo** igual à missão Gravar cliente.
+- [ ] Missão **Gravar cliente** antiga (sem raio) continua sem círculo.
+
+**O que deve aparecer:** rota `PUBLISHED` com `assignmentRegionRadiusMeters`; origem = centro; placeholder interno ausente em Clientes.
+
+**Se falhar:** publicar sem clique → 422 `REGION_CENTER_REQUIRED`. Outro EMPLOYEE na rota → 403 em record-point.
+
+---
+
 ## Roteiro 11 — Rotas de hoje: Gerir vs Ver
 
 **Objetivo:** mudar a rota **antes** do Play.  
@@ -346,6 +369,31 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **O que deve aparecer:** evidência da visita no gestor; campo isolado do cadastro.
 
 **Se falhar:** sem **Gravar viagem** a trilha âmbar pode não existir. Sem GPS, o relatório também não existirá (roteiros 13–14 pulados).
+
+---
+
+## Roteiro 17 — Custos da frota
+
+**Objetivo:** registrar um abastecimento REAL e ver o dashboard sem misturar estimativa.
+
+**Quem:** ADMIN (A) e EMPLOYEE (B).
+
+**A — escritório**
+
+1. Administração → Empresa → informe um preço de referência (ex. 6,19) e salve. Esse número é só ESTIMATIVA.
+2. Recursos → Abastecimentos → Novo: veículo, km, litros, R$/L. O total aparece calculado; não dá para digitar o total. Salve.
+3. Recursos → Custos: o card Combustível deve ser **REAL** (soma dos cupons). Consumo REAL só aparece depois de **dois** abastecimentos do mesmo veículo com km crescente.
+4. Abra uma rota concluída (Ver): o card de custo mostra ESTIMADO se houver consumo cadastrado + preço; REAL só se o km da rota estiver entre dois abastecimentos.
+5. Com login EMPLOYEE, abrir `/costs` (colar URL): a API recusa (403).
+
+**B — campo**
+
+1. Minha rota → **Abastecer** → km, litros, preço, foto se a empresa exigir → Registrar.
+2. Volta para Minha rota. Play/Cheguei/Concluir continuam iguais.
+
+**O que deve aparecer:** selos REAL / ESTIMADO / NÃO CALCULÁVEL; nunca um 0 no lugar de “não calculável” (exceto gasto REAL R$ 0 quando não há cupom no mês).
+
+**Se falhar:** sem preço de referência a estimativa da rota fica não calculável; um único fill não gera km/L REAL.
 
 ---
 

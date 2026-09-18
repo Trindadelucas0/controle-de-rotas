@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { ClipboardList } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
@@ -148,6 +149,7 @@ export function ServicesListPage() {
     <div>
       <PageHeader
         title="Ordens de serviço"
+        icon={<ClipboardList />}
         subtitle="Serviços e visitas por cliente"
         action={
           canManageOs(user?.role) ? (

@@ -1,6 +1,9 @@
 'use client';
 
+import { Inbox, Pencil } from 'lucide-react';
 import { FormError } from '@/components/auth/FormError';
+import { IconTile } from '@/components/reui/icon-tile';
+import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function FieldGrid({ children }: { children: React.ReactNode }) {
@@ -23,16 +26,25 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  icon,
 }: {
   title: string;
   subtitle?: string;
   action?: React.ReactNode;
+  icon?: React.ReactNode;
 }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
-      <div>
-        <h1 className="text-2xl font-semibold tracking-tight text-brand-900">{title}</h1>
-        {subtitle ? <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">{subtitle}</p> : null}
+      <div className="flex min-w-0 items-start gap-3">
+        {icon ? (
+          <IconTile variant="outline" size="sm" aria-hidden="true">
+            {icon}
+          </IconTile>
+        ) : null}
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight text-brand-900">{title}</h1>
+          {subtitle ? <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">{subtitle}</p> : null}
+        </div>
       </div>
       {action}
     </div>
@@ -88,26 +100,6 @@ export function FormCard({
         </div>
       </fieldset>
     </form>
-  );
-}
-
-function PencilIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      width="16"
-      height="16"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden
-    >
-      <path d="M12 20h9" />
-      <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
-    </svg>
   );
 }
 
@@ -210,7 +202,7 @@ export function EditableRecordShell({
           onClick={onEdit}
           aria-label={editLabel}
         >
-          <PencilIcon />
+          <Pencil size={16} aria-hidden="true" />
           {editLabel}
         </button>
       }
@@ -299,9 +291,16 @@ export function DataTable({
 }) {
   if (!rows || rows.length === 0) {
     return (
-      <p className="ops-surface rounded-[10px] border-dashed px-5 py-10 text-center text-sm text-[var(--muted)]">
-        {empty}
-      </p>
+      <Empty className="ops-surface rounded-[10px] border-dashed px-5 py-10">
+        <EmptyHeader>
+          <EmptyMedia>
+            <IconTile variant="outline" size="lg" aria-hidden="true">
+              <Inbox />
+            </IconTile>
+          </EmptyMedia>
+          <EmptyDescription className="text-[var(--muted)]">{empty}</EmptyDescription>
+        </EmptyHeader>
+      </Empty>
     );
   }
   return (

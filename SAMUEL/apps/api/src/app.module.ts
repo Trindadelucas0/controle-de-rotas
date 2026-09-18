@@ -18,6 +18,8 @@ import { VisitsModule } from './modules/visits/visits.module';
 import { FieldModule } from './modules/field/field.module';
 import { TrackingModule } from './modules/tracking/tracking.module';
 import { OpsModule } from './modules/ops/ops.module';
+import { FuelModule } from './modules/fuel/fuel.module';
+import { CostsModule } from './modules/costs/costs.module';
 
 @Module({
   imports: [
@@ -43,6 +45,8 @@ import { OpsModule } from './modules/ops/ops.module';
     FieldModule,
     TrackingModule,
     OpsModule,
+    FuelModule,
+    CostsModule,
   ],
 })
 export class AppModule {}

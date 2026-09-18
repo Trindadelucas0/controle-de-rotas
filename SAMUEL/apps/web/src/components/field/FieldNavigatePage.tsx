@@ -37,6 +37,12 @@ import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { cartoDarkRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import {
+  formatRegionKm,
+  isRegionMission,
+  metersFromRegionCenter,
+  regionCirclePolygon,
+} from '@/lib/region-circle';
+import {
   formatDistanceKm,
   formatDuration,
   formatEta,
@@ -149,6 +155,10 @@ type NavRoute = {
   startedAt?: string | null;
   recordTrip?: boolean;
   recordNewCustomer?: boolean;
+  assignmentRegionLatitude?: number | null;
+  assignmentRegionLongitude?: number | null;
+  assignmentRegionRadiusMeters?: number | null;
+  assignmentRegionName?: string | null;
   recordedCustomers?: RecordedCustomer[];
   plannedDistanceMeters?: number | null;
   plannedDurationSeconds?: number | null;
@@ -639,6 +649,39 @@ export function FieldNavigatePage() {
   const markerHeading = smoothedGps?.heading ?? gps?.heading ?? 0;
 
   const isRecordMission = Boolean(route?.recordNewCustomer);
+  const regionMission = route ? isRegionMission(route) : false;
+  const regionCircle = useMemo(() => {
+    if (
+      !route ||
+      !isRegionMission(route) ||
+      route.assignmentRegionLatitude == null ||
+      route.assignmentRegionLongitude == null ||
+      route.assignmentRegionRadiusMeters == null
+    ) {
+      return null;
+    }
+    return regionCirclePolygon(
+      route.assignmentRegionLatitude,
+      route.assignmentRegionLongitude,
+      route.assignmentRegionRadiusMeters,
+    );
+  }, [route]);
+
+  const regionDistanceM =
+    gps &&
+    route &&
+    route.assignmentRegionLatitude != null &&
+    route.assignmentRegionLongitude != null
+      ? metersFromRegionCenter(gps, {
+          latitude: route.assignmentRegionLatitude,
+          longitude: route.assignmentRegionLongitude,
+        })
+      : null;
+  const regionOutside =
+    regionMission &&
+    route?.assignmentRegionRadiusMeters != null &&
+    regionDistanceM != null &&
+    regionDistanceM > route.assignmentRegionRadiusMeters;
 
   const showManeuverBanner =
     !isRecordMission &&
@@ -1411,6 +1454,25 @@ export function FieldNavigatePage() {
             setSelectedLandmarkId(null);
           }}
         >
+          {mapReady && regionCircle ? (
+            <Source id="region-circle" type="geojson" data={regionCircle}>
+              <Layer
+                id="region-circle-fill"
+                type="fill"
+                paint={{ 'fill-color': '#FF5722', 'fill-opacity': 0.12 }}
+              />
+              <Layer
+                id="region-circle-line"
+                type="line"
+                paint={{
+                  'line-color': '#FF5722',
+                  'line-width': 2,
+                  'line-opacity': 0.9,
+                }}
+              />
+            </Source>
+          ) : null}
+
           {mapReady && geojson ? (
             <Source id="nav-route" type="geojson" data={geojson}>
               <Layer
@@ -1510,7 +1572,7 @@ export function FieldNavigatePage() {
       <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="pointer-events-auto mx-auto mt-3 max-w-md flex items-center justify-between gap-2">
           <p className="text-sm font-semibold tracking-wide text-white/80">
-            {route?.recordNewCustomer ? 'GRAVAR' : 'ROTAS'}
+            {route?.recordNewCustomer ? (regionMission ? 'GRAVAR REGIÃO' : 'GRAVAR') : 'ROTAS'}
           </p>
           <div className="flex items-center gap-2">
             {route?.recordTrip ? (
@@ -1534,6 +1596,25 @@ export function FieldNavigatePage() {
             </button>
           </div>
         </div>
+
+        {regionMission && route?.assignmentRegionRadiusMeters != null ? (
+          <div
+            className={`pointer-events-auto mx-auto mt-3 max-w-md rounded-[10px] border px-4 py-2 text-sm ${
+              regionOutside
+                ? 'border-amber-400/50 bg-amber-700 text-white'
+                : 'border-[var(--border)] bg-surface text-brand-900'
+            }`}
+            role="status"
+            aria-live="polite"
+          >
+            {regionOutside
+              ? `Fora do raio · ${formatDistanceKm(regionDistanceM ?? 0)} do centro`
+              : `Dentro da região · ${formatDistanceKm(regionDistanceM ?? 0)} do centro · ${formatRegionKm(route.assignmentRegionRadiusMeters)}`}
+            {route.assignmentRegionName ? (
+              <span className="mt-0.5 block text-xs opacity-80">{route.assignmentRegionName}</span>
+            ) : null}
+          </div>
+        ) : null}
 
         {!route?.recordNewCustomer ? (
         <div
@@ -1756,6 +1837,11 @@ export function FieldNavigatePage() {
         <RecordToCustomerSheet
           busy={recordPointBusy}
           error={recordPointError}
+          warning={
+            regionOutside
+              ? 'GPS fora do raio da região. Você ainda pode gravar o ponto.'
+              : null
+          }
           onCancel={() => {
             if (recordPointBusy) return;
             setShowRecordPoint(false);
@@ -1795,6 +1881,11 @@ export function FieldNavigatePage() {
           ) : null}
           {route?.recordNewCustomer ? (
             <div className="mb-2 space-y-2">
+              {regionOutside ? (
+                <p className="rounded-xl bg-amber-800/90 px-3 py-2 text-center text-xs font-semibold text-white">
+                  Fora do raio — ainda é possível adicionar o ponto
+                </p>
+              ) : null}
               {recordPointMsg ? (
                 <p className="rounded-xl bg-emerald-700/90 px-3 py-2 text-center text-xs font-semibold text-white">
                   {recordPointMsg}

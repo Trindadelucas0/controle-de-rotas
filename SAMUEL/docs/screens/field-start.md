@@ -27,7 +27,7 @@ section max-w-lg
 | Passo | Conteúdo |
 | --- | --- |
 | gps | pedido rápido de GPS (iOS só no toque); HTTP LAN **pula**; fallback origem planejada |
-| summary | com GPS: pin **pessoa** + mais perto→mais longe + km; em HTTP: ordem planejada |
+| summary | com GPS: pin **pessoa** + mais perto→mais longe + km; em HTTP: ordem planejada; missão região: círculo + texto de designação |
 | vehicle | pin vira **carro**; select veículos (`GET /field/vehicles?routeId=`) |
 | checklist | pin carro; Km inicial * (number); Combustível * (EMPTY…FULL); Observação (max 500) |
 | confirm | pin carro; resumo placa, km, combustível, 1ª parada + km |

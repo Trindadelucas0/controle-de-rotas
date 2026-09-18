@@ -57,6 +57,7 @@ Busca de endereço (Nominatim); CEP lookup. Sem filtro de lista.
 | Editar | mode=edit |
 | Cancelar | restaura dados salvos → view |
 | Salvar | `PATCH /api/v1/companies/me` (incl. lat/lng) → view |
+| Custos da frota | `GET/PATCH /companies/me/cost-settings` — preço R$/L de referência (ESTIMATIVA) e exigir comprovante |
 | Clique/arraste no mapa | define pin (só edit) |
 | Escolher sugestão | preenche endereço + pin |
 

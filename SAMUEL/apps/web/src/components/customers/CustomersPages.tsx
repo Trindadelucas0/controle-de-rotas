@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Building2 } from 'lucide-react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
@@ -134,6 +135,7 @@ export function CustomersListPage() {
     <div>
       <PageHeader
         title="Clientes"
+        icon={<Building2 />}
         action={
           <Link href="/customers/new" className="ops-btn ops-btn-primary">
             Novo

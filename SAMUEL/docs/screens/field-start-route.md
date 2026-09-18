@@ -13,7 +13,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - Card do passo atual
 - Campos:
   - **GPS** — pedido rápido (rede/Wi‑Fi ~8 s, depois GPS fino ~15 s). No iPhone **não** dispara sozinho (só no toque). Se falhar: **Continuar com origem planejada** (1ª parada ou pin da missão)
-  - **Resumo** — mini-mapa Dark Matter com polyline menta + pin **pessoa**; paradas da mais perto para a mais longe + km (preview local; ordem definitiva no Play)
+  - **Resumo** — mini-mapa Dark Matter com polyline menta + pin **pessoa**; paradas da mais perto para a mais longe + km (preview local; ordem definitiva no Play). Missão **Gravar região**: mapa do círculo no lugar da polyline.
   - **Veículo** — pin vira **carro**; select (`GET /field/vehicles`); pré-seleciona veículo da rota se houver; mostra último km/combustível; omite carro em uso por outro
   - **Km inicial** — number, obrigatório, > 0 (pré-preenchido com o último km do veículo)
   - **Combustível** — select: Vazio, 1/4, 1/2, 3/4, Cheio (pré-preenchido)

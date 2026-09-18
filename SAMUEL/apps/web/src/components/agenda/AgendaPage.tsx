@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Calendar } from 'lucide-react';
 import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useSessionUser } from '@/lib/session-context';
@@ -67,7 +68,7 @@ export function AgendaPage() {
 
   return (
     <div>
-      <PageHeader title="Agenda" subtitle="Visitas do dia" />
+      <PageHeader title="Agenda" subtitle="Visitas do dia" icon={<Calendar />} />
       <OperationalSummaryStrip
         loading={loading && !summary}
         error={summaryError}

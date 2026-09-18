@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
@@ -93,6 +94,7 @@ export function EmployeesListPage() {
     <div>
       <PageHeader
         title="Funcionários"
+        icon={<Users />}
         action={
           <Link href="/employees/new" className="ops-btn ops-btn-primary">
             Novo

@@ -27,6 +27,7 @@ type Props = {
   initial?: Partial<RecordPointForm>;
   busy?: boolean;
   error?: string | null;
+  warning?: string | null;
   submitLabel?: string;
   laterLabel?: string;
   showLater?: boolean;
@@ -39,6 +40,7 @@ export function RecordToCustomerSheet({
   initial,
   busy,
   error,
+  warning,
   submitLabel = 'Salvar ponto e continuar',
   laterLabel = 'Só o nome — completar depois',
   showLater = true,
@@ -72,6 +74,11 @@ export function RecordToCustomerSheet({
         <p className="mt-1 text-sm text-[var(--muted)]">
           Nome obrigatório. Telefone, documento e endereço podem ir agora ou depois.
         </p>
+        {warning ? (
+          <p className="mt-3 rounded-[8px] bg-amber-500/15 px-3 py-2 text-sm text-amber-800" role="status">
+            {warning}
+          </p>
+        ) : null}
 
         {error ? (
           <p className="mt-3 rounded-[8px] bg-red-500/10 px-3 py-2 text-sm text-red-300" role="alert">

@@ -61,6 +61,8 @@ No celular, toque no **☰** para abrir o menu. No computador o menu fica à esq
 │ Clientes │  ← gestores; EMPLOYEE não vê                     │
 │ Funcion. │  ← ADMIN / MANAGER                               │
 │ Veículos │  ← ADMIN / MANAGER                               │
+│ Abastec. │  ← ADMIN / MANAGER / SUPERVISOR                  │
+│ Custos   │  ← ADMIN / MANAGER / SUPERVISOR                  │
 │ ADMIN    │                                                  │
 │ Empresas │  ← só PLATFORM_ADMIN                             │
 │ Empresa  │  ← ADMIN                                         │
@@ -222,6 +224,12 @@ No campo o card chama **Gravar acesso**. Play → mapa **GRAVAR**. Duas ações 
 Cadastro só com nome fica com **lápis** no Mapa. Gestor e o funcionário dono completam depois. Se houver outra rota Publicada no dia, depois de concluir aparece **Iniciar**.
 
 **Gravar viagem** (checkbox no modo Clientes, cliente já cadastrado) continua como estava — sem o botão Adicionar ponto.
+
+### 6.7 Missão Gravar região
+
+No planejador, aba **Região**: clique no mapa (centro), raio **5 km** (ajustável), funcionário, data, veículo → **Publicar missão**. Nome da região é opcional.
+
+No campo o card chama **Gravar região** e mostra **Você foi designado para {nome} · raio N km** + mini-mapa com o círculo. Play, **Adicionar ponto** e **Finalizar por completo** são iguais à missão Gravar cliente. Fora do raio o mapa avisa; ainda dá para gravar o ponto. Clientes já cadastrados no círculo no planejador não entram como paradas.
 
 ---
 

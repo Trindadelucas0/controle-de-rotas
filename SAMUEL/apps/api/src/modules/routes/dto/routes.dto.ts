@@ -246,6 +246,37 @@ export class DispatchRecordMissionDto {
   vehicleId!: string;
 }
 
+export class DispatchRegionMissionDto {
+  @IsDateString()
+  date!: string;
+
+  @IsUUID('4')
+  employeeId!: string;
+
+  @IsUUID('4')
+  vehicleId!: string;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  latitude?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  longitude?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  radiusMeters?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  regionName?: string;
+}
+
 export class RecordPointCustomerDto {
   @IsString()
   @MinLength(2)

@@ -1,4 +1,5 @@
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
+import { OdometerReadingSource } from '@prisma/client';
 import { VehiclesRepository } from './vehicles.repository';
 import {
   CreateVehicleDto,
@@ -7,6 +8,8 @@ import {
 } from './dto/vehicles.dto';
 import { AuthUser } from '../auth/decorators/auth.decorators';
 import { httpError } from '../../common/errors/http-error';
+import { PrismaService } from '../../common/prisma/prisma.service';
+import { writeOdometerReading } from '../costs/odometer-write';
 
 function isUniquePlateError(err: unknown): boolean {
   return (err as { code?: string })?.code === 'P2002';
@@ -14,7 +17,10 @@ function isUniquePlateError(err: unknown): boolean {
 
 @Injectable()
 export class VehiclesService {
-  constructor(private readonly vehiclesRepository: VehiclesRepository) {}
+  constructor(
+    private readonly vehiclesRepository: VehiclesRepository,
+    private readonly prisma: PrismaService,
+  ) {}
 
   async list(user: AuthUser, query: ListVehiclesQueryDto) {
     const vehicles = await this.vehiclesRepository.list({
@@ -62,6 +68,10 @@ export class VehiclesService {
 
   async update(user: AuthUser, id: string, dto: UpdateVehicleDto) {
     try {
+      const existing = await this.vehiclesRepository.findByIdInCompany(id, user.companyId);
+      if (!existing) {
+        throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
+      }
       const vehicle = await this.vehiclesRepository.update(id, user.companyId, {
         ...(dto.plate !== undefined ? { plate: dto.plate } : {}),
         ...(dto.brand !== undefined ? { brand: dto.brand } : {}),
@@ -75,6 +85,27 @@ export class VehiclesService {
       });
       if (!vehicle) {
         throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
+      }
+      if (dto.odometerKm !== undefined && dto.odometerKm != null && dto.odometerKm !== existing.odometerKm) {
+        await writeOdometerReading(this.prisma, {
+          companyId: user.companyId,
+          vehicleId: id,
+          source: OdometerReadingSource.ADMIN_ADJUST,
+          km: dto.odometerKm,
+          occurredAt: new Date(),
+          actorUserId: user.id,
+          note: 'Ajuste administrativo do cadastro',
+        });
+        await this.prisma.auditLog.create({
+          data: {
+            companyId: user.companyId,
+            userId: user.id,
+            action: 'VEHICLE_ODOMETER_ADJUSTED',
+            entity: 'Vehicle',
+            entityId: id,
+            metadata: { before: existing.odometerKm, after: dto.odometerKm },
+          },
+        });
       }
       return { vehicle };
     } catch (err: unknown) {

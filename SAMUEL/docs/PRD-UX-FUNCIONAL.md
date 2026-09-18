@@ -87,23 +87,22 @@ Toda mutação na UI (POST/PATCH/DELETE disparado por botão ou submit):
 ### 1. Identidade
 
 - Rotas cobertas: todas autenticadas **exceto** `/field/navigate` e `/field/visits/[id]` (layout tela cheia)
-- Arquivos: `apps/web/src/app/(app)/layout.tsx`, `AppHeader.tsx`, `AppNav.tsx`, `UserMenu.tsx`
+- Arquivos: `apps/web/src/app/(app)/layout.tsx`, `AppHeader.tsx`, `AppSidebar.tsx`, `AppNav.tsx`, `UserMenu.tsx`
 - Full-bleed (sem `max-w-5xl`): `/` e `/map`
 
 ### 2. Componentes
 
 ```
-flex min-h-screen
-├── aside desktop (lg+): marca Rotas + nome da empresa + AppSidebarNav
-├── drawer mobile: overlay + mesma nav (☰ no header)
-└── coluna
-    ├── AppHeader: ☰ | Rotas | UserMenu (nome, role, Alterar senha, Sair)
-    └── main (full-bleed em / e /map)
+SidebarProvider + TooltipProvider
+├── AppSidebar (desktop + sheet mobile): marca Rotas + nome da empresa + grupos Lucide
+└── SidebarInset
+    ├── AppHeader: SidebarTrigger (md-) | UserMenu (dropdown: nome, role, Alterar senha, tema, Sair)
+    └── conteúdo (full-bleed em / e /map)
 ```
 
-Header, sidebar e drawer: `bg-[var(--surface)]` conforme `data-theme`. No claro, nome / Alterar senha / Sair / marca Rotas permanecem visíveis.
+Header, sidebar e sheet: `--surface` / `--sidebar` conforme `data-theme`. No claro, nome / Alterar senha / Sair / marca Rotas permanecem visíveis. Título **Rotas** não se duplica no header no desktop.
 
-### 3. Informação — grupos do menu (`AppSidebarNav`)
+### 3. Informação — grupos do menu (`NAV_GROUPS` / `AppSidebar`)
 
 **Operação**
 
@@ -116,9 +115,9 @@ Header, sidebar e drawer: `bg-[var(--surface)]` conforme `data-theme`. No claro,
 | Rotas | `/routes` | ADMIN, MANAGER, SUPERVISOR |
 | Campo | `/field/my-route` | EMPLOYEE |
 
-**Recursos:** Clientes (ADMIN, MANAGER, SUPERVISOR) · Funcionários (ADMIN, MANAGER) · Veículos (ADMIN, MANAGER)
+**Recursos:** Clientes (ADMIN, MANAGER, SUPERVISOR) · Funcionários (ADMIN, MANAGER) · Veículos (ADMIN, MANAGER) · Abastecimentos (ADMIN, MANAGER, SUPERVISOR) · Custos (ADMIN, MANAGER, SUPERVISOR)
 
-**Administração:** Empresa · Usuários (só ADMIN)
+**Administração:** Empresas (só PLATFORM_ADMIN) · Empresa · Usuários (ADMIN; PLATFORM_ADMIN herda ADMIN)
 
 ### 4. KPI
 
@@ -132,8 +131,8 @@ N/A.
 
 | Ação | Efeito |
 | --- | --- |
-| Clique no item | navega; fecha drawer no mobile |
-| Marca “Rotas” | `/` |
+| Clique no item | navega; fecha sheet no mobile |
+| Marca “Rotas” | na sidebar (header desktop não duplica) |
 | Alterar senha | `/account/change-password` |
 | Sair | `POST /auth/logout` → `/login` (botão “Saindo…” enquanto busy) |
 
@@ -147,11 +146,11 @@ N/A.
 
 ### 8. Permissões
 
-Itens sem `roles` (Início, Clientes) aparecem para todos. Demais itens somem da nav se o papel não estiver na lista.
+Itens sem `roles` (Início) aparecem para todos. Demais itens somem da nav se o papel não estiver na lista. `PLATFORM_ADMIN` herda itens com `ADMIN`.
 
 ### 9. Navegação
 
-Layout `(field-nav)` **não** usa este chrome. Campo `/field/my-route`, `/field/start/[id]`, `/field/tracking-status` usam chrome + `FieldPwaLocationGate`.
+Layout `(field-nav)` **não** usa este chrome (sem `SidebarProvider`). Campo `/field/my-route`, `/field/start/[id]`, `/field/tracking-status` usam chrome + `FieldPwaLocationGate`.
 
 Ficha: [home-shell.md](screens/home-shell.md)
 
@@ -429,7 +428,7 @@ H1 Rotas
     [Publicar] + mapa (azul road / âmbar reta / F funcionário / E empresa)
 ```
 
-Modo Visitas agendadas: inalterado nesta entrega.
+Modo Visitas agendadas: inalterado nesta entrega. Aba **Gravar cliente** (sem mapa). Aba **Região**: clique = centro, raio 5 km, publicar missão de gravar com `assignmentRegion*`.
 
 **KPI / ações / estados / permissões:** iguais (summary + preview-customers + dispatch). SUPERVISOR sem Publicar. Campo ausente → —. Publicar/salvar: botão bloqueado + overlay **Publicando…** / **Salvando…** até a API retornar (anti-duplo-clique).
 
@@ -541,6 +540,28 @@ Ficha: [vehicles.md](screens/vehicles.md)
 
 ---
 
+### 4.4 Abastecimentos — `/fuel`, `/fuel/new`, `/fuel/[id]`
+
+**Papéis:** ADMIN, MANAGER (CRUD); SUPERVISOR leitura; EMPLOYEE só via campo.
+
+**Lista:** paginada; filtros período / veículo / busca; total do período = soma ACTIVE. Empty: “Nenhum abastecimento no período.”
+
+**Novo:** litros, R$/L, km, posto, foto; total preview = litros × preço (servidor grava). Sem campo total digitável.
+
+**Detalhe:** comprovante; ADMIN cancela (soft).
+
+Fichas: [fuel.md](screens/fuel.md)
+
+### 4.5 Custos da frota — `/costs`
+
+**Papéis:** ADMIN, MANAGER, SUPERVISOR. EMPLOYEE 403.
+
+**KPI:** `GET /costs/dashboard` com `kind` REAL | ESTIMATED | UNAVAILABLE. Cards: combustível, km de rotas com distância real, custo/km. Alertas operacionais (sem a palavra fraude).
+
+Ficha: [costs.md](screens/costs.md)
+
+---
+
 ## 5. Execução (campo)
 
 Trava comum: [§5.0](#50-trava-pwa--gps). Telas de campo **não** mostram Maps/Waze — navegação só no Rotas.
@@ -595,6 +616,7 @@ Ficha: [field-pwa-gate.md](screens/field-pwa-gate.md)
 | Concluir rota | IN_PROGRESS (do dia ou de outro dia), sem visita `ARRIVED`/`IN_PROGRESS` | `POST /field/routes/:id/complete` (“Concluindo…”). Visita aberta: banner + arraste desabilitado + link `/field/visits/{id}` (missão Gravar cliente não aplica). |
 | Status GPS | sempre | `/field/tracking-status` |
 | Ver agenda | empty | `/agenda` |
+| Abastecer | sempre | `/field/fuel-new` |
 
 GPS: `watchPosition` + fila local → `POST /tracking/points`. Com Gravar viagem o badge mostra pontos enviados / fila. Card Minha rota: `GPS ativo · HH:MM:SS` ou mensagem da API.
 
@@ -603,6 +625,16 @@ GPS: `watchPosition` + fila local → `POST /tracking/points`. Com Gravar viagem
 **Navegação:** publicar em `/routes` → esta tela → wizard → navigate.
 
 Ficha: [field-my-route.md](screens/field-my-route.md)
+
+---
+
+### 5.1b Abastecimento no campo — `/field/fuel-new`
+
+**Papéis:** EMPLOYEE. Gate PWA do layout `/field/*`.
+
+**Arquivo:** `FieldFuelPage.tsx`. Formulário curto: veículo, km, litros, preço, total calculado, foto. `POST /field/fuel-fills`. Sem dashboard.
+
+Ficha: [field-fuel.md](screens/field-fuel.md)
 
 ---
 
@@ -786,6 +818,7 @@ Ficha: [settings-users.md](screens/settings-users.md)
 | Rotas publicar | sim | sim | preview só | não |
 | Clientes | sim | sim | update sim | não |
 | Funcionários / Veículos | sim | sim | não | não |
+| Abastecimentos / Custos | sim | sim | leitura | campo: só POST fill próprio |
 | Empresa / Usuários | sim | não | não | não |
 | Campo `/field/*` | não (nav) | não | não | sim |
 
@@ -816,4 +849,4 @@ Se o software ganhar tela nova: criar `docs/screens/{slug}.md` **e** incluir uma
 | 0.9.3 | 29/08/2026 | Iniciar rota em HTTP no celular: pula GPS, origem = 1ª parada (software v0.11.1) |
 | 0.9.4 | 01/09/2026 | Check-in: `/field/visits/[id]` + Cheguei na nav (software v0.12.0) |
 | 0.9.5 | 01/09/2026 | Navegação: LineString teal recorta na parada-alvo (software v0.12.1) |
-| 0.9.6 | 10/09/2026 | §0.6 anti-duplo-clique + LoadingOverlay em publicar/iniciar (software v0.16.9) |
+| 0.9.7 | 17/09/2026 | Abastecimentos `/fuel`, custos `/costs`, campo `/field/fuel-new` (software v0.20.0) |

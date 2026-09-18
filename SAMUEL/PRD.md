@@ -227,7 +227,7 @@ Cadastrar cliente (CNPJ/CEP/rua/clique) → Pin no mapa   ← entregue
   → Funcionário inicia rota (PWA) → GPS no mapa         ← entregue (10–11, HTTP)
   → Check-in → relatório + evidências → check-out          ← entregue (12–13)
   → Finalizar rota → Dashboard (KM / status)            ← Concluir entregue; KPI rico pendente (14)
-  → Custos / KPIs ricos                                 ← pendente (15)
+  → Custos da frota (combustível REAL vs ESTIMADO)      ← entregue (15, v0.20.0)
 ```
 
 ---
@@ -262,7 +262,7 @@ Cadastrar cliente (CNPJ/CEP/rua/clique) → Pin no mapa   ← entregue
 | 14 | Dashboard operacional (enriquece a **mesma** home `/`) | `/` (não `/dashboard` paralelo) |
 | 21 | Enriquecimento: prontuário tabs, OS/agenda/rotas ricas, fichas funcionário/veículo | várias telas existentes |
 | 16 | Auditoria UI | `/settings/audit` |
-| 15 | Custos e KPIs financeiros (R$/km) | home + settings |
+| 15 | Custos da frota (abastecimento + dashboard) | `/fuel`, `/costs`, `/field/fuel-new` — **Done** v0.20.0 |
 
 Temas 10+11+17+18+19 (campo/GPS/dispatch) já entregues — ver changelog.
 
@@ -274,7 +274,7 @@ Também comprometidos e ainda sem código:
 
 ### 10.4 Fase 2 (pós-MVP próximo)
 
-- Custos e combustível (estimado e depois real) — alinhado ao tema 15
+- Tipos de custo além de combustível (manutenção, pedágio) e rentabilidade — além do tema 15 v0.20.0
 - KPIs mais ricos (funcionário, veículo, cliente, rota)
 - Rota dinâmica (adicionar/remover parada no dia)
 - Replay de rota (planejado × real)
@@ -472,9 +472,9 @@ Check-in (“Cheguei — chegada verificada”) com GPS; relatório fixo (result
 
 Fotos JPEG/PNG/WebP em `STORAGE_DIR`; metadados em `visit_evidence`; download autenticado. S3 = fase 2.
 
-### 12.15 Custos e combustível — Planejado (tema 15 / Fase 2)
+### 12.15 Custos e combustível — Entregue (tema 15 / v0.20.0)
 
-Estimativa: `KM / consumo médio = litros` → `litros × preço = custo`. Depois abastecimentos reais. KPIs de custo: custo/visita, custo/cliente, custo/rota, custo/km.
+Abastecimentos persistidos (`fuel_fills`). Total = litros × R$/L no servidor. Consumo REAL = tanque a tanque. Custo REAL da rota só se o km estiver coberto por um par de fills; senão NÃO CALCULÁVEL. Estimativa: `km / avgConsumption × referenceFuelPricePerLiter` (rótulo ESTIMADO). Dashboard `/costs`; lista `/fuel`; campo `/field/fuel-new`. Sem receita/margem. OCR não implementado (stub). Fora: cartão combustível, UI de manutenção/pedágio.
 
 ### 12.16 Dashboard e KPIs — Planejado (tema 14)
 
@@ -545,7 +545,7 @@ Lista → KPI strip (API) → Filtros → Tabela enriquecida → Detalhe → Res
 | `/map` | Hub operacional + live + context | ADMIN, MANAGER, SUPERVISOR | Equipe · visitas · ao vivo | [map.md](docs/screens/map.md) |
 | `/services` · `/new` · `/[id]` | Ordens de serviço | ADMIN, MANAGER (SUPERVISOR leitura) | Summary `/ops/service-orders/summary` | [services.md](docs/screens/services.md) |
 | `/agenda` | Visitas do dia | Todos (EMPLOYEE: próprias) | Summary `/ops/agenda/summary` | [agenda.md](docs/screens/agenda.md) |
-| `/routes` | Rotas de hoje + planejador (`?customerId=`) | ADMIN, MANAGER (SUPERVISOR preview) | Summary `/ops/routes/summary` + aba Hoje | [routes.md](docs/screens/routes.md) |
+| `/routes` | Rotas de hoje + planejador (Clientes / Visitas / Gravar cliente / **Região**) | ADMIN, MANAGER (SUPERVISOR preview) | Summary `/ops/routes/summary` + aba Hoje | [routes.md](docs/screens/routes.md) |
 | `/field/my-route` | Capas do dia (trava PWA+GPS) | EMPLOYEE | N rotas · tempo/km do dia | [field-my-route.md](docs/screens/field-my-route.md) · [field-pwa-gate.md](docs/screens/field-pwa-gate.md) |
 | `/field/start/[id]` | Wizard início | EMPLOYEE | Paradas · planned | [field-start.md](docs/screens/field-start.md) |
 | `/field/navigate` | Nav GPS tela cheia | EMPLOYEE | HUD: tempo, km, ETA, km/h | [field-navigate.md](docs/screens/field-navigate.md) |
@@ -657,6 +657,8 @@ GET               /visits
 GET|PATCH         /visits/:id
 POST              /visits/:id/check-in
 POST              /routes/preview
+POST              /routes/dispatch-record-mission
+POST              /routes/dispatch-region-mission
 POST              /routes
 POST              /routes/:id/publish
 POST              /routes/:id/start | /complete | /reroute

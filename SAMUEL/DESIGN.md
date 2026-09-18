@@ -50,7 +50,7 @@ components:
 
 # DESIGN.md — Rotas (SAMUEL)
 
-Identidade visual **v0.16.0**, derivada do código em `apps/web`.
+Identidade visual **v0.18.5**, derivada do código em `apps/web`.
 
 ## Overview
 
@@ -78,7 +78,7 @@ Overpass 400–700 em toda a UI. Sem serif. Labels de campo em 11px uppercase mu
 
 ## Layout
 
-Densidade operacional. Home: atenção → execução → faixa de KPIs → listas. Formulários em seções (`FormSection` + `FieldGrid`). Uma ação primária por vista. Sidebar agrupada: Operação / Recursos / Administração.
+Densidade operacional. Home: atenção → execução → faixa de KPIs → listas. Formulários em seções (`FormSection` + `FieldGrid`). Uma ação primária por vista. Sidebar agrupada ReUI (`c-sidebar-1`): Operação / Recursos / Administração com Lucide outline + rótulos. `IconTile` outline nos cabeçalhos de cadastro e no vazio do `DataTable`. Sem Motion Icons.
 
 ## Elevation & Depth
 
@@ -95,9 +95,10 @@ Radius 4 / 6 / 8 / 10 px. Não usar `rounded-xl` como costume de template.
 - `.ops-btn-ghost` — baixo peso
 - `.ops-btn-danger` — irreversível
 - `.ops-input` / `.ops-label` / `.ops-tabs` / `.ops-surface`
+- Chrome: `Sidebar` + `DropdownMenu` (shadcn / ReUI free); cadastro continua em `.ops-surface` (não misturar Frame+Card)
 - Basemap: CARTO `dark_all`. Polyline `#2EE6C7` com glow.
 
 ## Do's and Don'ts
 
 - Do: KPI ausente = `—`. Encerrar ≠ Concluir. Presence ≠ Operational.
-- Don't: menta em botão/tab/badge. Não inventar KPI. Não usar roxo, musgo, serif, glass.
+- Don't: menta em botão/tab/badge. Não inventar KPI. Não usar roxo, musgo, serif, glass. Não usar Motion Icons (Ultimate).

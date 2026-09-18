@@ -15,6 +15,8 @@ import {
   type RouteGpsWatchHandle,
 } from '@/lib/field-tracking';
 import { StartRoutePreviewMap } from './StartRoutePreviewMap';
+import { FieldRegionPreviewMap } from './FieldRegionPreviewMap';
+import { formatRegionKm, isRegionMission } from '@/lib/region-circle';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
 import { OdometerPhotoCapture } from './OdometerPhotoCapture';
@@ -34,6 +36,10 @@ type RouteDetail = {
   status: string;
   date?: string;
   recordNewCustomer?: boolean;
+  assignmentRegionLatitude?: number | null;
+  assignmentRegionLongitude?: number | null;
+  assignmentRegionRadiusMeters?: number | null;
+  assignmentRegionName?: string | null;
   originLatitude?: number | null;
   originLongitude?: number | null;
   plannedDistanceMeters?: number | null;
@@ -384,6 +390,18 @@ export function FieldStartRoutePage() {
     />
   ) : null;
 
+  const regionPreview =
+    isRegionMission(route) &&
+    route.assignmentRegionLatitude != null &&
+    route.assignmentRegionLongitude != null &&
+    route.assignmentRegionRadiusMeters != null ? (
+      <FieldRegionPreviewMap
+        latitude={route.assignmentRegionLatitude}
+        longitude={route.assignmentRegionLongitude}
+        radiusMeters={route.assignmentRegionRadiusMeters}
+      />
+    ) : null;
+
   return (
     <section className="relative mx-auto max-w-lg space-y-6">
       <LoadingOverlay show={submitting} label="Iniciando…" />
@@ -395,7 +413,9 @@ export function FieldStartRoutePage() {
           {route.recordNewCustomer ? 'Iniciar gravação' : 'Iniciar rota'}
         </h1>
         <p className="mt-1 text-sm text-[var(--muted)]">
-          {route.recordNewCustomer
+          {isRegionMission(route) && route.assignmentRegionRadiusMeters != null
+            ? `Você foi designado para ${route.assignmentRegionName || 'esta região'} · raio ${formatRegionKm(route.assignmentRegionRadiusMeters)}`
+            : route.recordNewCustomer
             ? 'Grave o caminho e marque pontos (clientes) no GPS. Encerre quando quiser.'
             : `${route.stops.length} parada(s)`}
           {route.plannedDurationSeconds != null
@@ -476,12 +496,15 @@ export function FieldStartRoutePage() {
         <div className="space-y-4 rounded-2xl border border-brand-100 bg-surface p-5">
           <h2 className="font-semibold text-brand-900">Resumo</h2>
           <p className="text-sm text-[var(--muted)]">
-            {route.recordNewCustomer
+            {isRegionMission(route)
+              ? 'A gravação começa no seu GPS, dentro da região designada. Fora do raio o app avisa, mas ainda dá para marcar ponto.'
+              : route.recordNewCustomer
               ? 'A gravação começa no seu GPS. Marque um ponto em cada fazenda nova e finalize quando quiser.'
               : gpsFallback
               ? 'Sem GPS neste endereço HTTP (o celular só libera localização em HTTPS ou o PC em localhost). Ordem = planejada. Origem do Play = 1ª parada.'
               : 'Entregas ordenadas da mais perto para a mais longe a partir de onde você está. A ordem definitiva é gravada ao confirmar o início.'}
           </p>
+          {regionPreview}
           {route.recordNewCustomer ? null : previewMap}
           {route.recordNewCustomer ? null : (
           <ol className="space-y-2 text-sm">

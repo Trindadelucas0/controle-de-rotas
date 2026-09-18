@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Truck } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { apiFetch, ApiError } from '@/lib/api-client';
@@ -10,6 +11,7 @@ import {
   summaryKm,
 } from '@/components/ops/OperationalSummaryStrip';
 import { EntityContextPanel } from '@/components/ops/EntityContextPanel';
+import { VehicleCostPanel } from '@/components/costs/VehicleCostPanel';
 import { formatMetersKm, type EntityContextCard, type VehiclesSummary } from '@/lib/ops-types';
 
 export type VehicleDto = {
@@ -80,6 +82,7 @@ export function VehiclesListPage() {
     <div>
       <PageHeader
         title="Veículos"
+        icon={<Truck />}
         action={
           <Link href="/vehicles/new" className="ops-btn ops-btn-primary">
             Novo
@@ -377,6 +380,7 @@ export function EditVehiclePage({ id }: { id: string }) {
         acoes={card?.acoes ?? []}
       />
       {msg ? <p className="mb-3 text-sm text-[var(--ok)]">{msg}</p> : null}
+      <VehicleCostPanel vehicleId={id} />
       <EditableRecordShell
         mode={mode}
         onEdit={() => {

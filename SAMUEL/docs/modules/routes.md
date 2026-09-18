@@ -8,6 +8,8 @@ Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s
 
 `record_new_customer` (`recordNewCustomer`) — missão **Gravar cliente** (v0.18.0): o gestor encaminha sessão sem lista de clientes; cada **Adicionar ponto** cria um `Customer` no GPS; **complete** só fecha a sessão. Placeholder `recordSessionShell` nunca vai ao mapa. Plano: [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
 
+Campos opcionais `assignment_region_*` — missão **Gravar região** (v0.19.0): centro + raio na `Route`; origem = centro clicado. Identificação: `recordNewCustomer` + `assignmentRegionRadiusMeters != null`. Plano: [plans/23-gravar-regiao.md](../plans/23-gravar-regiao.md).
+
 ## Telas
 
 | Rota | Doc |
@@ -17,7 +19,7 @@ Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s
 | `/field/navigate` | [screens/field-navigate.md](../screens/field-navigate.md) |
 | `/field/visits/[id]` | [screens/field-visit.md](../screens/field-visit.md) |
 
-Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-multi-rotas-dia.md](../plans/18-multi-rotas-dia.md), [plans/21-gravar-viagem-acesso.md](../plans/21-gravar-viagem-acesso.md), [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
+Plano: [plans/17-rota-clientes.md](../plans/17-rota-clientes.md), [plans/18-multi-rotas-dia.md](../plans/18-multi-rotas-dia.md), [plans/21-gravar-viagem-acesso.md](../plans/21-gravar-viagem-acesso.md), [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md), [plans/23-gravar-regiao.md](../plans/23-gravar-regiao.md).
 
 ---
 
@@ -385,6 +387,34 @@ Formato interno de `plannedStepsJson`:
   - **404** `VEHICLE_NOT_FOUND`
 - Side effects: cliente placeholder `recordSessionShell` (nome interno, sem pin); OS “Gravar acesso {data}”; visita no pin da empresa
 - Como testar: `/routes` aba Gravar cliente → Publicar → Minha rota do funcionário mostra **Gravar acesso**
+
+## Endpoint POST /api/v1/routes/dispatch-region-mission
+
+- Auth: ADMIN, MANAGER (JWT; PLATFORM_ADMIN herda)
+- Rate limit: mesmo preview/dispatch (Redis)
+- Body:
+
+```json
+{
+  "date": "2026-09-17",
+  "employeeId": "uuid",
+  "vehicleId": "uuid",
+  "latitude": -23.55,
+  "longitude": -46.63,
+  "radiusMeters": 5000,
+  "regionName": "Raio 5 km"
+}
+```
+
+- `radiusMeters` opcional (500–50000, default **5000**). `regionName` opcional (vazio → `"Raio 5 km"` no default).
+- Respostas:
+  - **201/200** — `{ route }` `PUBLISHED` com `recordTrip` + `recordNewCustomer` + `assignmentRegion*`
+  - **422** `REGION_CENTER_REQUIRED` / `REGION_RADIUS_INVALID` / `EMPLOYEE_NOT_DISPATCHABLE` / `VEHICLE_NOT_AVAILABLE`
+  - **404** `VEHICLE_NOT_FOUND`
+  - **403** `AUTH_FORBIDDEN` (EMPLOYEE / SUPERVISOR)
+- Side effects: placeholder `recordSessionShell` igual dispatch-record-mission; OS “Gravar região {data}”; `originLatitude/Longitude` = centro clicado (não pin da empresa)
+- UI: `/routes` aba **Região**
+- Como testar: clique + 5 km → Publicar → Minha rota **Gravar região**; sem centro 422; roteiro **10c**
 
 ## Endpoint POST /api/v1/field/routes/:id/record-point
 

@@ -29,7 +29,7 @@ div 100dvh (sem chrome do app)
 └── controles: Encerrar (confirm); botão alvo / Centralizar (follow) **acima do HUD** (`-top-14` / `sm:-top-16`, sobe com marcos)
 ```
 
-Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; pins = pontos marcados (✎ se cadastro em aberto); GPS denso como Gravar viagem. **Gravar viagem** clássica (cliente já cadastrado) **não** ganha Adicionar ponto.
+Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; pins = pontos marcados (✎ se cadastro em aberto); GPS denso como Gravar viagem. **Gravar viagem** clássica (cliente já cadastrado) **não** ganha Adicionar ponto. Missão **Gravar região** (`assignmentRegionRadiusMeters`): overlay fill+line do círculo; HUD **GRAVAR REGIÃO** + dentro/fora + km até o centro; GPS fora do raio avisa e **não** bloqueia Adicionar ponto.
 
 ### 3. Informação
 
@@ -148,4 +148,5 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 11. Rota de 1 cliente com trilha ACTIVE (viagem passada): Play → Navegar com GPS. Tempo/Restante/ETA preenchidos após o 1º fix; linha menta nasce no carro (não no início da gravação). Acelerar/reduzir muda Tempo e ETA; Restante só cai com o deslocamento. Parado: VEL. 0; Tempo não volta às horas da viagem original.
 12. Banner de marco: fundo escuro, título âmbar, **OK** ou **Sim/Não** — legível sobre o mapa; considera marcos de **todas** as paradas da rota.
 13. Missão **Gravar cliente**: HUD GRAVAR + **Adicionar ponto**; após 2 pontos continua Gravando; Finalizar **não** pede nome; rota clássica com Gravar viagem **não** mostra Adicionar ponto.
+14. Missão **Gravar região**: círculo no mapa + HUD dentro/fora; Adicionar ponto fora do raio continua permitido (aviso).
 14. Cheguei sem **Finalizar visita**: banner no HUD + arraste opaco; **Abrir visita** vai para `/field/visits/{id}`; o modal de km/foto **não** abre. Arraste até o fim sobre o mapa **não** volta ao início no meio do gesto.

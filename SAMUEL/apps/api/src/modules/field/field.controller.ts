@@ -17,6 +17,8 @@ import { FieldService } from './field.service';
 import { MyRouteQueryDto, FieldVehiclesQueryDto } from './dto/field.dto';
 import { CompleteRouteDto, RecordPointDto } from '../routes/dto/routes.dto';
 import { RoutesService } from '../routes/routes.service';
+import { FuelService } from '../fuel/fuel.service';
+import { CreateFuelFillDto } from '../fuel/dto/fuel.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { CurrentUser, Roles, AuthUser } from '../auth/decorators/auth.decorators';
@@ -27,6 +29,7 @@ export class FieldController {
   constructor(
     private readonly fieldService: FieldService,
     private readonly routesService: RoutesService,
+    private readonly fuelService: FuelService,
   ) {}
 
   @Get('my-route')
@@ -39,6 +42,17 @@ export class FieldController {
   @Roles(UserRole.EMPLOYEE)
   vehicles(@CurrentUser() user: AuthUser, @Query() query: FieldVehiclesQueryDto) {
     return this.fieldService.listVehicles(user, query.routeId);
+  }
+
+  @Post('fuel-fills')
+  @Roles(UserRole.EMPLOYEE)
+  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  createFuelFill(
+    @CurrentUser() user: AuthUser,
+    @Body() dto: CreateFuelFillDto,
+    @UploadedFile() file?: Express.Multer.File,
+  ) {
+    return this.fuelService.create(user, dto, file);
   }
 
   @Get('tracking-status')

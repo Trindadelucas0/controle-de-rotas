@@ -1,11 +1,12 @@
 import { Module } from '@nestjs/common';
 import { AuthModule } from '../auth/auth.module';
 import { RoutesModule } from '../routes/routes.module';
+import { FuelModule } from '../fuel/fuel.module';
 import { FieldController } from './field.controller';
 import { FieldService } from './field.service';
 
 @Module({
-  imports: [AuthModule, RoutesModule],
+  imports: [AuthModule, RoutesModule, FuelModule],
   controllers: [FieldController],
   providers: [FieldService],
 })

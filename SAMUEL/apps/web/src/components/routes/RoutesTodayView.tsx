@@ -10,6 +10,7 @@ import {
   summaryKm,
 } from '@/components/ops/OperationalSummaryStrip';
 import { RouteManagePanel } from './RouteManagePanel';
+import { formatRegionKm } from '@/lib/region-circle';
 
 type RouteRow = {
   id: string;
@@ -22,6 +23,8 @@ type RouteRow = {
   _count?: { stops: number };
   stopsDone?: number;
   recordNewCustomer?: boolean;
+  assignmentRegionRadiusMeters?: number | null;
+  assignmentRegionName?: string | null;
 };
 
 const ROUTE_LIST_STATUS: Record<string, string> = {
@@ -135,7 +138,9 @@ export function RoutesTodayView() {
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
                   <p className="text-base font-semibold text-brand-900">
-                    {route.recordNewCustomer
+                    {route.recordNewCustomer && route.assignmentRegionRadiusMeters != null
+                      ? `Gravar região · ${route.assignmentRegionName || formatRegionKm(route.assignmentRegionRadiusMeters)}`
+                      : route.recordNewCustomer
                       ? 'Gravar acesso'
                       : `Rota ${String(index + 1).padStart(2, '0')}`}
                   </p>
@@ -148,7 +153,9 @@ export function RoutesTodayView() {
                   {route.vehicle?.plate ? ` · ${route.vehicle.plate}` : ''}
                 </p>
               <p className="mt-1 text-xs text-[var(--muted)]">
-                {route.recordNewCustomer
+                {route.recordNewCustomer && route.assignmentRegionRadiusMeters != null
+                  ? `Missão de gravar região — ${formatRegionKm(route.assignmentRegionRadiusMeters)}`
+                  : route.recordNewCustomer
                   ? 'Missão de gravar — pontos viram clientes'
                   : [
                       route._count?.stops != null

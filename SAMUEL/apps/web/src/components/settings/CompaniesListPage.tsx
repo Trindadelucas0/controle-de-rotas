@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { Building } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { DataTable, PageHeader } from '@/components/ui/crud';
@@ -47,6 +48,7 @@ export function CompaniesListPage() {
     <div>
       <PageHeader
         title="Empresas"
+        icon={<Building />}
         subtitle="Provisionamento de tenants da plataforma"
         action={
           <Link href="/settings/companies/new" className="ops-btn ops-btn-primary">

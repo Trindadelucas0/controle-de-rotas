@@ -1,6 +1,7 @@
 'use client';
 
 import Link from 'next/link';
+import { UserCog } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { DataTable, PageHeader } from '@/components/ui/crud';
@@ -37,6 +38,7 @@ export function UsersListPage() {
     <div>
       <PageHeader
         title="Usuários"
+        icon={<UserCog />}
         subtitle="Contas de acesso da empresa"
         action={
           <Link href="/settings/users/new" className="ops-btn ops-btn-primary">

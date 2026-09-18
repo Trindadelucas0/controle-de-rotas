@@ -28,7 +28,7 @@ Origem única configurável: `CORS_ORIGIN` (dev: `http://localhost:3000`). Sem `
 
 ## Audit
 
-Eventos: `USER_LOGIN`, `USER_LOGOUT`, `PASSWORD_RESET_REQUESTED`, `PASSWORD_RESET_COMPLETED`, `PASSWORD_CHANGED`. Metadata sem senha.
+Eventos: login/logout/senha, rotas/visitas, `VEHICLE_ODOMETER_ADJUSTED`, criação/cancelamento de abastecimento. Metadata sem senha. Arquivo de cupom só com evidência do mesmo `companyId`.
 
 ## Checklist rápido
 

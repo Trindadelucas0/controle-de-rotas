@@ -100,7 +100,9 @@ N/A no form.
 
 ### 6. Ações
 
-Editar / Cancelar (só detalhe); Salvar → `POST /vehicles` ou `PATCH /vehicles/:id`; após criar → `/vehicles/:id` (já em view).
+Editar / Cancelar (só detalhe); Salvar → `POST /vehicles` ou `PATCH /vehicles/:id`; após criar → `/vehicles/:id` (já em view). PATCH de km grava `OdometerReading` `ADMIN_ADJUST` (não apaga o passado).
+
+Painel de custos no detalhe: `VehicleCostPanel` (`GET /costs/vehicles/:id`) + últimas leituras.
 
 ### 7. Estados
 
@@ -120,7 +122,7 @@ Form full-width.
 
 ### 11. Fora de escopo
 
-Histórico de KM da rota (start/end + fotos no fluxo de campo); conferência visual no admin. Sem OCR.
+OCR de odômetro. Tipos de custo além de combustível na ficha.
 
 ### 12. Como testar
 

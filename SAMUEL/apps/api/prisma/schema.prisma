@@ -150,6 +150,45 @@ enum CustomerLandmarkType {
   ESTRADA_RUIM
 }
 
+enum FuelFillStatus {
+  ACTIVE
+  CANCELLED
+}
+
+enum FuelPaymentMethod {
+  FUEL_CARD
+  COMPANY_CARD
+  CASH
+  PIX
+  OTHER
+}
+
+enum VehicleCostType {
+  FUEL
+  MAINTENANCE
+  TIRES
+  TOLL
+  PARKING
+  WASH
+  OTHER
+}
+
+enum OdometerReadingSource {
+  ROUTE_START
+  ROUTE_END
+  FUEL_FILL
+  ADMIN_ADJUST
+  MAINTENANCE
+  OTHER
+}
+
+enum OcrStatus {
+  NONE
+  PENDING
+  DONE
+  SKIPPED
+}
+
 model Company {
   id              String         @id @default(uuid()) @db.Uuid
   name            String         @db.VarChar(200)
@@ -165,6 +204,9 @@ model Company {
   locationStatus  LocationStatus @default(PENDING) @map("location_status")
   serviceOrderSeq Int            @default(1000) @map("service_order_seq")
   status          CompanyStatus  @default(ACTIVE)
+  /// Preço R$/L para estimativa (nunca misturar com custo real).
+  referenceFuelPricePerLiter Decimal? @map("reference_fuel_price_per_liter") @db.Decimal(12, 4)
+  fuelReceiptRequired        Boolean  @default(false) @map("fuel_receipt_required")
   createdAt       DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -183,6 +225,10 @@ model Company {
   employeeObservations EmployeeObservation[]
   customerAccessPaths  CustomerAccessPath[]
   customerLandmarks    CustomerLandmark[]
+  fuelFills            FuelFill[]
+  fuelFillEvidence     FuelFillEvidence[]
+  vehicleCosts         VehicleCost[]
+  odometerReadings     OdometerReading[]
 
   @@map("companies")
 }
@@ -208,6 +254,10 @@ model User {
   visitEvents          VisitEvent[]        @relation("VisitEventActor")
   visitEvidence        VisitEvidence[]     @relation("VisitEvidenceActor")
   routeEvidence        RouteEvidence[]     @relation("RouteEvidenceActor")
+  fuelFillsCreated     FuelFill[]          @relation("FuelFillCreatedBy")
+  fuelFillEvidence     FuelFillEvidence[]  @relation("FuelFillEvidenceActor")
+  vehicleCostsCreated  VehicleCost[]       @relation("VehicleCostCreatedBy")
+  odometerReadings     OdometerReading[]   @relation("OdometerReadingActor")
 
   @@index([companyId])
   @@map("users")
@@ -236,6 +286,7 @@ model Employee {
   recordedAccessPaths   CustomerAccessPath[] @relation("AccessPathRecordedBy")
   createdLandmarks      CustomerLandmark[]   @relation("LandmarkCreatedBy")
   observations          EmployeeObservation[]
+  fuelFills             FuelFill[]
 
   @@index([companyId])
   @@index([status])
@@ -310,7 +361,10 @@ model Vehicle {
   company        Company         @relation(fields: [companyId], references: [id])
   routes         Route[]
   trackingPoints TrackingPoint[]
-  observations   EmployeeObservation[]
+  observations       EmployeeObservation[]
+  fuelFills          FuelFill[]
+  vehicleCosts       VehicleCost[]
+  odometerReadings   OdometerReading[]
 
   @@unique([companyId, plate])
   @@index([companyId])
@@ -472,6 +526,11 @@ model Route {
   recordTrip             Boolean                     @default(false) @map("record_trip")
   /// Missão de gravar: pontos viram clientes novos; concluir fecha a sessão.
   recordNewCustomer      Boolean                     @default(false) @map("record_new_customer")
+  /// Centro/raio da missão Gravar região (null = missão clássica ou Gravar cliente).
+  assignmentRegionLatitude     Float?  @map("assignment_region_latitude")
+  assignmentRegionLongitude    Float?  @map("assignment_region_longitude")
+  assignmentRegionRadiusMeters Int?    @map("assignment_region_radius_meters")
+  assignmentRegionName         String? @map("assignment_region_name") @db.VarChar(200)
   quality                String?                     @db.VarChar(32)
   publishedAt            DateTime?                   @map("published_at") @db.Timestamptz(6)
   startedAt              DateTime?                   @map("started_at") @db.Timestamptz(6)
@@ -496,6 +555,7 @@ model Route {
   recordedCustomers  Customer[]            @relation("RecordedFromRoute")
   evidence           RouteEvidence[]
   observations       EmployeeObservation[]
+  odometerReadings   OdometerReading[]
 
   @@index([companyId])
   @@index([employeeId])
@@ -614,6 +674,8 @@ model RouteEvidence {
   latitude     Float?
   longitude    Float?
   actorUserId  String?           @map("actor_user_id") @db.Uuid
+  ocrStatus    OcrStatus         @default(NONE) @map("ocr_status")
+  ocrValue     String?           @map("ocr_value") @db.VarChar(64)
   createdAt    DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
 
   company Company @relation(fields: [companyId], references: [id])
@@ -702,4 +764,112 @@ model CustomerLandmark {
   @@index([customerId])
   @@index([type])
   @@map("customer_landmarks")
+}
+
+model FuelFill {
+  id               String            @id @default(uuid()) @db.Uuid
+  companyId        String            @map("company_id") @db.Uuid
+  vehicleId        String            @map("vehicle_id") @db.Uuid
+  employeeId       String?           @map("employee_id") @db.Uuid
+  occurredAt       DateTime          @map("occurred_at") @db.Timestamptz(6)
+  odometerKm       Decimal           @map("odometer_km") @db.Decimal(12, 1)
+  liters           Decimal           @db.Decimal(12, 3)
+  pricePerLiter    Decimal           @map("price_per_liter") @db.Decimal(12, 4)
+  totalCost        Decimal           @map("total_cost") @db.Decimal(14, 2)
+  fuelType         String?           @map("fuel_type") @db.VarChar(40)
+  station          String?           @db.VarChar(160)
+  paymentMethod    FuelPaymentMethod @default(OTHER) @map("payment_method")
+  receiptRef       String?           @map("receipt_ref") @db.VarChar(80)
+  notes            String?           @db.VarChar(500)
+  status           FuelFillStatus    @default(ACTIVE)
+  createdByUserId  String            @map("created_by_user_id") @db.Uuid
+  ocrOdometerKm    Decimal?          @map("ocr_odometer_km") @db.Decimal(12, 1)
+  ocrStatus        OcrStatus         @default(NONE) @map("ocr_status")
+  cancelledAt      DateTime?         @map("cancelled_at") @db.Timestamptz(6)
+  cancelledByUserId String?          @map("cancelled_by_user_id") @db.Uuid
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company   Company             @relation(fields: [companyId], references: [id])
+  vehicle   Vehicle             @relation(fields: [vehicleId], references: [id])
+  employee  Employee?           @relation(fields: [employeeId], references: [id])
+  createdBy User                @relation("FuelFillCreatedBy", fields: [createdByUserId], references: [id])
+  evidence  FuelFillEvidence[]
+  vehicleCost VehicleCost?
+  odometerReadings OdometerReading[]
+
+  @@index([companyId, occurredAt])
+  @@index([companyId, vehicleId])
+  @@index([companyId, status])
+  @@map("fuel_fills")
+}
+
+model FuelFillEvidence {
+  id           String   @id @default(uuid()) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  fuelFillId   String   @map("fuel_fill_id") @db.Uuid
+  storageKey   String   @map("storage_key") @db.VarChar(500)
+  mimeType     String   @map("mime_type") @db.VarChar(100)
+  sizeBytes    Int      @map("size_bytes")
+  originalName String?  @map("original_name") @db.VarChar(255)
+  actorUserId  String?  @map("actor_user_id") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company  Company  @relation(fields: [companyId], references: [id])
+  fuelFill FuelFill @relation(fields: [fuelFillId], references: [id], onDelete: Cascade)
+  actor    User?    @relation("FuelFillEvidenceActor", fields: [actorUserId], references: [id])
+
+  @@index([companyId])
+  @@index([fuelFillId])
+  @@map("fuel_fill_evidence")
+}
+
+model VehicleCost {
+  id              String          @id @default(uuid()) @db.Uuid
+  companyId       String          @map("company_id") @db.Uuid
+  vehicleId       String          @map("vehicle_id") @db.Uuid
+  type            VehicleCostType
+  amount          Decimal         @db.Decimal(14, 2)
+  occurredAt      DateTime        @map("occurred_at") @db.Timestamptz(6)
+  fuelFillId      String?         @unique @map("fuel_fill_id") @db.Uuid
+  notes           String?         @db.VarChar(500)
+  status          FuelFillStatus  @default(ACTIVE)
+  createdByUserId String?         @map("created_by_user_id") @db.Uuid
+  createdAt       DateTime        @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime        @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company   Company   @relation(fields: [companyId], references: [id])
+  vehicle   Vehicle   @relation(fields: [vehicleId], references: [id])
+  fuelFill  FuelFill? @relation(fields: [fuelFillId], references: [id], onDelete: SetNull)
+  createdBy User?     @relation("VehicleCostCreatedBy", fields: [createdByUserId], references: [id])
+
+  @@index([companyId, occurredAt])
+  @@index([companyId, vehicleId, type])
+  @@index([companyId, status])
+  @@map("vehicle_costs")
+}
+
+model OdometerReading {
+  id          String                 @id @default(uuid()) @db.Uuid
+  companyId   String                 @map("company_id") @db.Uuid
+  vehicleId   String                 @map("vehicle_id") @db.Uuid
+  source      OdometerReadingSource
+  km          Decimal                @db.Decimal(12, 1)
+  occurredAt  DateTime               @map("occurred_at") @db.Timestamptz(6)
+  routeId     String?                @map("route_id") @db.Uuid
+  fuelFillId  String?                @map("fuel_fill_id") @db.Uuid
+  actorUserId String?                @map("actor_user_id") @db.Uuid
+  note        String?                @db.VarChar(300)
+  createdAt   DateTime               @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  company  Company   @relation(fields: [companyId], references: [id])
+  vehicle  Vehicle   @relation(fields: [vehicleId], references: [id])
+  route    Route?    @relation(fields: [routeId], references: [id], onDelete: SetNull)
+  fuelFill FuelFill? @relation(fields: [fuelFillId], references: [id], onDelete: SetNull)
+  actor    User?     @relation("OdometerReadingActor", fields: [actorUserId], references: [id])
+
+  @@index([companyId, vehicleId, occurredAt])
+  @@index([routeId])
+  @@index([fuelFillId])
+  @@map("odometer_readings")
 }

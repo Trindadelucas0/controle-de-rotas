@@ -80,12 +80,13 @@ Detalhes: [modules/visits.md](modules/visits.md). UI: `/agenda`.
 
 ## Routes
 
-Detalhes: [modules/routes.md](modules/routes.md). UI: `/routes` (modos Clientes + Visitas agendadas + **Gravar cliente**).
+Detalhes: [modules/routes.md](modules/routes.md). UI: `/routes` (modos Clientes + Visitas agendadas + **Gravar cliente** + **Região**).
 
 - `POST /routes/preview` ? `{ visitIds, roundtrip? }`
 - `POST /routes/preview-customers` — `{ customerIds, employeeIds, roundtrip?, date?, recordTrip?, originMode? }` (`originMode`: `EMPLOYEE_LAST` padrão ou `COMPANY`; 1–25 clientes, 1–8 funcionários com login; sem persistir; inclui `dayLoad` + `startOrigin`); ordem das paradas = **mais perto → mais longe** da origem escolhida; `recordTrip: true` grava trilha em **todas** as rotas do lote (1+ clientes)
 - `POST /routes/dispatch-customers` — mesmo body; cria OS+visitas+rotas `PUBLISHED` + `plannedStepsJson` + `recordTrip` (ADMIN/MANAGER); **permite várias rotas no dia**; reusa veículo do dia; `origin*` = início do traçado (funcionário ou E); roundtrip volta ao E; se cliente tem `CustomerAccessPath` ACTIVE e a rota tem 1 parada, usa geometria gravada **recortada a partir da origem** (não a trilha inteira)
 - `POST /routes/dispatch-record-mission` — ADMIN/MANAGER `{ date, employeeId, vehicleId }` → rota `PUBLISHED` com `recordTrip` + `recordNewCustomer`; placeholder interno (não aparece no mapa). Sem lista de clientes.
+- `POST /routes/dispatch-region-mission` — ADMIN/MANAGER `{ date, employeeId, vehicleId, latitude, longitude, radiusMeters?, regionName? }` → mesma missão de gravar + `assignmentRegion*` (raio default 5000 m); origem = centro; 422 `REGION_CENTER_REQUIRED` / `REGION_RADIUS_INVALID`. Fora do raio no `record-point` **não** gera 422 no MVP.
 - `GET /routes`, `POST /routes` (`recordTrip?`), `GET /routes/:id`, `PATCH /routes/:id` (ADMIN/MANAGER; só `PLANNED`|`PUBLISHED`), `POST /routes/:id/publish`, `POST /routes/:id/cancel` (idem), `DELETE /routes/:id` (ADMIN; qualquer status exceto `IN_PROGRESS`)
 - `POST /routes/:id/start` — EMPLOYEE atribuído → `IN_PROGRESS`; **multipart** `file` (foto do odômetro, obrigatória) + `vehicleId`, `startOdometerKm`, `startFuelLevel`, `latitude`, `longitude`, `startNotes?`; trava o veículo (`IN_USE`; 409 `VEHICLE_IN_USE` se outra rota `IN_PROGRESS` no mesmo carro); reordena paradas da mais perto para a mais longe; erro `ROUTE_ALREADY_ACTIVE` se já houver outra rota do funcionário
 - `POST /routes/:id/reroute` — EMPLOYEE atribuído + rota `IN_PROGRESS`; body `{ latitude, longitude, reorderRemaining }`; recalcula geometry/steps a partir do GPS (mesmo recorte de trilha); `reorderRemaining: true` = pendentes mais perto→mais longe; rate limit Redis 30/min (mesmo preview)
@@ -102,7 +103,8 @@ Detalhes: [modules/routes.md](modules/routes.md). UI: `/routes` (modos Clientes 
 Detalhes: [modules/tracking.md](modules/tracking.md). UI: `/field/my-route`, `/field/start/[id]`, `/field/navigate`, `/map`.
 
 - `GET /field/vehicles?routeId=` — veículos livres da empresa (omite quem está em outra `IN_PROGRESS`) + atribuído à rota; inclui `odometerKm`, `lastFuelLevel`
-- `GET /field/my-route` — `{ date, routes, route, openRecordedCustomers }` (query `?date=` opcional; dia operacional `APP_TIMEZONE`; inclui `IN_PROGRESS` de outro dia; poll 15s na PWA; cada rota traz `recordTrip`, `recordNewCustomer`, `recordedCustomers[]`; cada parada pode trazer `accessPath` ACTIVE e `landmarks[]` com `customerId` e `createdBy`)
+- `POST /field/fuel-fills` — EMPLOYEE; multipart igual `POST /fuel-fills` (veículo da empresa)
+- `GET /field/my-route` — `{ date, routes, route, openRecordedCustomers }` (query `?date=` opcional; dia operacional `APP_TIMEZONE`; inclui `IN_PROGRESS` de outro dia; poll 15s na PWA; cada rota traz `recordTrip`, `recordNewCustomer`, `assignmentRegionLatitude|Longitude|RadiusMeters|Name`, `recordedCustomers[]`; cada parada pode trazer `accessPath` ACTIVE e `landmarks[]` com `customerId` e `createdBy`)
 - `GET /field/tracking-status`
 - `POST /tracking/points` — body `{ points: [{ routeId, latitude, longitude, accuracy?, speed?, heading?, recordedAt? }] }` (máx. 50). Histórico: 25 m/15 s; se `recordTrip`, 5 m/2 s. Redis live é best-effort e não bloqueia o PostGIS.
   - JWT → employee (não aceita employeeId no body)
@@ -123,4 +125,18 @@ Detalhes: [modules/ops.md](modules/ops.md). UI: `/`, `/map`, listas Recursos, `/
 - Context: `/ops/customers|employees|vehicles|service-orders/:id`
 - Listas enriquecidas: `/ops/customers|employees|vehicles/list-enriched`
 - EMPLOYEE: summary agenda; **sem** summaries/lista/context de clientes
-- Sem inventar m?tricas: `null` / "?" quando n?o h? check-in, KM real ou custo R$
+- Sem inventar métricas: `null` / "?" quando não há check-in, KM real ou custo R$
+
+## Fuel / Custos da frota
+
+Detalhes: [modules/costs.md](modules/costs.md). UI: `/fuel`, `/costs`, `/field/fuel-new`.
+
+- `POST /fuel-fills` — ADMIN/MANAGER multipart (`vehicleId`, `occurredAt`, `odometerKm`, `liters`, `pricePerLiter`, `file?`). `totalCost` só no servidor (`liters × pricePerLiter`).
+- `GET /fuel-fills` — paginado; EMPLOYEE só os que criou
+- `GET /fuel-fills/:id`, `PATCH` ADMIN/MANAGER, `POST /fuel-fills/:id/cancel` ADMIN (soft)
+- `GET /fuel-fills/:id/evidence/:eid/file`
+- `GET/PATCH /companies/me/cost-settings` — preço de referência (ESTIMATIVA) + exigir comprovante (PATCH ADMIN)
+- `GET /costs/dashboard?from&to&vehicleId&employeeId&fuelType` — métricas `{ kind: REAL|ESTIMATED|UNAVAILABLE, value, reason? }`
+- `GET /costs/vehicles/:id`, `GET /costs/routes/:id`
+- `GET /vehicles/:id/odometer-readings`
+- Consumo REAL = tanque a tanque. Custo REAL da rota só se o km da rota estiver coberto por um par de abastecimentos. Sem dado: `value: null`, nunca 0 falso.

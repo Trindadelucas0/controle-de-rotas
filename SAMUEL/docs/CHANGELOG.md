@@ -1,5 +1,39 @@
 # Changelog
 
+## v0.20.0 — 2026-09-17
+
+### Custos da frota (abastecimento, consumo, dashboard)
+
+- Modelos `FuelFill`, `VehicleCost` (FUEL), `OdometerReading`, evidência do cupom; preço de referência e flag de comprovante na empresa
+- Motor único `cost-calc.ts`: REAL / ESTIMADO / NÃO CALCULÁVEL; tanque a tanque; custo real da rota só com par de fills cobrindo o km
+- Escritório: `/fuel` (lista paginada + form) e `/costs`; ficha do veículo + card na rota
+- Campo: `/field/fuel-new` a partir de Minha rota; `POST /field/fuel-fills`
+- PATCH de odômetro do veículo gera leitura `ADMIN_ADJUST` + audit; start/complete de rota gravam `ROUTE_START`/`END`
+- OCR só stub; sem receita/margem; UI desta entrega só combustível
+- Como validar: roteiro **17** em `docs/GUIA-TESTES.md`
+
+## v0.19.0 — 2026-09-17
+
+### Missão Gravar região (ponto + raio)
+
+- Quarta aba **Região** no planejador: clique/arraste o centro, raio padrão 5 km (500 m–50 km), funcionário/veículo/data → **Publicar missão**
+- `POST /routes/dispatch-region-mission` grava `assignmentRegion*` na rota; origem = centro clicado; reusa `recordTrip` + `recordNewCustomer` + placeholder da sessão
+- Campo: texto de designação + mini-mapa do círculo em Minha rota e no início; overlay + HUD dentro/fora na navegação
+- GPS fora do raio: aviso; **Adicionar ponto** e finalizar iguais a Gravar cliente (sem 422)
+- SUPERVISOR não publica; EMPLOYEE 403 no dispatch
+- Como validar: roteiro **10c** em `docs/GUIA-TESTES.md`
+
+## v0.18.5 — 2026-09-17
+
+### Chrome — sidebar ReUI, Lucide, IconTile
+
+- Sidebar agrupada (Operação / Recursos / Administração) com ícones Lucide outline e rótulos; sheet mobile no lugar do drawer custom
+- Header: `SidebarTrigger`; marca **Rotas** só na sidebar; conta em `DropdownMenu` (nome, papel, Alterar senha, tema, Sair)
+- `PageHeader` opcional com `IconTile` outline sm; lista vazia do `DataTable` com `IconTile` + texto; lápis Lucide 16px
+- Identidade: Overpass, accent `#FF5722`, canvas `#121212`; `(field-nav)` continua sem sidebar
+- Arquivos: `(app)/layout.tsx`, `AppSidebar.tsx`, `AppNav.tsx`, `AppHeader.tsx`, `UserMenu.tsx`, `crud.tsx`, `globals.css`
+- Como validar: papéis na nav iguais a `NAV_GROUPS`; tema claro/escuro no chrome; `/field/navigate` tela cheia
+
 ## v0.18.4 — 2026-09-15
 
 ### Fix — foto da visita “Erro interno do servidor”

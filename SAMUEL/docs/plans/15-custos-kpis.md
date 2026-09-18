@@ -1,42 +1,51 @@
 # Tema 15 — Custos e KPIs financeiros
 
-**Status:** planned
+**Status:** done (primeira entrega — combustível)
 
-**Fase:** pós-ciclo crítico 07–14. Não bloqueia MVP operacional OS→Visita→Rota→Campo.
+**Fase:** evolução operacional. Não inclui receita, margem, OCR motor, UI de manutenção/pedágio.
 
-## Escopo planejado
+## Escopo entregue (0.20.0)
 
-- Custo estimado por KM (parâmetro da empresa / veículo)
-- Custo por visita / por rota / por funcionário (agregações)
-- Combustível: estimado primeiro; real (lançamento manual ou integração) depois
-- Ligação aos totais de distância planejada/real (temas 09 e 11)
+- Abastecimentos reais (`FuelFill` + ledger `VehicleCost` FUEL)
+- Histórico de odômetro (`OdometerReading`)
+- Motor `cost-calc.ts`: REAL / ESTIMATED / UNAVAILABLE
+- Dashboard `/costs`, ficha do veículo, card na rota
+- PWA `/field/fuel-new`
+- Preço de referência e comprovante obrigatório na Empresa
+- Alertas no dashboard (`CONSUMPTION_VARIANCE`, `COST_PER_KM_UP`, `MISSING_RECEIPT`, `ODOMETER_INCONSISTENT`)
+- OCR só gancho (stub)
 
-## Telas previstas
+## Telas
 
 | Rota | Papéis | Objetivo |
 | --- | --- | --- |
-| `/dashboard` (seção custos) ou `/settings/costs` | ADMIN, MANAGER | Parâmetros + leitura de KPIs $ |
+| `/fuel` | ADMIN, MANAGER, SUPERVISOR | Lista/form de abastecimentos |
+| `/costs` | ADMIN, MANAGER, SUPERVISOR | KPIs REAL vs ESTIMADO |
+| `/field/fuel-new` | EMPLOYEE | Registro simples |
+| `/settings/company` | ADMIN | Preço ref + exigir comprovante |
 
-## APIs previstas
+## APIs
 
-| Método | Path (proposto) | Notas |
+| Método | Path | Notas |
 | --- | --- | --- |
-| `GET/PATCH` | `/api/v1/companies/me/cost-settings` | R$/km, etc. |
-| `GET` | `/api/v1/dashboard/costs?from&to` | Agregados |
+| `GET/PATCH` | `/api/v1/companies/me/cost-settings` | Preço/L de referência (ESTIMATIVA) + flag comprovante |
+| `GET` | `/api/v1/costs/dashboard?from&to` | Agregados com `kind` |
+| CRUD | `/api/v1/fuel-fills` | Multipart; total no servidor |
+| `POST` | `/api/v1/field/fuel-fills` | EMPLOYEE |
 
-## Fora de escopo
+## Fora de escopo (ainda)
 
 - Cartão combustível / ERP
-- Chatwoot
-- Precificação comercial de cliente
+- OCR de cupom
+- UI de tipos além de combustível
+- Rentabilidade / receita
 
-## Critérios de aceite (quando done)
+## Critérios de aceite
 
-- [ ] Cálculos auditáveis (fórmula documentada)
-- [ ] Sem custo inventado quando falta KM real — mostrar estimado vs indisponível
-- [ ] Secrets de integrações futuras só no backend
+- [x] Cálculos auditáveis em `cost-calc.ts` + testes
+- [x] Sem custo inventado quando falta KM / par de fills — ESTIMADO ou NÃO CALCULÁVEL
+- [x] Secrets de OCR futuros só no backend (stub local)
 
-## Como validar (quando implementado)
+## Como validar
 
-1. Configurar R$/km → rota com KM known → custo bate fórmula.
-2. Sem actual KM → UI não finge precisão.
+Roteiro **17** em `docs/GUIA-TESTES.md`.

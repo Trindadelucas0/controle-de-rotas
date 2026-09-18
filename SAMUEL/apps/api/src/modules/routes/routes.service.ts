@@ -8,6 +8,7 @@ import {
   EmployeeObservationSeverity,
   EmployeeStatus,
   LocationStatus,
+  OdometerReadingSource,
   Prisma,
   RouteEvidenceKind,
   RouteStatus,
@@ -22,6 +23,7 @@ import { RedisService } from '../../common/redis/redis.service';
 import { LocalStorageService } from '../../common/storage/local-storage.service';
 import { AuthUser } from '../auth/decorators/auth.decorators';
 import { httpError } from '../../common/errors/http-error';
+import { writeOdometerReading } from '../costs/odometer-write';
 import { TrackingService } from '../tracking/tracking.service';
 import { EmployeeObservationsService } from '../ops/employee-observations.service';
 import { allocateServiceOrderNumber } from '../service-orders/service-order-seq';
@@ -31,6 +33,7 @@ import {
   CreateRouteDto,
   DispatchCustomersRouteDto,
   DispatchRecordMissionDto,
+  DispatchRegionMissionDto,
   ListRoutesQueryDto,
   PreviewCustomersRouteDto,
   PreviewRouteDto,
@@ -75,6 +78,7 @@ import {
   RECORD_SESSION_SHELL_NAME,
   normalizeRecordCustomerName,
 } from './record-mission.util';
+import { resolveAssignmentRegion } from './region-mission.util';
 import {
   EmployeeSlot,
   pickEmployeeDispatchPosition,
@@ -365,6 +369,123 @@ export class RoutesService {
               sequence: 1,
               latitude: origin.latitude,
               longitude: origin.longitude,
+            },
+          },
+        },
+      });
+      return route.id;
+    });
+
+    const { route } = await this.getOne(user, createdId);
+    return { route };
+  }
+
+  async dispatchRegionMission(user: AuthUser, dto: DispatchRegionMissionDto) {
+    await this.assertRateLimit(user.id);
+    const region = resolveAssignmentRegion({
+      latitude: dto.latitude,
+      longitude: dto.longitude,
+      radiusMeters: dto.radiusMeters,
+      regionName: dto.regionName,
+    });
+    if (!region.ok) {
+      throw httpError(HttpStatus.UNPROCESSABLE_ENTITY, region.code, region.message);
+    }
+
+    const dateIso = utcDateIso(dto.date);
+    const date = new Date(`${dateIso}T00:00:00.000Z`);
+    const originLat = region.value.latitude;
+    const originLng = region.value.longitude;
+
+    const employee = await this.prisma.employee.findFirst({
+      where: {
+        id: dto.employeeId,
+        companyId: user.companyId,
+        status: EmployeeStatus.ACTIVE,
+      },
+      select: { id: true, userId: true, name: true },
+    });
+    if (!employee?.userId) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'EMPLOYEE_NOT_DISPATCHABLE',
+        'Escolha um funcionário ativo com usuário de campo.',
+      );
+    }
+
+    const vehicle = await this.prisma.vehicle.findFirst({
+      where: { id: dto.vehicleId, companyId: user.companyId },
+      select: { id: true, status: true },
+    });
+    if (!vehicle) {
+      throw httpError(HttpStatus.NOT_FOUND, 'VEHICLE_NOT_FOUND', 'Veículo não encontrado.');
+    }
+    if (vehicle.status !== VehicleStatus.AVAILABLE && vehicle.status !== VehicleStatus.IN_USE) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'VEHICLE_NOT_AVAILABLE',
+        'Este veículo não está disponível.',
+      );
+    }
+
+    const createdId = await this.prisma.$transaction(async (tx) => {
+      const shell = await tx.customer.create({
+        data: {
+          companyId: user.companyId,
+          name: RECORD_SESSION_SHELL_NAME,
+          status: CustomerStatus.DRAFT,
+          recordSessionShell: true,
+          locationStatus: LocationStatus.PENDING,
+        },
+      });
+      const number = await allocateServiceOrderNumber(tx, user.companyId);
+      const order = await tx.serviceOrder.create({
+        data: {
+          companyId: user.companyId,
+          customerId: shell.id,
+          number,
+          title: `Gravar região ${dateIso}`,
+          status: ServiceOrderStatus.IN_PROGRESS,
+          createdByUserId: user.id,
+        },
+      });
+      const visit = await tx.visit.create({
+        data: {
+          companyId: user.companyId,
+          serviceOrderId: order.id,
+          customerId: shell.id,
+          employeeId: employee.id,
+          scheduledStart: new Date(`${dateIso}T08:00:00.000Z`),
+          status: VisitStatus.ASSIGNED,
+          latitude: originLat,
+          longitude: originLng,
+        },
+      });
+      const route = await tx.route.create({
+        data: {
+          companyId: user.companyId,
+          employeeId: employee.id,
+          vehicleId: vehicle.id,
+          date,
+          status: RouteStatus.PUBLISHED,
+          roundtrip: false,
+          originName: region.value.regionName,
+          originLatitude: originLat,
+          originLongitude: originLng,
+          recordTrip: true,
+          recordNewCustomer: true,
+          assignmentRegionLatitude: originLat,
+          assignmentRegionLongitude: originLng,
+          assignmentRegionRadiusMeters: region.value.radiusMeters,
+          assignmentRegionName: region.value.regionName,
+          publishedAt: new Date(),
+          stops: {
+            create: {
+              companyId: user.companyId,
+              visitId: visit.id,
+              sequence: 1,
+              latitude: originLat,
+              longitude: originLng,
             },
           },
         },
@@ -1234,6 +1355,15 @@ export class RoutesService {
         lastKm: vehicle.odometerKm,
         startFuel: dto.startFuelLevel,
       });
+      await writeOdometerReading(this.prisma, {
+        companyId: user.companyId,
+        vehicleId: vehicle.id,
+        source: OdometerReadingSource.ROUTE_START,
+        km: dto.startOdometerKm,
+        occurredAt: new Date(),
+        routeId: id,
+        actorUserId: user.id,
+      });
       await this.prisma.auditLog.create({
         data: {
           companyId: user.companyId,
@@ -1383,6 +1513,15 @@ export class RoutesService {
       startKm: dto.startOdometerKm,
       lastKm: vehicle.odometerKm,
       startFuel: dto.startFuelLevel,
+    });
+    await writeOdometerReading(this.prisma, {
+      companyId: user.companyId,
+      vehicleId: vehicle.id,
+      source: OdometerReadingSource.ROUTE_START,
+      km: dto.startOdometerKm,
+      occurredAt: new Date(),
+      routeId: id,
+      actorUserId: user.id,
     });
     await this.prisma.auditLog.create({
       data: {
@@ -2038,6 +2177,15 @@ export class RoutesService {
           odometerKm: route.endOdometerKm,
           lastFuelLevel: route.endFuelLevel ?? undefined,
         },
+      });
+      await writeOdometerReading(this.prisma, {
+        companyId: user.companyId,
+        vehicleId: route.vehicleId,
+        source: OdometerReadingSource.ROUTE_END,
+        km: route.endOdometerKm,
+        occurredAt: new Date(),
+        routeId,
+        actorUserId: user.id,
       });
     } else if (route.vehicleId && route.endFuelLevel) {
       await this.prisma.vehicle.update({
