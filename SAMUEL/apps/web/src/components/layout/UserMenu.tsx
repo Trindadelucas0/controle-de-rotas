@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
+  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
@@ -47,19 +48,25 @@ export function UserMenu({ user }: { user: SessionUser }) {
         </span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-48">
-        <DropdownMenuLabel className="font-normal">
-          <span className="block truncate text-sm font-medium text-foreground">{user.name}</span>
-          <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">{user.role}</span>
-        </DropdownMenuLabel>
+        <DropdownMenuGroup>
+          <DropdownMenuLabel className="font-normal">
+            <span className="block truncate text-sm font-medium text-foreground">{user.name}</span>
+            <span className="block text-[11px] uppercase tracking-wide text-muted-foreground">{user.role}</span>
+          </DropdownMenuLabel>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem render={<Link href="/account/change-password" />}>Alterar senha</DropdownMenuItem>
-        <div className="px-1 py-1">
-          <ThemeToggle wide />
-        </div>
+        <DropdownMenuGroup>
+          <DropdownMenuItem render={<Link href="/account/change-password" />}>Alterar senha</DropdownMenuItem>
+          <div className="px-1 py-1">
+            <ThemeToggle wide />
+          </div>
+        </DropdownMenuGroup>
         <DropdownMenuSeparator />
-        <DropdownMenuItem disabled={busy} onClick={() => void onLogout()}>
-          {busy ? 'Saindo…' : 'Sair'}
-        </DropdownMenuItem>
+        <DropdownMenuGroup>
+          <DropdownMenuItem disabled={busy} onClick={() => void onLogout()}>
+            {busy ? 'Saindo…' : 'Sair'}
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
       </DropdownMenuContent>
     </DropdownMenu>
   );

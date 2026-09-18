@@ -1,7 +1,13 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import MapLibreMap, { Layer, Marker, NavigationControl, Source } from 'react-map-gl/maplibre';
+import MapLibreMap, {
+  Layer,
+  Marker,
+  NavigationControl,
+  ScaleControl,
+  Source,
+} from 'react-map-gl/maplibre';
 import type { MapLayerMouseEvent, MapRef, MarkerDragEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
@@ -23,8 +29,17 @@ type EmployeeOption = { id: string; name: string; status?: string; userId?: stri
 type VehicleOption = { id: string; plate: string; status?: string };
 type NearbyPin = { id: string; name: string; latitude: number; longitude: number };
 type AddressSuggestion = { label: string; latitude: number; longitude: number };
+type AddressHint = 'idle' | 'loading' | 'ok' | 'not_found' | 'error' | 'rate_limit';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 3.8 };
+
+function addressHintMessage(hint: AddressHint): string | null {
+  if (hint === 'loading') return 'Buscando endereço…';
+  if (hint === 'not_found') return 'Nenhum endereço encontrado.';
+  if (hint === 'rate_limit') return 'Muitas buscas. Aguarde.';
+  if (hint === 'error') return 'Falha ao buscar endereço.';
+  return null;
+}
 
 export function RoutesPlannerRegionMission() {
   const user = useSessionUser();
@@ -32,6 +47,9 @@ export function RoutesPlannerRegionMission() {
   const mapStyle = getRasterStyleForTheme(theme);
   const mapRef = useRef<MapRef>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const radiusMetersRef = useRef(DEFAULT_REGION_RADIUS_METERS);
+  const addressAbort = useRef<AbortController | null>(null);
+  const appliedLabelRef = useRef<string | null>(null);
 
   const canPublish =
     user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN' || user?.role === 'MANAGER';
@@ -48,6 +66,7 @@ export function RoutesPlannerRegionMission() {
   const [nameTouched, setNameTouched] = useState(false);
   const [addressQ, setAddressQ] = useState('');
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
+  const [addressHint, setAddressHint] = useState<AddressHint>('idle');
   const [nearby, setNearby] = useState<NearbyPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [publishing, setPublishing] = useState(false);
@@ -56,6 +75,8 @@ export function RoutesPlannerRegionMission() {
 
   const hasCenter = latitude != null && longitude != null;
   const defaultName = `Raio ${formatRegionKm(radiusMeters)}`;
+  radiusMetersRef.current = radiusMeters;
+  const addressMsg = addressHintMessage(addressHint);
 
   const circle = useMemo(() => {
     if (!hasCenter) return null;
@@ -95,14 +116,31 @@ export function RoutesPlannerRegionMission() {
     return () => ro.disconnect();
   }, []);
 
-  useEffect(() => {
-    if (!hasCenter || !mapRef.current) return;
-    mapRef.current.fitBounds(regionCircleBounds(latitude!, longitude!, radiusMeters), {
+  const fitMapToCenter = useCallback((lat: number, lng: number) => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.getMap()?.resize();
+    map.fitBounds(regionCircleBounds(lat, lng, radiusMetersRef.current), {
       padding: 40,
       maxZoom: 13,
       duration: 500,
     });
-  }, [hasCenter, latitude, longitude, radiusMeters]);
+  }, []);
+
+  const resetMapToBrasil = useCallback(() => {
+    const map = mapRef.current;
+    if (!map) return;
+    map.getMap()?.resize();
+    map.jumpTo({
+      center: [BRASIL.longitude, BRASIL.latitude],
+      zoom: BRASIL.zoom,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hasCenter || !mapRef.current) return;
+    fitMapToCenter(latitude!, longitude!);
+  }, [hasCenter, latitude, longitude, fitMapToCenter]);
 
   useEffect(() => {
     if (!hasCenter) {
@@ -121,18 +159,37 @@ export function RoutesPlannerRegionMission() {
 
   useEffect(() => {
     const q = addressQ.trim();
-    if (q.length < 3) {
+    if (appliedLabelRef.current && q === appliedLabelRef.current) {
       setSuggestions([]);
+      if (addressHint === 'loading') setAddressHint('idle');
       return;
     }
-    const t = window.setTimeout(() => {
-      void apiFetch<{ suggestions: AddressSuggestion[] }>(
-        `/api/v1/lookups/address?q=${encodeURIComponent(q)}`,
-      )
-        .then((r) => setSuggestions(r.suggestions ?? []))
-        .catch(() => setSuggestions([]));
+    if (q.length < 3) {
+      setSuggestions([]);
+      if (addressHint === 'loading') setAddressHint('idle');
+      return;
+    }
+    const t = window.setTimeout(async () => {
+      addressAbort.current?.abort();
+      const controller = new AbortController();
+      addressAbort.current = controller;
+      setAddressHint('loading');
+      try {
+        const r = await apiFetch<{ suggestions: AddressSuggestion[] }>(
+          `/api/v1/lookups/address?q=${encodeURIComponent(q)}`,
+          { signal: controller.signal },
+        );
+        setSuggestions(r.suggestions ?? []);
+        setAddressHint((r.suggestions ?? []).length ? 'ok' : 'not_found');
+      } catch (e) {
+        if (e instanceof DOMException && e.name === 'AbortError') return;
+        setSuggestions([]);
+        if (e instanceof ApiError && e.status === 429) setAddressHint('rate_limit');
+        else setAddressHint('error');
+      }
     }, 400);
     return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [addressQ]);
 
   function setCenter(lat: number, lng: number) {
@@ -141,12 +198,49 @@ export function RoutesPlannerRegionMission() {
     setMsg(null);
   }
 
+  function applyAddress(s: AddressSuggestion) {
+    appliedLabelRef.current = s.label;
+    setLatitude(s.latitude);
+    setLongitude(s.longitude);
+    setAddressQ(s.label);
+    setSuggestions([]);
+    setAddressHint('ok');
+    setMsg(null);
+    fitMapToCenter(s.latitude, s.longitude);
+    containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  function resetForm() {
+    appliedLabelRef.current = null;
+    addressAbort.current?.abort();
+    setLatitude(null);
+    setLongitude(null);
+    setAddressQ('');
+    setSuggestions([]);
+    setNearby([]);
+    setAddressHint('idle');
+    setRadiusMeters(DEFAULT_REGION_RADIUS_METERS);
+    setRegionName('');
+    setNameTouched(false);
+    setEmployeeId('');
+    setVehicleId('');
+    setError(null);
+    resetMapToBrasil();
+  }
+
   function handleClick(e: MapLayerMouseEvent) {
     setCenter(e.lngLat.lat, e.lngLat.lng);
   }
 
   function handleDragEnd(e: MarkerDragEvent) {
     setCenter(e.lngLat.lat, e.lngLat.lng);
+  }
+
+  function handleMapLoad() {
+    mapRef.current?.getMap()?.resize();
+    if (latitude != null && longitude != null) {
+      fitMapToCenter(latitude, longitude);
+    }
   }
 
   async function publish() {
@@ -168,6 +262,7 @@ export function RoutesPlannerRegionMission() {
         }),
       });
       setMsg('Missão de gravar região publicada. O funcionário vê a área em Minha rota.');
+      resetForm();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao publicar missão');
     } finally {
@@ -193,10 +288,12 @@ export function RoutesPlannerRegionMission() {
           mapStyle={mapStyle}
           style={{ width: '100%', height: '100%' }}
           attributionControl
+          onLoad={handleMapLoad}
           onClick={handleClick}
           cursor="crosshair"
         >
           <NavigationControl position="bottom-right" />
+          <ScaleControl position="bottom-left" unit="metric" maxWidth={120} />
           {circle ? (
             <Source id="region-circle" type="geojson" data={circle}>
               <Layer
@@ -224,6 +321,25 @@ export function RoutesPlannerRegionMission() {
               />
             </Marker>
           ))}
+          {suggestions.map((s) => (
+            <Marker
+              key={`sug-${s.label}-${s.latitude}-${s.longitude}`}
+              latitude={s.latitude}
+              longitude={s.longitude}
+              anchor="bottom"
+              onClick={(e) => {
+                e.originalEvent.stopPropagation();
+                applyAddress(s);
+              }}
+            >
+              <button
+                type="button"
+                className="h-3.5 w-3.5 rounded-full border-2 border-white bg-sky-500 shadow"
+                title={s.label}
+                aria-label={`Sugestão: ${s.label}`}
+              />
+            </Marker>
+          ))}
           {hasCenter ? (
             <Marker
               latitude={latitude!}
@@ -245,8 +361,9 @@ export function RoutesPlannerRegionMission() {
         <div>
           <h2 className="text-lg font-semibold text-brand-900">Gravar região</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Clique no mapa para o centro. Raio padrão 5 km. O funcionário grava pontos como na
-            missão Gravar cliente. Clientes já no círculo só aparecem no mapa (não viram paradas).
+            Clique no mapa ou busque um endereço para o centro. Raio padrão 5 km. O funcionário
+            grava pontos como na missão Gravar cliente. Clientes já no círculo só aparecem no mapa
+            (não viram paradas).
           </p>
         </div>
 
@@ -261,7 +378,7 @@ export function RoutesPlannerRegionMission() {
 
         {!hasCenter ? (
           <p className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
-            Clique no mapa para definir o centro.
+            Clique no mapa ou busque um endereço para definir o centro.
           </p>
         ) : (
           <p className="font-mono text-xs text-[var(--muted)]">
@@ -275,24 +392,31 @@ export function RoutesPlannerRegionMission() {
           <input
             type="search"
             value={addressQ}
-            onChange={(e) => setAddressQ(e.target.value)}
+            onChange={(e) => {
+              appliedLabelRef.current = null;
+              setAddressQ(e.target.value);
+            }}
+            onKeyDown={(e) => {
+              if (e.key !== 'Enter') return;
+              e.preventDefault();
+              if (suggestions[0]) applyAddress(suggestions[0]);
+            }}
             placeholder="Rua, cidade…"
             className="w-full ops-input text-sm"
             autoComplete="off"
           />
         </label>
+        {addressMsg && addressHint !== 'ok' ? (
+          <p className="text-xs text-[var(--warn)]">{addressMsg}</p>
+        ) : null}
         {suggestions.length > 0 ? (
-          <ul className="max-h-28 space-y-1 overflow-auto text-sm">
+          <ul className="max-h-40 space-y-1 overflow-auto text-sm">
             {suggestions.map((s) => (
-              <li key={`${s.label}-${s.latitude}`}>
+              <li key={`${s.label}-${s.latitude}-${s.longitude}`}>
                 <button
                   type="button"
                   className="w-full rounded-[6px] px-2 py-1.5 text-left hover:bg-surface"
-                  onClick={() => {
-                    setCenter(s.latitude, s.longitude);
-                    setAddressQ(s.label);
-                    setSuggestions([]);
-                  }}
+                  onClick={() => applyAddress(s)}
                 >
                   {s.label}
                 </button>

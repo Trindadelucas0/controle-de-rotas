@@ -84,6 +84,67 @@ export function regionCircleBounds(
   ];
 }
 
+const WORLD_RING: [number, number][] = [
+  [-180, -85],
+  [180, -85],
+  [180, 85],
+  [-180, 85],
+  [-180, -85],
+];
+
+/** Polígono mundial com furo no círculo — área fora do raio para escurecer no mapa. */
+export function regionMaskPolygon(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  steps = CIRCLE_STEPS,
+): RegionCircleFeature {
+  const circle = regionCirclePolygon(latitude, longitude, radiusMeters, steps);
+  const hole = circle.geometry.coordinates[0]!;
+  return {
+    type: 'Feature',
+    properties: {},
+    geometry: {
+      type: 'Polygon',
+      coordinates: [WORLD_RING, hole],
+    },
+  };
+}
+
+export function regionBoundsIncluding(
+  latitude: number,
+  longitude: number,
+  radiusMeters: number,
+  extra?: { latitude: number; longitude: number } | null,
+): [[number, number], [number, number]] {
+  const [[west, south], [east, north]] = regionCircleBounds(
+    latitude,
+    longitude,
+    radiusMeters,
+  );
+  if (!extra) return [[west, south], [east, north]];
+  return [
+    [Math.min(west, extra.longitude), Math.min(south, extra.latitude)],
+    [Math.max(east, extra.longitude), Math.max(north, extra.latitude)],
+  ];
+}
+
+/** Azimute em graus 0–360: 0 = norte, 90 = leste. */
+export function bearingDegrees(
+  from: { latitude: number; longitude: number },
+  to: { latitude: number; longitude: number },
+): number {
+  const toRad = (d: number) => (d * Math.PI) / 180;
+  const φ1 = toRad(from.latitude);
+  const φ2 = toRad(to.latitude);
+  const Δλ = toRad(to.longitude - from.longitude);
+  const y = Math.sin(Δλ) * Math.cos(φ2);
+  const x =
+    Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(Δλ);
+  const θ = Math.atan2(y, x);
+  return ((θ * 180) / Math.PI + 360) % 360;
+}
+
 export function metersFromRegionCenter(
   gps: { latitude: number; longitude: number },
   center: { latitude: number; longitude: number },

@@ -227,9 +227,9 @@ Cadastro só com nome fica com **lápis** no Mapa. Gestor e o funcionário dono 
 
 ### 6.7 Missão Gravar região
 
-No planejador, aba **Região**: clique no mapa (centro), raio **5 km** (ajustável), funcionário, data, veículo → **Publicar missão**. Nome da região é opcional.
+No planejador, aba **Região**: clique no mapa **ou** use **Buscar endereço** (digite a cidade/rua, Enter ou clique na sugestão — o mapa vai até o círculo). Raio **5 km** (ajustável), funcionário, data, veículo → **Publicar missão**. Nome da região é opcional. Depois de publicar, o painel limpa (a data fica) para a próxima região. A barra de escala mostra km reais; ao puxar o slider o círculo cresce no mesmo zoom.
 
-No campo o card chama **Gravar região** e mostra **Você foi designado para {nome} · raio N km** + mini-mapa com o círculo. Play, **Adicionar ponto** e **Finalizar por completo** são iguais à missão Gravar cliente. Fora do raio o mapa avisa; ainda dá para gravar o ponto. Clientes já cadastrados no círculo no planejador não entram como paradas.
+No campo o card chama **Gravar região** e mostra **Você foi designado para {nome} · raio N km** + mini-mapa com o círculo. Play, **Adicionar ponto** e **Finalizar por completo** são iguais à missão Gravar cliente. Na navegação, a área fora do raio fica escurecida e a borda laranja aparece no mapa; **Ver região** mostra o círculo inteiro; **Centralizar** volta a acompanhar o GPS. Fora do raio o HUD mostra seta e km até a borda; ainda dá para gravar o ponto. Clientes já cadastrados no círculo no planejador não entram como paradas.
 
 ---
 

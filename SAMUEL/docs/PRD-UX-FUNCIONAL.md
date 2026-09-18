@@ -428,7 +428,7 @@ H1 Rotas
     [Publicar] + mapa (azul road / âmbar reta / F funcionário / E empresa)
 ```
 
-Modo Visitas agendadas: inalterado nesta entrega. Aba **Gravar cliente** (sem mapa). Aba **Região**: clique = centro, raio 5 km, publicar missão de gravar com `assignmentRegion*`.
+Modo Visitas agendadas: inalterado nesta entrega. Aba **Gravar cliente** (sem mapa). Aba **Região**: clique ou busca de endereço = centro, raio 5 km, publicar missão de gravar com `assignmentRegion*`. Barra de escala métrica; o zoom não acompanha o slider (reenquadra no clique/arraste/busca). Após publicar, o formulário reseta (data mantida).
 
 **KPI / ações / estados / permissões:** iguais (summary + preview-customers + dispatch). SUPERVISOR sem Publicar. Campo ausente → —. Publicar/salvar: botão bloqueado + overlay **Publicando…** / **Salvando…** até a API retornar (anti-duplo-clique).
 
@@ -674,7 +674,9 @@ Fichas: [field-start.md](screens/field-start.md) (canônica; `field-start-route.
 
 **Componentes:** mapa Carto Dark Matter · LineString menta **só até a próxima parada** · markers de todas as paradas · marker GPS = **carro** (heading + interpolação) · faixa instrução (próxima **virada** + rua + faixa/distância; superfície escura + tinta; Chegando em âmbar + `#121212`) · banner de marco com **OK** laranja · HUD · Encerrar (confirm) · botão alvo / Centralizar (follow).
 
-**Mapa / follow:** com GPS, no 1º fix (ou GPS já presente no `onLoad`) a câmera centraliza **direto no carro** (zoom ~16, look-ahead) — sem overview carro+parada; follow ligado por padrão e acompanha o ícone interpolado; arrastar desliga follow; toque simples não desliga; botão alvo (acima do HUD) religa e recentraliza. Sem GPS, overview da rota (`fitBounds`). A linha **menta** (`#2EE6C7`) nasce no carro e **não** continua depois do pin-alvo (paradas futuras só como pinos).
+**Mapa / follow:** com GPS, no 1º fix (ou GPS já presente no `onLoad`) a câmera centraliza **direto no carro** (zoom ~16, look-ahead) — sem overview carro+parada; follow ligado por padrão e acompanha o ícone interpolado; arrastar **ou pinça de zoom** desliga follow; toque simples não desliga; botão alvo (acima do HUD) religa e recentraliza. Sem GPS, overview da rota (`fitBounds`); missão **Gravar região** enquadra o círculo. A linha **menta** (`#2EE6C7`) nasce no carro e **não** continua depois do pin-alvo (paradas futuras só como pinos).
+
+Missão **Gravar região**: máscara escura fora do raio + borda laranja tracejada + **Ver região** (pausa follow, enquadra círculo ∪ carro). HUD fora do raio: seta + km até a borda. GPS fora **não** bloqueia Adicionar ponto.
 
 **HUD (só com GPS; senão `—`)**
 

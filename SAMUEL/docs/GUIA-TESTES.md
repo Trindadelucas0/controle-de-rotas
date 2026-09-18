@@ -55,13 +55,14 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Objetivo:** o botão do tema troca a aparência.  
 **Quem:** qualquer um autenticado.
 
-- [ ] No topo, clique em **Claro** (se estiver escuro) ou **Escuro** (se estiver claro).
+- [ ] No canto superior direito, clique no seu nome (Conta). O menu deve abrir; a tela **não** vira erro genérico do Next.js.
+- [ ] No menu, clique em **Claro** (se estiver escuro) ou **Escuro** (se estiver claro).
 - [ ] No **Claro**, confira nome, **Alterar senha**, **Sair** e o título **Rotas** na sidebar (no celular: ☰ e **Fechar**).
 - [ ] Clique de novo para voltar.
 
 **O que deve aparecer:** fundo, mapa e chrome (header/menu) mudam na hora; botões do topo não somem. A preferência fica neste navegador.
 
-**Se falhar:** o rótulo do botão é o tema *destino*, não o atual.
+**Se falhar:** o rótulo do botão é o tema *destino*, não o atual. Tela preta “Application error… localhost” → o label do menu precisa estar dentro de `DropdownMenuGroup`.
 
 ---
 
@@ -217,13 +218,17 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Quem:** ADMIN/MANAGER publica; EMPLOYEE executa.
 
 - [ ] **Rotas → Planejador → Região**.
-- [ ] Clique no mapa (centro). Confira o círculo **5 km**. Ajuste o slider se quiser.
-- [ ] Data, funcionário com login, veículo. **Publicar missão**.
+- [ ] **Buscar endereço**: digite um lugar (ex. Unai), espere as sugestões + pins no mapa, Enter ou clique — o mapa reenquadra no círculo. Ou clique no mapa (centro).
+- [ ] Confira o círculo **5 km**. Barra de escala métrica no canto. Ajuste o slider: o círculo **cresce no mesmo zoom** (não reenquadra a cada km). 10 km deve bater com a escala (~10 km até a borda), não parecer 100 km.
+- [ ] Data, funcionário com login, veículo. **Publicar missão**. Toast verde; formulário limpa (busca, centro, raio 5 km, func/veículo); **data permanece**; **Publicar** desabilitado. Dá para lançar outra região sem recarregar.
 - [ ] SUPERVISOR: sem botão Publicar (API 403 se forçar).
 - [ ] Aba **Rotas de hoje**: card **Gravar região** + nome/km.
 - [ ] Login EMPLOYEE → **Campo**: texto “Você foi designado para…” + mini-mapa com círculo **antes** do Play.
 - [ ] **▶ Iniciar gravação** → Resumo com mapa do círculo → Play.
-- [ ] Navegação: círculo visível; HUD dentro ou fora + km até o centro.
+- [ ] Navegação: área **fora** do raio escurecida; borda laranja tracejada; pin do centro. Sem GPS, o mapa abre no círculo inteiro.
+- [ ] **Ver região**: enquadra o círculo (e o carro, se houver GPS); botão Centralizar apaga; o GPS **não** reenquadra sozinho. **Centralizar** volta ao zoom de GPS.
+- [ ] Pinça para afastar: o zoom escolhido permanece até tocar Centralizar.
+- [ ] HUD: dentro = km até o centro + raio; fora = seta + km até a borda + centro a Y km.
 - [ ] **Adicionar ponto** com GPS fora do raio: aviso, ponto **grava**.
 - [ ] **Finalizar por completo** igual à missão Gravar cliente.
 - [ ] Missão **Gravar cliente** antiga (sem raio) continua sem círculo.

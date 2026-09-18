@@ -68,7 +68,8 @@ Top-nav horizontal. Motion Icons. Blocos premium ReUI.
 3. SUPERVISOR: Mapa/Agenda/Serviços/Rotas/Clientes; sem Funcionários/Veículos/Admin.
 4. `/` e `/map` sem padding `max-w-5xl`.
 5. Tema **Claro**: header mostra nome no dropdown; sidebar mostra **Rotas**; trigger no mobile. Voltar a **Escuro** mantém contraste.
-6. Navegar em `/field/navigate`: sem sidebar.
+6. Clicar no nome/papel no header (Conta): o menu abre com Alterar senha, tema e Sair — **não** tela preta do Next.js.
+7. Navegar em `/field/navigate`: sem sidebar.
 
 ---
 

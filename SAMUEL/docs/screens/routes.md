@@ -19,7 +19,7 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §3.
 
 **Gravar cliente:** funcionário + data + veículo → **Publicar missão de gravar**. Sem lista de clientes. Rotas de hoje mostram o card **Gravar acesso**. Painel Gerir não edita paradas dessa missão (placeholder interno).
 
-**Região:** mapa clicável (pin arrastável) = centro; raio padrão 5 km (slider 0,5–50 km); nome opcional (vazio → “Raio 5 km”); busca de endereço opcional; pins cinza = clientes já no raio (não viram paradas). **Publicar missão** (ADMIN/MANAGER). Origem da rota = centro. Rotas de hoje: **Gravar região · {nome}**. Campo identifica região por `assignmentRegionRadiusMeters != null`.
+**Região:** mapa clicável (pin arrastável) = centro; raio padrão 5 km (slider 0,5–50 km); barra de escala métrica; o zoom **não** acompanha o slider (o círculo cresce/diminui no mesmo zoom; clique/arraste/**busca de endereço** reenquadra). Nome opcional (vazio → “Raio 5 km”); **Buscar endereço (opcional)** (Nominatim, debounce, Enter aplica a 1ª sugestão, pins de preview no mapa); pins cinza = clientes já no raio (não viram paradas). **Publicar missão** (ADMIN/MANAGER) no sucesso **limpa** centro/busca/raio/nome/func/veículo (data mantida; mapa Brasil) para a próxima região. Origem da rota = centro. Rotas de hoje: **Gravar região · {nome}**. Campo identifica região por `assignmentRegionRadiusMeters != null`.
 
 ### 3. Painel Gerir rota
 
@@ -77,4 +77,4 @@ Play/GPS nesta tela; editar/cancelar/excluir rota `IN_PROGRESS`; criar OS no PAT
 6. SUPERVISOR: Ver sem Salvar/Cancelar/Excluir.
 7. ADMIN: **Excluir rota** em Planejada/Publicada/Concluída/Incompleta/Cancelada → some da lista; visitas ASSIGNED ficam livres.
 8. Aba **Gravar cliente** → funcionário + data + veículo → Publicar → Rotas de hoje mostra **Gravar acesso** (sem “Sessão de gravação”).
-9. Aba **Região** → clique no mapa + raio 5 km + funcionário/veículo → Publicar → Rotas de hoje **Gravar região**. SUPERVISOR sem botão Publicar.
+9. Aba **Região** → **Buscar endereço** (ex. Unai) + Enter ou clique na sugestão → mapa no círculo; ou clique no mapa. Raio 5 km + funcionário/veículo → Publicar → Rotas de hoje **Gravar região**; o formulário limpa (data permanece). SUPERVISOR sem botão Publicar.

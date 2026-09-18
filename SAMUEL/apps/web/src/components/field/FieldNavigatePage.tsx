@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import MapGL, { Layer, Marker, Source } from 'react-map-gl/maplibre';
+import MapGL, { Layer, Marker, ScaleControl, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import type { Map as MapLibreMap } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
@@ -37,10 +37,14 @@ import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { cartoDarkRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import {
+  bearingDegrees,
   formatRegionKm,
   isRegionMission,
   metersFromRegionCenter,
+  regionBoundsIncluding,
+  regionCircleBounds,
   regionCirclePolygon,
+  regionMaskPolygon,
 } from '@/lib/region-circle';
 import {
   formatDistanceKm,
@@ -333,6 +337,7 @@ export function FieldNavigatePage() {
   const [error, setError] = useState<string | null>(null);
   const [gps, setGps] = useState<GpsState | null>(null);
   const [follow, setFollow] = useState(true);
+  const [mapBearing, setMapBearing] = useState(0);
   const [gpsHint, setGpsHint] = useState('Aguardando GPS…');
   const [gpsBlocked, setGpsBlocked] = useState(false);
   const [mapReady, setMapReady] = useState(false);
@@ -667,6 +672,23 @@ export function FieldNavigatePage() {
     );
   }, [route]);
 
+  const regionMask = useMemo(() => {
+    if (
+      !route ||
+      !isRegionMission(route) ||
+      route.assignmentRegionLatitude == null ||
+      route.assignmentRegionLongitude == null ||
+      route.assignmentRegionRadiusMeters == null
+    ) {
+      return null;
+    }
+    return regionMaskPolygon(
+      route.assignmentRegionLatitude,
+      route.assignmentRegionLongitude,
+      route.assignmentRegionRadiusMeters,
+    );
+  }, [route]);
+
   const regionDistanceM =
     gps &&
     route &&
@@ -682,6 +704,26 @@ export function FieldNavigatePage() {
     route?.assignmentRegionRadiusMeters != null &&
     regionDistanceM != null &&
     regionDistanceM > route.assignmentRegionRadiusMeters;
+  const regionMetersToEdge =
+    regionOutside &&
+    regionDistanceM != null &&
+    route?.assignmentRegionRadiusMeters != null
+      ? regionDistanceM - route.assignmentRegionRadiusMeters
+      : null;
+  const regionBearingToCenter =
+    gps &&
+    route &&
+    route.assignmentRegionLatitude != null &&
+    route.assignmentRegionLongitude != null
+      ? bearingDegrees(gps, {
+          latitude: route.assignmentRegionLatitude,
+          longitude: route.assignmentRegionLongitude,
+        })
+      : null;
+  const regionArrowDeg =
+    regionBearingToCenter != null
+      ? regionBearingToCenter - mapBearing
+      : 0;
 
   const showManeuverBanner =
     !isRecordMission &&
@@ -1014,6 +1056,25 @@ export function FieldNavigatePage() {
       return;
     }
 
+    if (
+      route &&
+      isRegionMission(route) &&
+      route.assignmentRegionLatitude != null &&
+      route.assignmentRegionLongitude != null &&
+      route.assignmentRegionRadiusMeters != null
+    ) {
+      routeFitDoneRef.current = true;
+      map.fitBounds(
+        regionCircleBounds(
+          route.assignmentRegionLatitude,
+          route.assignmentRegionLongitude,
+          route.assignmentRegionRadiusMeters,
+        ),
+        { padding: 48, maxZoom: 13, duration: 400 },
+      );
+      return;
+    }
+
     const lngs: number[] = [];
     const lats: number[] = [];
     for (const c of lineCoords) {
@@ -1038,7 +1099,7 @@ export function FieldNavigatePage() {
       ],
       { padding: 72, maxZoom: 15, duration: 400 },
     );
-  }, [lineCoords, route?.originLatitude, route?.originLongitude]);
+  }, [lineCoords, route]);
 
   useEffect(() => {
     if (!mapReady || gps || !route) return;
@@ -1235,6 +1296,35 @@ export function FieldNavigatePage() {
         ? { latitude: gps.latitude, longitude: gps.longitude, heading: gps.heading }
         : null);
     if (target) followCamera(target, { force: true });
+  }
+
+  function showRegionOverview() {
+    const map = mapRef.current?.getMap();
+    if (
+      !map ||
+      !route ||
+      route.assignmentRegionLatitude == null ||
+      route.assignmentRegionLongitude == null ||
+      route.assignmentRegionRadiusMeters == null
+    ) {
+      return;
+    }
+    userPanningRef.current = false;
+    setFollow(false);
+    const extra = gps
+      ? { latitude: gps.latitude, longitude: gps.longitude }
+      : smoothedGps
+        ? { latitude: smoothedGps.latitude, longitude: smoothedGps.longitude }
+        : null;
+    map.fitBounds(
+      regionBoundsIncluding(
+        route.assignmentRegionLatitude,
+        route.assignmentRegionLongitude,
+        route.assignmentRegionRadiusMeters,
+        extra,
+      ),
+      { padding: 56, maxZoom: 13, duration: 400, bearing: 0 },
+    );
   }
 
   function confirmExitNav() {
@@ -1448,29 +1538,68 @@ export function FieldNavigatePage() {
           onDragEnd={() => {
             userPanningRef.current = false;
           }}
+          onZoomStart={(e) => {
+            if (e.originalEvent) setFollow(false);
+          }}
+          onMove={(e) => {
+            const next = e.viewState.bearing;
+            setMapBearing((prev) => (Math.abs(prev - next) < 1 ? prev : next));
+          }}
           onClick={(e) => {
             const el = e.originalEvent.target as HTMLElement | null;
             if (el?.closest('[data-landmark-marker]')) return;
             setSelectedLandmarkId(null);
           }}
         >
+          {regionMission ? (
+            <ScaleControl position="bottom-left" unit="metric" maxWidth={100} />
+          ) : null}
+
+          {mapReady && regionMask ? (
+            <Source id="region-mask" type="geojson" data={regionMask}>
+              <Layer
+                id="region-mask-fill"
+                type="fill"
+                paint={{ 'fill-color': '#000000', 'fill-opacity': 0.38 }}
+              />
+            </Source>
+          ) : null}
+
           {mapReady && regionCircle ? (
             <Source id="region-circle" type="geojson" data={regionCircle}>
               <Layer
                 id="region-circle-fill"
                 type="fill"
-                paint={{ 'fill-color': '#FF5722', 'fill-opacity': 0.12 }}
+                paint={{ 'fill-color': '#FF5722', 'fill-opacity': 0.08 }}
               />
               <Layer
                 id="region-circle-line"
                 type="line"
                 paint={{
                   'line-color': '#FF5722',
-                  'line-width': 2,
-                  'line-opacity': 0.9,
+                  'line-width': 4,
+                  'line-opacity': 0.95,
+                  'line-dasharray': [2, 1.5],
                 }}
               />
             </Source>
+          ) : null}
+
+          {mapReady &&
+          route &&
+          regionMission &&
+          route.assignmentRegionLatitude != null &&
+          route.assignmentRegionLongitude != null ? (
+            <Marker
+              latitude={route.assignmentRegionLatitude}
+              longitude={route.assignmentRegionLongitude}
+              anchor="bottom"
+            >
+              <div
+                className="h-4 w-4 rounded-full border-2 border-white bg-accent shadow"
+                aria-label="Centro da região"
+              />
+            </Marker>
           ) : null}
 
           {mapReady && geojson ? (
@@ -1607,12 +1736,69 @@ export function FieldNavigatePage() {
             role="status"
             aria-live="polite"
           >
-            {regionOutside
-              ? `Fora do raio · ${formatDistanceKm(regionDistanceM ?? 0)} do centro`
-              : `Dentro da região · ${formatDistanceKm(regionDistanceM ?? 0)} do centro · ${formatRegionKm(route.assignmentRegionRadiusMeters)}`}
-            {route.assignmentRegionName ? (
-              <span className="mt-0.5 block text-xs opacity-80">{route.assignmentRegionName}</span>
-            ) : null}
+            <div className="flex items-start gap-3">
+              {regionOutside ? (
+                <span
+                  className="mt-0.5 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-black/25 text-current"
+                  aria-hidden
+                  style={{ transform: `rotate(${regionArrowDeg}deg)` }}
+                >
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                    <path
+                      d="M12 4L12 20M12 4L6 10M12 4L18 10"
+                      stroke="currentColor"
+                      strokeWidth="2.4"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                </span>
+              ) : null}
+              <div className="min-w-0 flex-1">
+                {regionOutside ? (
+                  <>
+                    <p className="font-semibold">
+                      Fora do raio
+                      {regionMetersToEdge != null
+                        ? ` · ${formatDistanceKm(regionMetersToEdge)} até a borda`
+                        : ''}
+                    </p>
+                    <p className="mt-0.5 text-xs opacity-90">
+                      Centro a {formatDistanceKm(regionDistanceM ?? 0)}
+                      {route.assignmentRegionName
+                        ? ` · ${route.assignmentRegionName}`
+                        : ''}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <p className="font-semibold">
+                      Dentro da região
+                      {regionDistanceM != null
+                        ? ` · ${formatDistanceKm(regionDistanceM)} do centro`
+                        : ''}
+                      {` · ${formatRegionKm(route.assignmentRegionRadiusMeters)}`}
+                    </p>
+                    {route.assignmentRegionName ? (
+                      <p className="mt-0.5 text-xs opacity-80">{route.assignmentRegionName}</p>
+                    ) : null}
+                  </>
+                )}
+              </div>
+              {regionCircle ? (
+                <button
+                  type="button"
+                  onClick={showRegionOverview}
+                  className={`shrink-0 rounded-full px-3 py-1.5 text-xs font-semibold focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
+                    regionOutside
+                      ? 'bg-black/35 text-white hover:bg-black/50'
+                      : 'bg-accent text-white hover:bg-accent/90'
+                  }`}
+                >
+                  Ver região
+                </button>
+              ) : null}
+            </div>
           </div>
         ) : null}
 

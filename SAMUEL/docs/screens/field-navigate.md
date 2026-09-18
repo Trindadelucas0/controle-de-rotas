@@ -29,7 +29,7 @@ div 100dvh (sem chrome do app)
 └── controles: Encerrar (confirm); botão alvo / Centralizar (follow) **acima do HUD** (`-top-14` / `sm:-top-16`, sobe com marcos)
 ```
 
-Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; pins = pontos marcados (✎ se cadastro em aberto); GPS denso como Gravar viagem. **Gravar viagem** clássica (cliente já cadastrado) **não** ganha Adicionar ponto. Missão **Gravar região** (`assignmentRegionRadiusMeters`): overlay fill+line do círculo; HUD **GRAVAR REGIÃO** + dentro/fora + km até o centro; GPS fora do raio avisa e **não** bloqueia Adicionar ponto.
+Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; pins = pontos marcados (✎ se cadastro em aberto); GPS denso como Gravar viagem. **Gravar viagem** clássica (cliente já cadastrado) **não** ganha Adicionar ponto. Missão **Gravar região** (`assignmentRegionRadiusMeters`): máscara escura fora do raio + fill interno + borda laranja 4 px tracejada + pin do centro; barra de escala métrica; HUD **GRAVAR REGIÃO** + dentro/fora (fora: seta rumo ao centro + km até a borda + km até o centro) + **Ver região** (pausa follow e enquadra círculo ∪ carro; **Centralizar** volta ao GPS); pinça no mapa pausa follow (igual arrastar); sem GPS, overview enquadra o círculo; GPS fora do raio avisa e **não** bloqueia Adicionar ponto.
 
 ### 3. Informação
 
@@ -67,7 +67,7 @@ Sem GPS: banner âmbar “Localização necessária” só para HTTP inseguro, p
 
 Banner “Recalculando…” enquanto a API responde; durante o recálculo / fora da rota **não** pinta a geometria velha (U-turn) — mostra conector GPS → próxima parada. Em erro, mantém o conector e mostra a mensagem.
 
-Mapa: tiles CARTO Dark Matter (`dark_all`) com `?key=` via `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` (não OSM.org). **Com GPS:** no 1º fix (ou se o GPS já existir no `onLoad`) a câmera faz `jumpTo` **direto no carro** em zoom ~16 (look-ahead); follow ligado por padrão e acompanha o **ícone interpolado**; overview da rota inteira **não** compete com o follow. **Sem GPS:** `fitBounds` na rota ao carregar (evita tela preta). Sem a env, a CARTO desenha watermark “API KEY REQUIRED”.
+**Mapa:** tiles CARTO Dark Matter (`dark_all`) com `?key=` via `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` (não OSM.org). **Com GPS:** no 1º fix (ou se o GPS já existir no `onLoad`) a câmera faz `jumpTo` **direto no carro** em zoom ~16 (look-ahead); follow ligado por padrão e acompanha o **ícone interpolado**; overview da rota inteira **não** compete com o follow. Pinça de zoom desliga follow (o GPS não força zoom 15 de volta). **Sem GPS:** `fitBounds` na rota ao carregar (evita tela preta); missão Gravar região enquadra o círculo. Sem a env, a CARTO desenha watermark “API KEY REQUIRED”.
 
 Botão **Centralizar** (alvo): ancorado **acima** do bloco inferior (marcos opcionais + HUD), alinhado à coluna `max-w-md`; sobe junto quando os chips de marco aparecem.
 
@@ -88,8 +88,9 @@ N/A.
 | Adicionar ponto | só missão `recordNewCustomer`; sheet nome*; `POST /field/routes/:id/record-point`; GPS não para |
 | Cheguei (banner ~80 m) | abre `/field/visits/[id]` — **não** grava check-in sozinho |
 | Centralizar (alvo) | reativa follow e recentraliza no ícone do carro na hora |
+| Ver região | só missão Gravar região; pausa follow e `fitBounds` no círculo ∪ GPS |
 | Tentar GPS de novo | `requestCurrentPosition` progressivo (fino → coarse) + reinicia watch |
-| Arrastar mapa (pan/drag) | desliga follow; toque simples **não** desliga |
+| Arrastar mapa (pan/drag) ou pinça de zoom | desliga follow; toque simples **não** desliga |
 | GPS watch | seed coarse + `watchPosition` → fila local → `POST /tracking/points` (lote até 50, retry) |
 | Marcos | Só com `recordTrip`; POST imediato; se falhar, fila `samuel:landmark-queue` + retry online/visibility; mesmos botões na visita após Cheguei |
 | Toque no ícone de marco | ficha com nome do tipo + “Adicionado por …” (gestor se sem funcionário); toque de novo ou no mapa fecha |
@@ -137,7 +138,7 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 
 1. Start com GPS (`localhost`) → navigate **abre o mapa** (sem overlay vermelho) → centraliza no carro e **acompanha** o ícone ao se mover; banner “Recalculando…” no 1º fix → linha **menta** nasce no carro; banner com **próxima virada** (rua) + faixa/distância — não “Saia em direção a…” do trecho atual enquanto houver virada à frente.
 2. Rota com **3+ paradas**: a linha menta vai até o pin da próxima (ex. 2) e **não** atravessa 3, 4…; os pinos seguintes continuam visíveis. Ao avançar, a linha encolhe a partir do carro. Ao passar ~40 m da parada, o alvo avança e a linha recorta de novo.
-3. Arrastar o mapa → follow desliga (botão alvo escuro); toque sem arrastar mantém follow.
+3. Arrastar o mapa **ou pinça de zoom** → follow desliga (botão alvo escuro); toque sem arrastar mantém follow.
 4. Tocar no alvo → volta a centralizar e acompanhar.
 5. Rota já iniciada sem GPS real (HTTP) → abrir navigate no PC com GPS longe → banner Recalculando → nova linha menta (ainda só até a próxima parada).
 6. Sair do corredor (~>50 m) por ~2–3 s → Recalculando (sem mudar ordem das paradas); U-turn velho não fica pintado.
@@ -148,5 +149,5 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 11. Rota de 1 cliente com trilha ACTIVE (viagem passada): Play → Navegar com GPS. Tempo/Restante/ETA preenchidos após o 1º fix; linha menta nasce no carro (não no início da gravação). Acelerar/reduzir muda Tempo e ETA; Restante só cai com o deslocamento. Parado: VEL. 0; Tempo não volta às horas da viagem original.
 12. Banner de marco: fundo escuro, título âmbar, **OK** ou **Sim/Não** — legível sobre o mapa; considera marcos de **todas** as paradas da rota.
 13. Missão **Gravar cliente**: HUD GRAVAR + **Adicionar ponto**; após 2 pontos continua Gravando; Finalizar **não** pede nome; rota clássica com Gravar viagem **não** mostra Adicionar ponto.
-14. Missão **Gravar região**: círculo no mapa + HUD dentro/fora; Adicionar ponto fora do raio continua permitido (aviso).
-14. Cheguei sem **Finalizar visita**: banner no HUD + arraste opaco; **Abrir visita** vai para `/field/visits/{id}`; o modal de km/foto **não** abre. Arraste até o fim sobre o mapa **não** volta ao início no meio do gesto.
+14. Missão **Gravar região**: área fora do raio escurecida + borda tracejada visível; **Ver região** enquadra o círculo e o carro (Centralizar volta ao GPS); pinça pausa follow; HUD fora do raio com seta + km até a borda; Adicionar ponto fora do raio continua permitido (aviso).
+15. Cheguei sem **Finalizar visita**: banner no HUD + arraste opaco; **Abrir visita** vai para `/field/visits/{id}`; o modal de km/foto **não** abre. Arraste até o fim sobre o mapa **não** volta ao início no meio do gesto.

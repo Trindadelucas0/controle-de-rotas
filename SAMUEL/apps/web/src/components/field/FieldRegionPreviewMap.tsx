@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef } from 'react';
-import Map, { Layer, Marker, Source } from 'react-map-gl/maplibre';
+import Map, { Layer, Marker, ScaleControl, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { osmRasterStyle } from '@/lib/map-style';
@@ -56,6 +56,7 @@ export function FieldRegionPreviewMap({
           });
         }}
       >
+        <ScaleControl position="bottom-left" unit="metric" maxWidth={80} />
         <Source id="region-circle" type="geojson" data={circle}>
           <Layer
             id="region-circle-fill"

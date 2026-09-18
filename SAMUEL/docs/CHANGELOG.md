@@ -1,5 +1,41 @@
 # Changelog
 
+## v0.20.4 — 2026-09-18
+
+### Região — raio visível na navegação do funcionário
+
+- Navegação **Gravar região**: máscara escura fora do raio, borda laranja 4 px tracejada, pin do centro
+- HUD **Ver região** enquadra o círculo (e o carro); **Centralizar** volta ao GPS; pinça pausa o acompanhamento
+- Sem GPS, overview inicial mostra o círculo inteiro (não só o ponto do centro)
+- Fora do raio: seta rumo ao centro + km até a borda; Adicionar ponto continua permitido
+- Como validar: roteiro **10c** em `docs/GUIA-TESTES.md`
+
+## v0.20.3 — 2026-09-18
+
+### Região — busca de endereço no mapa e reset após publicar
+
+- Aba **Região**: **Buscar endereço** lista Nominatim, mostra pins no mapa; Enter ou clique define o centro e reenquadra o círculo (`fitBounds`)
+- Estados: buscando / nenhum resultado / erro / rate limit; slider de raio continua sem reenquadrar
+- **Publicar missão** ok: mensagem verde; limpa centro, busca, raio (volta a 5 km), nome, funcionário e veículo; data permanece; mapa volta ao Brasil
+- Como validar: roteiro **10c** em `docs/GUIA-TESTES.md`
+
+## v0.20.2 — 2026-09-18
+
+### Fix — clique na conta derrubava a aplicação
+
+- Sintoma: clicar **Admin Demo** (botão Conta no header) mostrava `Application error: a client-side exception has occurred while loading localhost`
+- Causa: `DropdownMenuLabel` (Base UI `Menu.GroupLabel`) fora de `DropdownMenuGroup` em `UserMenu.tsx`; o throw no layout não é capturado pelo `error.tsx` da página
+- Como validar: em `/`, `/map` e `/routes`, abrir a conta → menu com Alterar senha, tema e Sair; a tela permanece atrás
+
+## v0.20.1 — 2026-09-18
+
+### Fix — raio da região no mapa parecia 10× maior
+
+- Planejador **Região**: `fitBounds` só no centro (clique/arraste/busca); o slider não reenquadra — o círculo cresce no mesmo zoom
+- Reenquadra só no clique/arraste/busca do centro; `ScaleControl` métrico no planejador, mini-mapa e navegação da missão
+- Teste: 10 km ao norte ≈ 0,09° de latitude (não 0,9°)
+- Como validar: roteiro **10c** (slider 5 → 10 km vs barra de escala)
+
 ## v0.20.0 — 2026-09-17
 
 ### Custos da frota (abastecimento, consumo, dashboard)
