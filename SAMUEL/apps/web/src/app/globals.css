@@ -98,6 +98,12 @@ html[data-theme='dark'] {
   --sidebar-accent-foreground: #f2f2f4;
   --sidebar-border: rgba(255, 255, 255, 0.08);
   --sidebar-ring: #ff5722;
+  /* App chrome: bottom nav + safe areas */
+  --app-bottom-nav-height: 3.5rem;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 html[data-theme='light'] {
@@ -147,6 +153,11 @@ html[data-theme='light'] {
   --sidebar-accent-foreground: #1a1a1c;
   --sidebar-border: rgba(0, 0, 0, 0.08);
   --sidebar-ring: #ff5722;
+  --app-bottom-nav-height: 3.5rem;
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-left: env(safe-area-inset-left, 0px);
+  --safe-right: env(safe-area-inset-right, 0px);
 }
 
 html,
@@ -219,6 +230,7 @@ textarea {
 
   .ops-input {
     @apply w-full px-3 py-2 text-sm outline-none transition;
+    min-height: 2.75rem;
     background: var(--input-bg);
     border: 1px solid var(--border-strong);
     border-radius: var(--radius);
@@ -236,6 +248,8 @@ textarea {
 
   .ops-btn {
     @apply inline-flex items-center justify-center gap-2 px-3.5 py-2 text-sm font-semibold transition;
+    min-height: 2.75rem;
+    min-width: 2.75rem;
     border-radius: var(--radius);
   }
 
@@ -252,7 +266,10 @@ textarea {
     background: var(--accent-hover);
   }
 
-  .ops-btn-primary:active:not(:disabled) {
+  .ops-btn-primary:active:not(:disabled),
+  .ops-btn-secondary:active:not(:disabled),
+  .ops-btn-ghost:active:not(:disabled),
+  .ops-btn-danger:active:not(:disabled) {
     transform: scale(0.98);
   }
 
@@ -323,7 +340,8 @@ textarea {
 
   .ops-tab {
     border-radius: var(--radius);
-    padding: 0.375rem 0.875rem;
+    min-height: 2.75rem;
+    padding: 0.5rem 0.875rem;
     font-size: 0.875rem;
     font-weight: 600;
     color: var(--muted);
@@ -334,9 +352,47 @@ textarea {
     color: var(--ink);
   }
 
+  .ops-tab:active {
+    transform: scale(0.98);
+  }
+
   .ops-tab[aria-selected='true'] {
     background: var(--accent);
     color: #fff;
+  }
+
+  /* Mobile chrome spacing: reserve bottom nav + home indicator */
+  .app-main-pad {
+    padding-bottom: 1.5rem;
+  }
+
+  @media (max-width: 767px) {
+    .app-main-pad {
+      padding-bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom) + 1rem);
+    }
+
+    .app-main-pad-fullbleed {
+      padding-bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom));
+    }
+
+    .ops-btn,
+    .ops-input,
+    .ops-tab {
+      min-height: 2.75rem;
+    }
+  }
+
+  .safe-pt {
+    padding-top: var(--safe-top);
+  }
+
+  .safe-pb {
+    padding-bottom: var(--safe-bottom);
+  }
+
+  .safe-px {
+    padding-left: var(--safe-left);
+    padding-right: var(--safe-right);
   }
 
   details > summary {

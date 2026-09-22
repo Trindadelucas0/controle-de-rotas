@@ -112,6 +112,8 @@ export function FuelListPage() {
         <div className="h-40 animate-pulse rounded-2xl bg-surface" />
       ) : (
         <DataTable
+          mobileTitleKey="vehicle"
+          mobileKeys={['date', 'liters', 'total', 'km']}
           columns={[
             { key: 'date', label: 'Data' },
             { key: 'vehicle', label: 'Veículo' },

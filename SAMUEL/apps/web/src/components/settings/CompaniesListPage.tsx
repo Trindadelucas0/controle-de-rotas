@@ -57,7 +57,7 @@ export function CompaniesListPage() {
         }
       />
       <form
-        className="mb-4 flex flex-wrap gap-2"
+        className="mb-4 flex flex-col gap-2 sm:flex-row sm:flex-wrap"
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -67,19 +67,19 @@ export function CompaniesListPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar nome, documento ou e-mail"
-          className="min-w-[12rem] flex-1 ops-input text-sm"
+          className="min-w-0 flex-1 ops-input text-sm sm:min-w-[12rem]"
         />
         <select
           value={status}
           onChange={(e) => setStatus(e.target.value)}
-          className="w-40 ops-input text-sm"
+          className="w-full ops-input text-sm sm:w-40"
           aria-label="Status"
         >
           <option value="">Todos os status</option>
           <option value="ACTIVE">ACTIVE</option>
           <option value="INACTIVE">INACTIVE</option>
         </select>
-        <button type="submit" className="ops-btn ops-btn-secondary">
+        <button type="submit" className="ops-btn ops-btn-secondary shrink-0">
           Buscar
         </button>
       </form>
@@ -89,6 +89,8 @@ export function CompaniesListPage() {
       ) : (
         <DataTable
           empty="Nenhuma empresa cadastrada."
+          mobileTitleKey="name"
+          mobileKeys={['document', 'status', 'email']}
           columns={[
             { key: 'name', label: 'Nome' },
             { key: 'document', label: 'Documento' },

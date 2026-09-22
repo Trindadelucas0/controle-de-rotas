@@ -47,7 +47,7 @@ export function UsersListPage() {
         }
       />
       <form
-        className="mb-4 flex gap-2"
+        className="mb-4 flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -57,9 +57,9 @@ export function UsersListPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar nome ou e-mail"
-          className="flex-1 ops-input text-sm"
+          className="min-w-0 flex-1 ops-input text-sm"
         />
-        <button type="submit" className="ops-btn ops-btn-secondary">
+        <button type="submit" className="ops-btn ops-btn-secondary shrink-0">
           Buscar
         </button>
       </form>
@@ -69,6 +69,8 @@ export function UsersListPage() {
       ) : (
         <DataTable
           empty="Nenhuma conta de acesso. Crie um usuário para liberar login."
+          mobileTitleKey="name"
+          mobileKeys={['email', 'role', 'status']}
           columns={[
             { key: 'name', label: 'Nome' },
             { key: 'email', label: 'E-mail' },

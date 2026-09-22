@@ -838,7 +838,7 @@ export function FieldVisitPage() {
 
   return (
 
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[#121212] px-4 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-[max(1rem,env(safe-area-inset-top))] text-white">
+    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[#121212] px-4 pb-[max(1.5rem,var(--safe-bottom))] pt-[max(1rem,var(--safe-top))] text-white">
 
       <div className="mx-auto w-full max-w-md">
 

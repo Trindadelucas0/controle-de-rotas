@@ -1698,7 +1698,7 @@ export function FieldNavigatePage() {
         </MapGL>
       </div>
 
-      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-3 pt-[max(0.75rem,env(safe-area-inset-top))]">
+      <div className="pointer-events-none absolute inset-x-0 top-0 z-10 p-3 pt-[max(0.75rem,var(--safe-top))]">
         <div className="pointer-events-auto mx-auto mt-3 max-w-md flex items-center justify-between gap-2">
           <p className="text-sm font-semibold tracking-wide text-white/80">
             {route?.recordNewCustomer ? (regionMission ? 'GRAVAR REGIÃO' : 'GRAVAR') : 'ROTAS'}
@@ -2037,7 +2037,7 @@ export function FieldNavigatePage() {
         />
       ) : null}
 
-      <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+      <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-[max(0.75rem,var(--safe-bottom))]">
         <div className="relative mx-auto max-w-md">
           <button
             type="button"

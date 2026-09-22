@@ -989,7 +989,7 @@ export function OperationalMap() {
   ];
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col bg-canvas">
+    <div className="flex h-[calc(100dvh-3.5rem-var(--app-bottom-nav-height)-var(--safe-bottom))] flex-col bg-canvas md:h-[calc(100dvh-3.5rem)]">
       {/* Toolbar */}
       <form
         className="flex flex-wrap items-end gap-2 border-b border-brand-100 bg-surface px-3 py-2"
@@ -1347,11 +1347,11 @@ export function OperationalMap() {
         ) : null}
 
         {/* Mobile bottom tabs */}
-        <div className="border-t border-brand-100 bg-surface md:hidden">
+        <div className="border-t border-brand-100 bg-surface pb-[env(safe-area-inset-bottom,0px)] md:hidden">
           <div className="flex border-b border-brand-100">
             <button
               type="button"
-              className={`flex-1 px-3 py-2 text-sm font-semibold ${
+              className={`min-h-11 flex-1 px-3 py-2 text-sm font-semibold ${
                 mobileTab === 'equipe'
                   ? 'border-b-2 border-brand-600 text-brand-800'
                   : 'text-[var(--muted)]'
@@ -1362,7 +1362,7 @@ export function OperationalMap() {
             </button>
             <button
               type="button"
-              className={`flex-1 px-3 py-2 text-sm font-semibold ${
+              className={`min-h-11 flex-1 px-3 py-2 text-sm font-semibold ${
                 mobileTab === 'detalhe'
                   ? 'border-b-2 border-brand-600 text-brand-800'
                   : 'text-[var(--muted)]'

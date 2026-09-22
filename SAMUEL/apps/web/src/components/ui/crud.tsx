@@ -4,6 +4,7 @@ import { Inbox, Pencil } from 'lucide-react';
 import { FormError } from '@/components/auth/FormError';
 import { IconTile } from '@/components/reui/icon-tile';
 import { Empty, EmptyDescription, EmptyHeader, EmptyMedia } from '@/components/ui/empty';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 import { SubmitButton } from '@/components/ui/SubmitButton';
 
 export function FieldGrid({ children }: { children: React.ReactNode }) {
@@ -34,19 +35,19 @@ export function PageHeader({
   icon?: React.ReactNode;
 }) {
   return (
-    <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
+    <div className="mb-5 flex flex-col gap-3 sm:mb-6 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
       <div className="flex min-w-0 items-start gap-3">
         {icon ? (
           <IconTile variant="outline" size="sm" aria-hidden="true">
             {icon}
           </IconTile>
         ) : null}
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-brand-900">{title}</h1>
+        <div className="min-w-0">
+          <h1 className="text-xl font-semibold tracking-tight text-brand-900 sm:text-2xl">{title}</h1>
           {subtitle ? <p className="mt-1 max-w-2xl text-sm text-[var(--muted)]">{subtitle}</p> : null}
         </div>
       </div>
-      {action}
+      {action ? <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row sm:flex-wrap sm:items-center">{action}</div> : null}
     </div>
   );
 }
@@ -93,11 +94,11 @@ export function FormCard({
       {error ? <FormError message={error} /> : null}
       <fieldset disabled={!!loading} className="min-w-0 space-y-6 border-0 p-0 disabled:opacity-70">
         {children}
-        <div className="flex flex-col items-stretch gap-2 border-t border-[var(--border)] pt-4 sm:flex-row sm:items-center sm:justify-end">
-          {submitHint ? <p className="text-xs text-[var(--muted)] sm:mr-auto">{submitHint}</p> : null}
+        <MobileActionBar>
+          {submitHint ? <p className="order-last text-xs text-[var(--muted)] md:order-first md:mr-auto">{submitHint}</p> : null}
           {secondaryAction}
           <SubmitButton loading={!!loading}>{submitLabel}</SubmitButton>
-        </div>
+        </MobileActionBar>
       </fieldset>
     </form>
   );
@@ -284,10 +285,16 @@ export function DataTable({
   columns,
   rows,
   empty,
+  mobileTitleKey,
+  mobileKeys,
 }: {
   columns: { key: string; label: string }[];
   rows: Record<string, React.ReactNode>[];
   empty: string;
+  /** Chave usada como título do card no mobile (default: primeira coluna ≠ actions). */
+  mobileTitleKey?: string;
+  /** Campos no card além do título (default: demais colunas exceto actions). */
+  mobileKeys?: string[];
 }) {
   if (!rows || rows.length === 0) {
     return (
@@ -303,33 +310,71 @@ export function DataTable({
       </Empty>
     );
   }
+
+  const dataCols = columns.filter((c) => c.key !== 'actions');
+  const titleKey = mobileTitleKey ?? dataCols[0]?.key;
+  const detailKeys =
+    mobileKeys ??
+    dataCols.filter((c) => c.key !== titleKey).map((c) => c.key);
+  const labelByKey = Object.fromEntries(columns.map((c) => [c.key, c.label]));
+  const hasActions = columns.some((c) => c.key === 'actions');
+
   return (
-    <div className="ops-surface overflow-x-auto rounded-[10px]">
-      <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
-          <tr>
-            {columns.map((c) => (
-              <th key={c.key} className="px-3 py-2.5 font-semibold">
-                {c.label}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row, i) => (
-            <tr
-              key={i}
-              className="border-b border-[var(--border)] last:border-0 hover:bg-white/[0.03]"
-            >
+    <>
+      {/* Mobile: cards */}
+      <ul className="space-y-3 md:hidden">
+        {rows.map((row, i) => (
+          <li key={i} className="ops-surface rounded-[10px] p-4">
+            {titleKey ? (
+              <div className="text-base font-semibold text-brand-900">{row[titleKey]}</div>
+            ) : null}
+            <dl className="mt-3 space-y-2">
+              {detailKeys.map((key) => (
+                <div key={key} className="flex flex-col gap-0.5">
+                  <dt className="text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+                    {labelByKey[key] || key}
+                  </dt>
+                  <dd className="text-sm text-brand-900">{row[key]}</dd>
+                </div>
+              ))}
+            </dl>
+            {hasActions && row.actions != null ? (
+              <div className="mt-4 flex flex-wrap gap-2 border-t border-[var(--border)] pt-3 [&>a]:inline-flex [&>a]:min-h-11 [&>a]:items-center [&>a]:px-3 [&>button]:min-h-11">
+                {row.actions}
+              </div>
+            ) : null}
+          </li>
+        ))}
+      </ul>
+
+      {/* Desktop: tabela */}
+      <div className="ops-surface hidden overflow-x-auto rounded-[10px] md:block">
+        <table className="min-w-full text-left text-sm">
+          <thead className="border-b border-[var(--border)] text-[11px] font-semibold uppercase tracking-wide text-[var(--muted)]">
+            <tr>
               {columns.map((c) => (
-                <td key={c.key} className="px-3 py-2.5 text-brand-900">
-                  {row[c.key]}
-                </td>
+                <th key={c.key} className="px-3 py-2.5 font-semibold">
+                  {c.label}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row, i) => (
+              <tr
+                key={i}
+                className="border-b border-[var(--border)] last:border-0 hover:bg-white/[0.03]"
+              >
+                {columns.map((c) => (
+                  <td key={c.key} className="px-3 py-2.5 text-brand-900">
+                    {row[c.key]}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </>
   );
 }

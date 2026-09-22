@@ -1,5 +1,18 @@
 # Changelog
 
+## v0.21.0 — 2026-09-22
+
+### PWA mobile-first (chrome app-like)
+
+- Mobile (&lt;768): **bottom nav** por papel + sheet **Mais**; sidebar só no desktop
+- Safe areas no header, bottom nav e sheets; alvos de toque ~44px (`.ops-btn` / `.ops-input`)
+- Listagens CRUD: **cards** no mobile, tabela no `md+` (`DataTable`)
+- Formulários: `MobileActionBar` sticky acima da bottom nav
+- Planejador de rotas: tabs Lista/Mapa no mobile; mapa ops respeita altura da bottom nav
+- Manifest: `start_url` = `/` (multi-papel)
+- Docs: `docs/screens/home-shell.md`, `docs/plans/24-mobile-first-pwa.md`
+- Código web: `apps/web`
+
 ## v0.20.4 — 2026-09-18
 
 ### Região — raio visível na navegação do funcionário

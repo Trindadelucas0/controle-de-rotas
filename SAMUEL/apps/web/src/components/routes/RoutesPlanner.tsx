@@ -63,13 +63,17 @@ export function RoutesPlanner() {
 
   return (
     <div className="space-y-3">
-      <div role="tablist" aria-label="Modo do planejador" className="ops-tabs">
+      <div
+        role="tablist"
+        aria-label="Modo do planejador"
+        className="ops-tabs flex w-full max-w-full overflow-x-auto"
+      >
         <button
           type="button"
           role="tab"
           aria-selected={mode === 'customers'}
           onClick={() => setMode('customers')}
-          className="ops-tab"
+          className="ops-tab shrink-0"
         >
           Clientes
         </button>
@@ -78,25 +82,25 @@ export function RoutesPlanner() {
           role="tab"
           aria-selected={mode === 'visits'}
           onClick={() => setMode('visits')}
-          className="ops-tab"
+          className="ops-tab shrink-0"
         >
-          Visitas agendadas
+          Visitas
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={mode === 'record'}
           onClick={() => setMode('record')}
-          className="ops-tab"
+          className="ops-tab shrink-0"
         >
-          Gravar cliente
+          Gravar
         </button>
         <button
           type="button"
           role="tab"
           aria-selected={mode === 'region'}
           onClick={() => setMode('region')}
-          className="ops-tab"
+          className="ops-tab shrink-0"
         >
           Região
         </button>

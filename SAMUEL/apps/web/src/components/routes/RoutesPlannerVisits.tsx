@@ -106,6 +106,7 @@ export function RoutesPlannerVisits({ company }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [savedRouteId, setSavedRouteId] = useState<string | null>(null);
+  const [mobilePane, setMobilePane] = useState<'lista' | 'mapa'>('lista');
   const previewAbort = useRef<AbortController | null>(null);
 
   const hasOrigin = company.latitude != null && company.longitude != null;
@@ -363,12 +364,36 @@ export function RoutesPlannerVisits({ company }: Props) {
   const busy = saving || publishing;
 
   return (
-    <div className="relative flex h-[calc(100vh-11rem)] min-h-[480px] flex-col gap-3 lg:flex-row">
+    <div className="relative flex min-h-0 flex-col gap-3 lg:h-[calc(100vh-11rem)] lg:min-h-[480px] lg:flex-row">
       <LoadingOverlay
         show={busy}
         label={publishing ? 'Publicando…' : 'Salvando…'}
       />
-      <aside className="flex w-full shrink-0 flex-col gap-3 overflow-auto rounded-2xl border border-brand-100 bg-surface p-4 lg:w-96">
+      <div className="ops-tabs w-full lg:hidden" role="tablist" aria-label="Painel do planejador">
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePane === 'lista'}
+          className="ops-tab flex-1"
+          onClick={() => setMobilePane('lista')}
+        >
+          Lista
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={mobilePane === 'mapa'}
+          className="ops-tab flex-1"
+          onClick={() => setMobilePane('mapa')}
+        >
+          Mapa
+        </button>
+      </div>
+      <aside
+        className={`flex w-full shrink-0 flex-col gap-3 overflow-auto rounded-2xl border border-brand-100 bg-surface p-4 max-lg:max-h-[min(70dvh,32rem)] lg:w-96 ${
+          mobilePane === 'lista' ? '' : 'max-lg:hidden'
+        }`}
+      >
         <div>
           <h2 className="text-lg font-semibold text-brand-900">Visitas agendadas</h2>
           <p className="mt-1 text-xs text-[var(--muted)]">
@@ -599,7 +624,11 @@ export function RoutesPlannerVisits({ company }: Props) {
         </div>
       </aside>
 
-      <div className="relative min-h-[320px] flex-1 overflow-hidden rounded-2xl border border-brand-100 bg-brand-50">
+      <div
+        className={`relative min-h-[50dvh] flex-1 overflow-hidden rounded-2xl border border-brand-100 bg-brand-50 lg:min-h-[320px] ${
+          mobilePane === 'mapa' ? '' : 'max-lg:hidden'
+        }`}
+      >
         <RouteMapLegend />
         <MapLibreMap
           ref={mapRef}

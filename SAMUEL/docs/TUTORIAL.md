@@ -44,7 +44,7 @@ O menu some o que o papel não pode. Abrir um endereço direto sem permissão: a
 
 ## 3. Tela depois do login
 
-No celular, toque no **☰** para abrir o menu. No computador o menu fica à esquerda. No telefone a **página não dá zoom**; só o **mapa** amplia com pinça.
+No celular, use a **barra inferior** (Início, Agenda, Mapa/Campo, etc.) e o botão **Mais** para o restante do menu. No computador o menu fica à esquerda (sidebar). No telefone a **página não dá zoom**; só o **mapa** amplia com pinça.
 
 ```text
 ┌─────────────────────────────────────────────────────────────┐

@@ -277,10 +277,10 @@ export function RoutesPlannerRegionMission() {
   }
 
   return (
-    <div className="relative flex min-h-[480px] flex-col gap-3 lg:h-[calc(100vh-11rem)] lg:flex-row">
+    <div className="relative flex min-h-[360px] flex-col gap-3 lg:h-[calc(100vh-11rem)] lg:min-h-[480px] lg:flex-row">
       <div
         ref={containerRef}
-        className="order-1 h-[280px] overflow-hidden rounded-2xl border border-brand-100 bg-surface sm:h-[360px] lg:order-2 lg:h-auto lg:min-h-0 lg:flex-1"
+        className="order-1 h-[min(50dvh,320px)] overflow-hidden rounded-2xl border border-brand-100 bg-surface sm:h-[360px] lg:order-2 lg:h-auto lg:min-h-0 lg:flex-1"
       >
         <MapLibreMap
           ref={mapRef}

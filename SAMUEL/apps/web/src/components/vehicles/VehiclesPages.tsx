@@ -107,14 +107,14 @@ export function VehiclesListPage() {
         }
       />
       <form
-        className="mb-4 flex gap-2"
+        className="mb-4 flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault();
           load();
         }}
       >
-        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa ou modelo" className="flex-1 ops-input text-sm" />
-        <button type="submit" className="ops-btn ops-btn-secondary">
+        <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Placa ou modelo" className="min-w-0 flex-1 ops-input text-sm" />
+        <button type="submit" className="ops-btn ops-btn-secondary shrink-0">
           Buscar
         </button>
       </form>
@@ -124,6 +124,8 @@ export function VehiclesListPage() {
       ) : (
         <DataTable
           empty="Nenhum veículo cadastrado. Cadastre a frota para publicar rotas."
+          mobileTitleKey="plate"
+          mobileKeys={['model', 'status', 'route', 'driver']}
           columns={[
             { key: 'plate', label: 'Placa' },
             { key: 'model', label: 'Modelo' },

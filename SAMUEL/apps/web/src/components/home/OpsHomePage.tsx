@@ -141,12 +141,12 @@ export function OpsHomePage() {
 
   if (!isOpsRole) {
     return (
-      <section className="space-y-5 p-6">
+      <section className="app-main-pad space-y-5 p-4 md:p-6 md:pb-6">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-brand-900">Olá, {user.name}</h1>
+          <h1 className="text-xl font-semibold tracking-tight text-brand-900 sm:text-2xl">Olá, {user.name}</h1>
           <p className="mt-1 text-sm text-[var(--muted)]">{user.company.name} · Campo</p>
         </div>
-        <div className="flex flex-wrap gap-3">
+        <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap">
           <Link href="/field/my-route" className="ops-btn ops-btn-primary">
             Minha rota
           </Link>
@@ -191,17 +191,17 @@ export function OpsHomePage() {
   }
 
   return (
-    <section className="space-y-5 p-4 md:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
+    <section className="app-main-pad space-y-5 p-4 md:p-6 md:pb-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight text-brand-900">
+          <h1 className="text-xl font-semibold tracking-tight text-brand-900 sm:text-2xl">
             Centro de Operações
           </h1>
           <p className="mt-1 text-sm text-[var(--muted)]">
             {user.company.name} · {user.name}
           </p>
         </div>
-        <div className="flex flex-wrap items-end gap-3">
+        <div className="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:flex-wrap sm:items-end">
           <label className="flex flex-col gap-1 text-sm">
             <span className="ops-label mb-0">Dia</span>
             <input

@@ -213,6 +213,8 @@ export function ServicesListPage() {
       ) : (
         <DataTable
           empty="Nenhuma ordem de serviço. Crie a primeira para agendar visitas."
+          mobileTitleKey="title"
+          mobileKeys={['number', 'customer', 'status', 'priority']}
           columns={[
             { key: 'number', label: '#' },
             { key: 'title', label: 'Título' },

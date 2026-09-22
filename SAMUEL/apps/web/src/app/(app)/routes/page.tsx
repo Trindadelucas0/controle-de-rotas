@@ -9,7 +9,7 @@ const RoutesPlanner = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="flex h-[calc(100vh-8.5rem)] min-h-[420px] items-center justify-center rounded-[10px] border border-[var(--border)] bg-surface text-sm text-[var(--muted)]">
+      <div className="flex h-[calc(100vh-8.5rem)] min-h-[280px] items-center justify-center rounded-[10px] border border-[var(--border)] bg-surface text-sm text-[var(--muted)] lg:min-h-[420px]">
         Carregando planejador de rotas…
       </div>
     ),
@@ -23,24 +23,18 @@ export default function RoutesPage() {
 
   return (
     <div>
-      <h1 className="mb-1 text-2xl font-semibold tracking-tight text-brand-900">Rotas</h1>
+      <h1 className="mb-1 text-xl font-semibold tracking-tight text-brand-900 sm:text-2xl">Rotas</h1>
       <p className="mb-4 text-sm text-[var(--muted)]">
         Planejamento, execução e monitoramento do dia (E → paradas → E).
       </p>
 
-      <div
-        role="tablist"
-        aria-label="Contexto de rotas"
-        className="mb-5 inline-flex rounded-[8px] border border-[var(--border)] bg-[var(--surface-2)] p-1"
-      >
+      <div role="tablist" aria-label="Contexto de rotas" className="ops-tabs mb-5 w-full max-w-md">
         <button
           type="button"
           role="tab"
           aria-selected={tab === 'today'}
           onClick={() => setTab('today')}
-          className={`rounded-[6px] px-4 py-1.5 text-sm font-semibold transition ${
-            tab === 'today' ? 'bg-accent text-white' : 'text-[var(--muted)] hover:text-brand-900'
-          }`}
+          className="ops-tab flex-1"
         >
           Rotas de hoje
         </button>
@@ -49,9 +43,7 @@ export default function RoutesPage() {
           role="tab"
           aria-selected={tab === 'planner'}
           onClick={() => setTab('planner')}
-          className={`rounded-[6px] px-4 py-1.5 text-sm font-semibold transition ${
-            tab === 'planner' ? 'bg-accent text-white' : 'text-[var(--muted)] hover:text-brand-900'
-          }`}
+          className="ops-tab flex-1"
         >
           Planejador
         </button>
@@ -63,7 +55,7 @@ export default function RoutesPage() {
         <>
           <p className="mb-4 text-sm text-[var(--muted)]">
             Escolha clientes e funcionários com login; o sistema divide, otimiza e publica as
-            rotas. O modo Visitas agendadas continua disponível para o fluxo por OS.
+            rotas. O modo Visitas continua disponível para o fluxo por OS.
           </p>
           <Suspense
             fallback={

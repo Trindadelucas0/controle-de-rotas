@@ -159,7 +159,7 @@ export function CustomersListPage() {
         }
       />
       <form
-        className="mb-4 flex gap-2"
+        className="mb-4 flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -169,9 +169,9 @@ export function CustomersListPage() {
           value={q}
           onChange={(e) => setQ(e.target.value)}
           placeholder="Nome, documento…"
-          className="flex-1 ops-input text-sm"
+          className="min-w-0 flex-1 ops-input text-sm"
         />
-        <button type="submit" className="ops-btn ops-btn-secondary">
+        <button type="submit" className="ops-btn ops-btn-secondary shrink-0">
           Buscar
         </button>
       </form>
@@ -181,6 +181,8 @@ export function CustomersListPage() {
       ) : (
         <DataTable
           empty="Nenhum cliente cadastrado. Cadastre o primeiro para usar no mapa e nas ordens."
+          mobileTitleKey="name"
+          mobileKeys={['city', 'status', 'nextVisit', 'openOs']}
           columns={[
             { key: 'name', label: 'Nome' },
             { key: 'document', label: 'Documento' },

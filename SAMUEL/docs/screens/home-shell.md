@@ -7,25 +7,35 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §1.
 ### 1. Identidade
 
 - Rotas cobertas: autenticadas **exceto** `/field/navigate` e `/field/visits/[id]`
-- Papéis: conforme item da sidebar
+- Papéis: conforme item da nav
 - Objetivo: navegação Operação · Recursos · Administração + sessão
-- Arquivos: `(app)/layout.tsx`, `AppHeader.tsx`, `AppSidebar.tsx`, `AppNav.tsx`, `UserMenu.tsx`
+- Arquivos: `(app)/layout.tsx`, `AppHeader.tsx`, `AppSidebar.tsx`, `AppBottomNav.tsx`, `AppMoreSheet.tsx`, `AppNav.tsx`, `nav-primary.ts`, `UserMenu.tsx`
 
 ### 2. Componentes
 
 ```
 SidebarProvider
-├── AppSidebar (c-sidebar-1): Rotas + empresa + grupos Lucide
+├── AppSidebar (só md+): Rotas + empresa + grupos Lucide
 └── SidebarInset
-    ├── AppHeader: SidebarTrigger (md-) | UserMenu dropdown
-    └── conteúdo: full-bleed em `/` e `/map`; senão max-w-5xl
+    ├── AppHeader: safe-area-top | UserMenu
+    ├── conteúdo: full-bleed em `/` e `/map`; senão max-w-5xl + app-main-pad
+    └── AppBottomNav (só <md): primários + Mais → AppMoreSheet
 ```
 
-Chrome (header, sidebar, sheet) usa `--surface` / `--sidebar` e segue `data-theme` (e classe `.dark` no `html`). Texto e botões ficam visíveis nos dois temas. Campo tela cheia (`field-nav`) permanece HUD escuro, **sem** `SidebarProvider`.
+Chrome usa `--surface` / `--sidebar` e `data-theme`. Campo tela cheia (`field-nav`) permanece HUD escuro, **sem** `SidebarProvider`/bottom nav.
 
 ### 3. Informação
 
-Grupos: **Operação** (Início, Mapa, Agenda, Serviços, Rotas, Campo) · **Recursos** (Clientes, Funcionários, Veículos, Abastecimentos, Custos) · **Administração** (Empresas PLATFORM_ADMIN, Empresa, Usuários). Custos/Abastecimentos: ADMIN, MANAGER, SUPERVISOR (não EMPLOYEE). Labels e papéis: ver PRD UX §1. Ícones em `app-icons.ts`.
+Grupos: **Operação** · **Recursos** · **Administração** (mesmos `NAV_GROUPS`).
+
+**Bottom nav (mobile):**
+
+| Papel | Itens na barra |
+|-------|----------------|
+| EMPLOYEE | Início, Agenda, Campo (+ Mais se houver extras) |
+| SUPERVISOR / MANAGER / ADMIN / PLATFORM_ADMIN | Início, Agenda, Mapa, Rotas + Mais |
+
+Itens restantes (Serviços, Clientes, etc.) ficam no sheet **Mais**.
 
 ### 4. KPI / totais
 
@@ -33,11 +43,11 @@ N/A.
 
 ### 5. Filtros e busca
 
-N/A.
+N/A no chrome.
 
 ### 6. Ações
 
-Navegar · Alterar senha → `/account/change-password` · Sair → logout + `/login` · tema no menu da conta.
+Navegar · Alterar senha · Sair · tema no menu da conta.
 
 ### 7. Estados
 
@@ -45,7 +55,7 @@ loading sessão (skeleton header + main) | idle | sem sessão (redirect api-clie
 
 ### 8. Permissões
 
-Middleware só cookie. Item some da nav se `roles` não inclui o papel (`roleAllowed` / `NAV_GROUPS`). API 403 se URL direta.
+Middleware só cookie. Item some da nav se `roles` não inclui o papel. API 403 se URL direta.
 
 ### 9. Navegação
 
@@ -53,24 +63,28 @@ Campo `/field/navigate` e `/field/visits/[id]` usam layout `(field-nav)` sem est
 
 ### 10. Mobile / PWA
 
-`SidebarTrigger` `aria-label="Abrir menu"` (visível abaixo de `md`). Sheet fecha ao navegar.
-
-Página sem zoom (pinch / duplo toque / teclado). Zoom de câmera só no canvas MapLibre das telas de mapa.
+- **&lt;768px:** bottom nav + Mais (bottom sheet); sidebar **não** abre drawer.
+- Safe areas: header (`safe-pt`), bottom nav (`--safe-bottom`), sheets.
+- Conteúdo com `app-main-pad` reserva altura da bottom nav.
+- Touch: `.ops-btn` / `.ops-input` / itens de menu ≥ ~44px.
+- Listagens CRUD: cards no mobile via `DataTable`.
+- PWA: `manifest` `display: standalone`, `start_url: "/"`, `viewportFit: cover`.
+- Página sem zoom (pinch); zoom de câmera só no MapLibre.
 
 ### 11. Fora de escopo
 
-Top-nav horizontal. Motion Icons. Blocos premium ReUI.
+Top-nav horizontal desktop. Motion Icons. Blocos premium ReUI.
 
 ### 12. Como testar
 
-1. ADMIN: três grupos visíveis.
-2. EMPLOYEE: Início, Agenda, Campo; sem Clientes/Mapa/Serviços/Rotas/Empresa.
-3. SUPERVISOR: Mapa/Agenda/Serviços/Rotas/Clientes; sem Funcionários/Veículos/Admin.
-4. `/` e `/map` sem padding `max-w-5xl`.
-5. Tema **Claro**: header mostra nome no dropdown; sidebar mostra **Rotas**; trigger no mobile. Voltar a **Escuro** mantém contraste.
-6. Clicar no nome/papel no header (Conta): o menu abre com Alterar senha, tema e Sair — **não** tela preta do Next.js.
-7. Navegar em `/field/navigate`: sem sidebar.
+1. ADMIN mobile: bottom nav Início/Agenda/Mapa/Rotas; Mais → Serviços/Clientes/…
+2. EMPLOYEE mobile: Início, Agenda, Campo.
+3. Desktop md+: sidebar com três grupos; sem bottom nav.
+4. `/` e `/map` full-bleed; conteúdo não sob a bottom nav.
+5. Tema claro/escuro: header e bottom nav legíveis.
+6. Conta no header: menu Alterar senha / tema / Sair.
+7. `/field/navigate`: sem sidebar nem bottom nav.
 
 ---
 
-Nota histórica: esta ficha substitui o “home legado” (atalhos pré-v0.10.0). Home atual: [home.md](home.md).
+Nota: substitui o modelo “hamburger → sidebar sheet” do chrome mobile (pré mobile-first PWA).

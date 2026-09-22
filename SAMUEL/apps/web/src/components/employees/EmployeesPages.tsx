@@ -117,7 +117,7 @@ export function EmployeesListPage() {
         }
       />
       <form
-        className="mb-4 flex gap-2"
+        className="mb-4 flex flex-col gap-2 sm:flex-row"
         onSubmit={(e) => {
           e.preventDefault();
           load();
@@ -128,9 +128,9 @@ export function EmployeesListPage() {
           onChange={(e) => setQ(e.target.value)}
           placeholder="Buscar"
           aria-label="Buscar funcionários"
-          className="flex-1 ops-input text-sm"
+          className="min-w-0 flex-1 ops-input text-sm"
         />
-        <button type="submit" className="ops-btn ops-btn-secondary">
+        <button type="submit" className="ops-btn ops-btn-secondary shrink-0">
           Buscar
         </button>
       </form>
@@ -140,6 +140,8 @@ export function EmployeesListPage() {
       ) : (
         <DataTable
           empty="Nenhum funcionário cadastrado. Cadastre a equipe para atribuir rotas."
+          mobileTitleKey="name"
+          mobileKeys={['jobTitle', 'status', 'route', 'access']}
           columns={[
             { key: 'name', label: 'Nome' },
             { key: 'jobTitle', label: 'Cargo' },

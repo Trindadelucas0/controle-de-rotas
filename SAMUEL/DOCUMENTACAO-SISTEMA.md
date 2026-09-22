@@ -2,8 +2,8 @@
 
 | Item | Valor |
 |------|--------|
-| Versão do sistema | 0.20.4 — Região: raio visível na navegação |
-| Última atualização | 18/09/2026 — navegação da missão Gravar região mostra o círculo, máscara fora do raio e botão Ver região |
+| Versão do sistema | 0.21.0 — PWA mobile-first (bottom nav, cards, safe areas) |
+| Última atualização | 22/09/2026 — chrome app-like no celular; listagens em cards; `start_url` `/` |
 | Fonte oficial de comportamento | Este hub aponta as fontes; **não** duplica regras inventadas |
 
 ## 1. Como usar este documento
@@ -24,15 +24,15 @@ Antes de editar código: ler a seção da tela em `docs/PRD-UX-FUNCIONAL.md` (ou
 
 ## 2. Tecnologias utilizadas
 
-Ver `PRD.md` §11 e `docs/ARCHITECTURE.md`. Resumo: Next.js 15 (web/PWA) → NestJS `/api/v1` → PostgreSQL+PostGIS + Redis; MapLibre + CARTO Dark Matter / Voyager conforme tema (`NEXT_PUBLIC_CARTO_BASEMAPS_KEY`); OSRM. UI: tema **escuro** padrão (`#121212` / `#1C1C1E` / `#FF5722`) com toggle claro/escuro (`data-theme` + classe `.dark` para o chrome shadcn, `localStorage` `samuel-theme`); header e sidebar ReUI (`SidebarProvider` + `AppSidebar`) usam `--surface` / tokens shadcn mapeados (`--primary` = laranja); Overpass; ícones Lucide outline; menta `#2EE6C7` só em polyline de rota. Layout `(field-nav)` permanece tela cheia, **sem** sidebar.
+Ver `PRD.md` §11 e `docs/ARCHITECTURE.md`. Resumo: Next.js 15 (web/PWA) → NestJS `/api/v1` → PostgreSQL+PostGIS + Redis; MapLibre + CARTO Dark Matter / Voyager conforme tema (`NEXT_PUBLIC_CARTO_BASEMAPS_KEY`); OSRM. UI: tema **escuro** padrão (`#121212` / `#1C1C1E` / `#FF5722`) com toggle claro/escuro (`data-theme` + classe `.dark` para o chrome shadcn, `localStorage` `samuel-theme`); header + **sidebar desktop** (`AppSidebar`) + **bottom nav mobile** (`AppBottomNav` / `AppMoreSheet`); Overpass; ícones Lucide outline; menta `#2EE6C7` só em polyline de rota. Layout `(field-nav)` permanece tela cheia, **sem** sidebar/bottom nav.
 
 ### 2.1 Histórico de versões
 
-Ver `docs/CHANGELOG.md` (atual: **v0.20.4**).
+Ver `docs/CHANGELOG.md` (atual: **v0.21.0**).
 
 ## 3. Mapa de telas / conexões
 
-Navegação (chrome): sidebar **Operação · Recursos · Administração** (`AppSidebar` + `NAV_GROUPS` em `AppNav.tsx`).
+Navegação: desktop = sidebar **Operação · Recursos · Administração** (`AppSidebar` + `NAV_GROUPS`). Mobile (&lt;768) = bottom nav (primários por papel) + sheet **Mais** (`nav-primary.ts`).
 
 ```
 Rotas
@@ -59,7 +59,7 @@ PLATFORM_ADMIN · ADMIN · MANAGER · SUPERVISOR · EMPLOYEE — detalhes em `PR
 | Rota | Código web | Doc UX |
 |------|------------|--------|
 | `/login` … auth | `apps/web/src/components/auth/*` | `docs/screens/login.md` etc. |
-| `/` + chrome | `OpsHomePage.tsx`, `(app)/layout.tsx`, `AppSidebar.tsx`, `AppNav.tsx` | `home.md` / `home-shell.md` |
+| `/` + chrome | `OpsHomePage.tsx`, `(app)/layout.tsx`, `AppSidebar.tsx`, `AppBottomNav.tsx`, `AppNav.tsx` | `home.md` / `home-shell.md` |
 | Cadastros | `components/{customers,employees,vehicles,settings,fuel,costs}/*` | screens correspondentes |
 | `/map` | `OperationalMap.tsx` | `map.md` |
 | `/services`, `/agenda`, `/routes` | `ServicesPages`, `AgendaPage`, `RoutesPlanner*` | screens |

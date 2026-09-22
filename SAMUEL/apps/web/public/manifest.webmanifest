@@ -3,7 +3,7 @@
   "short_name": "Rotas",
   "description": "Operações externas — rota e localização no app da tela inicial",
   "id": "/",
-  "start_url": "/field/my-route",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
