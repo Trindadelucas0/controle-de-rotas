@@ -15,7 +15,7 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §3.
 
 **Rotas de hoje:** summary + lista `Rota NN`, status, N paradas, km. Em cada card: **Gerir** (ADMIN/MANAGER em `PLANNED`|`PUBLISHED`) ou **Ver** (demais / status não editável). Abre painel lateral/bottom sheet. ADMIN: **Excluir rota** no painel se não estiver Em andamento.
 
-**Planejador:** modos Clientes | Visitas agendadas | **Gravar cliente** | **Região**. No modo Clientes: checkbox **Gravar viagem** (`recordTrip`) — aplica a todas as rotas do lote (1+ clientes); densifica GPS, fila local e grava trilha no check-in de cada cliente (retry no finalizar). Seletor **Origem do cálculo**: última localização do funcionário (padrão) ou pin da empresa.
+**Planejador:** modos Clientes | Visitas agendadas | **Gravar cliente** | **Região**. No modo Clientes: checkbox **Gravar viagem** (`recordTrip`) — aplica a todas as rotas do lote (1+ clientes); densifica GPS, fila local e grava trilha no check-in de cada cliente (retry no finalizar). **Cada cliente com trilha gravada** (ACTIVE) é alcançado pelas ruas até o ponto mais perto dessa trilha, e dali o carro segue o GPS gravado até a fazenda — isso vale em **qualquer rota**, com **1 ou várias paradas**. Seletor **Origem do cálculo**: última localização do funcionário (padrão) ou pin da empresa.
 
 **Gravar cliente:** funcionário + data + veículo → **Publicar missão de gravar**. Sem lista de clientes. Rotas de hoje mostram o card **Gravar acesso**. Painel Gerir não edita paradas dessa missão (placeholder interno).
 

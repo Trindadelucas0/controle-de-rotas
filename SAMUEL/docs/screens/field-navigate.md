@@ -33,7 +33,7 @@ Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; 
 
 ### 3. Informação
 
-- Instrução da **próxima manobra real** (`plannedStepsJson`): pula `depart` / `continue` / `new name` / `notification` e mostra a virada à frente (rua = `name` || `ref`)
+- Instrução da **próxima manobra real** (`plannedStepsJson`): pula `depart` / `continue` / `new name` / `notification` e mostra a virada à frente (rua = `name` || `ref`). Se `name === 'Caminho gravado'` (passo da trilha ACTIVE), mostra **"Siga o caminho gravado"**
 - Faixa: ícones OSRM (`lanes` da 1ª intersection) quando existirem; senão texto pelo `modifier` (`Faixa da esquerda` / `direita` / `Siga em frente` / `Faixa de retorno`). Rotatória/chegada: sem faixa inventada
 - Distância até a virada (`em N m` / `em N km`)
 - Seta principal (`aria-hidden`) alinhada ao modifier da próxima manobra
@@ -73,7 +73,7 @@ Botão **Centralizar** (alvo): ancorado **acima** do bloco inferior (marcos opci
 
 Contraste do HUD: não usar `bg-brand-900` + `text-amber-50` (depois do remap, `brand-900` é tinta clara). Banner de marco = superfície + **OK** ou **Sim/Não** `ops-btn-primary`/`secondary`. Cheguei = `#121212` + branco. Texto sobre âmbar = `#121212`.
 
-**Linha menta:** recorte no cliente até a parada corrente (`clipLineToNextStop` em `nav-geometry.ts`). Com GPS, o **primeiro ponto é sempre a posição do carro** (trecho já percorrido some); fim = fim do leg OSRM dessa parada (a linha termina no pin). Pinos das paradas seguintes permanecem. Trilha `CustomerAccessPath`: `start`/`reroute` recortam a geometria a partir do GPS (`tripFromAccessPath` / `clipAccessPathToOrigin`); o HUD de km/tempo segue a posição e a velocidade ao vivo.
+**Linha menta:** recorte no cliente até a parada corrente (`clipLineToNextStop` em `nav-geometry.ts`). Com GPS, o **primeiro ponto é sempre a posição do carro** (trecho já percorrido some); fim = fim do leg OSRM dessa parada (a linha termina no pin). Pinos das paradas seguintes permanecem. Trilha `CustomerAccessPath`: cada parada com trilha ACTIVE desenha ruas até o ponto mais perto dessa trilha e, dali, o GPS gravado até a fazenda. `start`/`reroute` recortam a geometria a partir do GPS; o HUD de km/tempo segue a posição e a velocidade ao vivo. Sem trilha, comportamento atual (OSRM ou reta até o pin).
 
 ### 5. Filtros e busca
 

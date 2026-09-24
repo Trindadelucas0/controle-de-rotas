@@ -4,7 +4,7 @@ Rotas por **visitas** (fluxo legado do planejador) e por **clientes** (dispatch 
 
 Campo novo no modelo `routes`: `planned_steps_json` (`plannedStepsJson`) — manobras OSRM (`steps=true`) ou fallback linha reta, gravadas no publish por clientes para a PWA não depender do OSRM no Play.
 
-Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s no servidor) na navegação, enfileira pontos no celular e no check-in/check-out consolida trilha em `CustomerAccessPath`. Unique parcial: um ACTIVE por (empresa, cliente). Modelos `customer_access_paths` e `customer_landmarks` (tema 21 / v0.15.3).
+Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s no servidor) na navegação, enfileira pontos no celular e no check-in/check-out consolida trilha em `CustomerAccessPath`. Unique parcial: um ACTIVE por (empresa, cliente). Modelos `customer_access_paths` e `customer_landmarks` (tema 21 / v0.15.3). **Uso da trilha gravada:** cada parada com `CustomerAccessPath` ACTIVE é alcançada pelo mapa até o ponto mais perto dessa trilha, e dali o carro segue o GPS gravado até a fazenda — isso vale em **qualquer rota** (1 ou várias paradas), não só rotas de 1 cliente. Aproximação por OSRM se > 50 m da trilha; se falhar, reta. Volta à empresa sempre pelo mapa.
 
 `record_new_customer` (`recordNewCustomer`) — missão **Gravar cliente** (v0.18.0): o gestor encaminha sessão sem lista de clientes; cada **Adicionar ponto** cria um `Customer` no GPS; **complete** só fecha a sessão. Placeholder `recordSessionShell` nunca vai ao mapa. Plano: [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
 

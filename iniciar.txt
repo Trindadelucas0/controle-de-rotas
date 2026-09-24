@@ -1,0 +1,91 @@
+ROTAS (SAMUEL) — instalar e usar no notebook (Windows)
+Pasta do código: C:\Users\trind\Desktop\controle de rotas\SAMUEL
+Fonte: SAMUEL\docs\DEV.md, SAMUEL\package.json, SAMUEL\docker-compose.yml, SAMUEL\.env.example
+
+ANTES (uma vez na máquina)
+1. Docker Desktop instalado e ABERTO (ícone da baleia rodando).
+2. Node.js 20 ou superior.
+3. Este projeto usa npm (não pnpm).
+
+O Docker sobe SÓ dois containers. O site e a API rodam no Node, fora do Docker.
+- samuel-postgres   postgis/postgis:16-3.5   porta 5433
+- samuel-redis      redis:7-alpine           porta 6379
+Usuário, senha e banco já entram no compose: samuel / samuel / samuel.
+Não há comando extra dentro do container. As tabelas entram pelo Prisma, no PC.
+
+ENTRAR NA PASTA (sempre na raiz do SAMUEL, nunca em apps)
+cd "C:\Users\trind\Desktop\controle de rotas\SAMUEL"
+
+1) ARQUIVOS .env (primeira vez)
+Copy-Item .env.example .env
+Copy-Item .env.example apps\api\.env
+Copy-Item apps\web\.env.example apps\web\.env.local
+
+O .env.example de dev já vem preenchido para o notebook (banco na 5433, Redis na 6379).
+Não precisa trocar senha para subir local.
+Opcional, só para o mapa sem a marca "API KEY REQUIRED":
+abra apps\web\.env.local e preencha NEXT_PUBLIC_CARTO_BASEMAPS_KEY.
+Deixe NEXT_PUBLIC_API_URL vazio.
+Não coloque PORT em apps\web\.env.local.
+
+2) DEPENDÊNCIAS
+npm install
+
+3) CONTAINERS (Docker novo)
+npm run docker:up
+
+É o mesmo que:
+docker compose up -d --wait
+
+Conferir:
+docker compose ps
+
+Devem aparecer:
+- samuel-postgres   porta 5433
+- samuel-redis      porta 6379
+
+4) BANCO (tabelas + usuário inicial)
+npm run db:migrate
+npm run db:seed
+
+5) SITE E API
+npm run dev
+
+Deixe esse terminal aberto. Não rode outro npm run dev ao mesmo tempo.
+
+Navegador: http://localhost:3000
+Mapa: http://localhost:3000/map
+Rotas: http://localhost:3000/routes
+Saúde da API: http://localhost:3001/api/v1/health
+Login do seed: admin@demo.local
+Senha: ChangeMe123!
+
+DIA A DIA (Docker já criado)
+cd "C:\Users\trind\Desktop\controle de rotas\SAMUEL"
+npm run dev
+
+O próprio npm run dev sobe os containers se estiverem parados.
+
+PARAR SÓ OS CONTAINERS
+npm run docker:down
+
+SE A PORTA 3000 OU 3001 ESTIVER OCUPADA
+Get-NetTCPConnection -LocalPort 3000,3001 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }
+
+Depois, de novo:
+npm run dev
+
+SE O POSTGRES FALHAR (volume antigo incompatível)
+cd "C:\Users\trind\Desktop\controle de rotas\SAMUEL"
+docker compose down
+docker volume rm samuel_samuel_pg
+docker compose up -d --wait
+npm run db:migrate
+npm run db:seed
+
+docker volume rm apaga os dados do banco local. Rode o seed de novo.
+
+NÃO É ESTE NOTEBOOK (só VPS de produção)
+docker compose -f docker-compose.prod.yml up -d --wait
+Pasta na VPS: /opt/analise/SAMUEL
+Atualizar o que já está no ar: SAMUEL\docs\vps-atualizar.txt

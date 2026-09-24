@@ -605,6 +605,12 @@ export function laneIndicationDeg(indication: string | undefined): number {
 /** Texto curto da manobra (banner). Usa name || ref. */
 export function maneuverInstruction(step: PlannedNavStep | null | undefined): string {
   if (!step) return 'Siga a rota';
+  
+  // Passo especial para trilha gravada
+  if (step.name === 'Caminho gravado') {
+    return 'Siga o caminho gravado';
+  }
+
   const type = (step.maneuver?.type || '').toLowerCase();
   const modifier = (step.maneuver?.modifier || '').toLowerCase();
   const road = stepRoadName(step);

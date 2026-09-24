@@ -484,6 +484,97 @@ export function straightLineTrip(
 }
 
 /**
+ * Recorta a trilha gravada a partir da origem, mantendo o comportamento
+ * de não voltar para trás (usa nearestOnLine + sliceLineFromAlong).
+ * Retorna geometria e passo para a navegação.
+ */
+export function legFromAccessPath(
+  origin: LatLng,
+  stop: GeoStop,
+  accessGeometry: { type: 'LineString'; coordinates: [number, number][] },
+): { geometry: [number, number][]; steps: PlannedNavStep[]; distanceMeters: number } {
+  const raw = accessGeometry.coordinates.length
+    ? [...accessGeometry.coordinates]
+    : [
+        [stop.longitude, stop.latitude] as [number, number],
+        [stop.longitude, stop.latitude] as [number, number],
+      ];
+
+  const coords = clipAccessPathToOrigin(origin, raw);
+  const dist = Math.round(lineLengthMeters(coords));
+  const dur = Math.round(dist / FALLBACK_SPEED_M_S);
+
+  return {
+    geometry: coords,
+    distanceMeters: dist,
+    steps: [
+      {
+        distanceMeters: dist,
+        durationSeconds: dur,
+        name: 'Caminho gravado',
+        ref: null,
+        lanes: null,
+        maneuver: {
+          type: 'arrive',
+          modifier: null,
+          location: [stop.longitude, stop.latitude] as [number, number],
+        },
+      },
+    ],
+  };
+}
+
+/**
+ * Monta uma perna aproximação + trilha para um cliente com acesso gravado.
+ * Se distância ao ponto mais perto ≤ 50 m: retorna só a trilha recortada.
+ * Se > 50 m: prefix com origem para indicar que OSRM/reta será colado na frente.
+ * Retorna geometria, passos e distância para o serviço emendarmos com a aproximação.
+ */
+export function legWithAccessPath(
+  origin: LatLng,
+  stop: GeoStop,
+  accessGeometry: { type: 'LineString'; coordinates: [number, number][] },
+): {
+  accessLeg: { geometry: [number, number][]; steps: PlannedNavStep[]; distanceMeters: number };
+  needsApproach: boolean;
+  approachTargetMeters: number;
+} {
+  const raw = accessGeometry.coordinates.length
+    ? [...accessGeometry.coordinates]
+    : [
+        [stop.longitude, stop.latitude] as [number, number],
+        [stop.longitude, stop.latitude] as [number, number],
+      ];
+
+  if (raw.length < 2) {
+    return {
+      accessLeg: legFromAccessPath(origin, stop, accessGeometry),
+      needsApproach: false,
+      approachTargetMeters: 0,
+    };
+  }
+
+  const nearest = nearestOnLine(raw, origin.longitude, origin.latitude);
+  const distToLine = nearest.distanceToLineMeters;
+
+  if (distToLine <= ACCESS_PATH_JOIN_M) {
+    // Perto: recorta direto
+    return {
+      accessLeg: legFromAccessPath(origin, stop, accessGeometry),
+      needsApproach: false,
+      approachTargetMeters: 0,
+    };
+  }
+
+  // Longe: retorna indicação que OSRM/reta será colado antes da trilha
+  return {
+    accessLeg: legFromAccessPath(origin, stop, accessGeometry),
+    needsApproach: true,
+    approachTargetMeters: nearest.alongMeters,
+  };
+}
+
+/**
  * Usa geometria gravada (CustomerAccessPath) para rota de 1 cliente.
  * Recorta a partir da origem atual (GPS no start/reroute) — não cola a
  * trilha inteira da gravação. `distanceMeters` do path é ignorado após o recorte.
@@ -503,20 +594,18 @@ export function tripFromAccessPath(
         [origin.longitude, origin.latitude] as [number, number],
         [stop.longitude, stop.latitude] as [number, number],
       ];
-  const coords = clipAccessPathToOrigin(origin, raw);
-  const dist = Math.round(lineLengthMeters(coords));
-  const dur = Math.round(dist / FALLBACK_SPEED_M_S);
   const home = returnTo ?? origin;
-  const geometry = [...coords];
+  const leg = legFromAccessPath(origin, stop, accessGeometry);
+  const geometry = [...leg.geometry];
   const legs: PlannedNavJson['legs'] = [
     {
-      distanceMeters: dist,
-      durationSeconds: dur,
-      steps: [fallbackArriveStep(stop, dist, dur)],
+      distanceMeters: leg.distanceMeters,
+      durationSeconds: Math.round(leg.distanceMeters / FALLBACK_SPEED_M_S),
+      steps: leg.steps,
     },
   ];
-  let totalDist = dist;
-  let totalDur = dur;
+  let totalDist = leg.distanceMeters;
+  let totalDur = Math.round(leg.distanceMeters / FALLBACK_SPEED_M_S);
 
   if (roundtrip) {
     const back = Math.round(haversineMeters(stop, home));
@@ -555,8 +644,8 @@ export function tripFromAccessPath(
       {
         ...stop,
         sequence: 1,
-        distanceMeters: dist,
-        durationSeconds: dur,
+        distanceMeters: leg.distanceMeters,
+        durationSeconds: Math.round(leg.distanceMeters / FALLBACK_SPEED_M_S),
       },
     ],
     totals: {

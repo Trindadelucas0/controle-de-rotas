@@ -1,6 +1,8 @@
 import {
   clipAccessPathToOrigin,
   haversineMeters,
+  legFromAccessPath,
+  legWithAccessPath,
   tripFromAccessPath,
   type GeoStop,
   type RouteOrigin,
@@ -56,6 +58,51 @@ describe('clipAccessPathToOrigin', () => {
     expect(clipped[0][0]).toBeCloseTo(-46.98, 4);
     expect(clipped[0][1]).toBeCloseTo(-16.045, 4);
     expect(clipped.length).toBeGreaterThanOrEqual(3);
+  });
+});
+
+describe('legFromAccessPath', () => {
+  it('recorta e retorna perna com passo Caminho gravado', () => {
+    const leg = legFromAccessPath(originBase, stop, {
+      type: 'LineString',
+      coordinates: tenKmTrail,
+    });
+    // Pode ter 2 ou 3 pontos dependendo do recorte
+    expect(leg.geometry.length).toBeGreaterThanOrEqual(2);
+    expect(leg.distanceMeters).toBeGreaterThan(4_500);
+    expect(leg.distanceMeters).toBeLessThan(5_500);
+    expect(leg.steps).toHaveLength(1);
+    expect(leg.steps[0].name).toBe('Caminho gravado');
+  });
+
+  it('prefixá a origem quando longe', () => {
+    const far = { latitude: -16.045, longitude: -46.98 };
+    const leg = legFromAccessPath(far, stop, {
+      type: 'LineString',
+      coordinates: tenKmTrail,
+    });
+    expect(leg.geometry[0][0]).toBeCloseTo(-46.98, 4);
+    expect(leg.geometry[0][1]).toBeCloseTo(-16.045, 4);
+  });
+});
+
+describe('legWithAccessPath', () => {
+  it('detecta se está perto (≤50m) e não precisa aproximação', () => {
+    const { needsApproach, accessLeg } = legWithAccessPath(originBase, stop, {
+      type: 'LineString',
+      coordinates: tenKmTrail,
+    });
+    expect(needsApproach).toBe(false);
+    expect(accessLeg.distanceMeters).toBeGreaterThan(4_500);
+  });
+
+  it('detecta se está longe e precisa OSRM/reta', () => {
+    const far = { latitude: -16.045, longitude: -46.8 }; // ~20 km a leste
+    const { needsApproach } = legWithAccessPath(far, stop, {
+      type: 'LineString',
+      coordinates: tenKmTrail,
+    });
+    expect(needsApproach).toBe(true);
   });
 });
 
