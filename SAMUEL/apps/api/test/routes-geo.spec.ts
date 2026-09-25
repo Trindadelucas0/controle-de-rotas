@@ -3,6 +3,7 @@ import {
   haversineMeters,
   legFromAccessPath,
   legWithAccessPath,
+  orderByDurationMatrix,
   tripFromAccessPath,
   type GeoStop,
   type RouteOrigin,
@@ -103,6 +104,20 @@ describe('legWithAccessPath', () => {
       coordinates: tenKmTrail,
     });
     expect(needsApproach).toBe(true);
+  });
+});
+
+describe('orderByDurationMatrix', () => {
+  it('escolhe a parada mais rápida, não a mais perto em linha reta', () => {
+    // Índices: 0 origem, 1 A (perto e lenta), 2 B, 3 C (longe e rápida).
+    // Proximidade A→B→C seria [0, 1, 2]. Duração: C primeiro, depois A, depois B.
+    const duration: Array<Array<number | null>> = [
+      [0, 600, 500, 100],
+      [600, 0, 50, 900],
+      [500, 50, 0, 900],
+      [100, 40, 400, 0],
+    ];
+    expect(orderByDurationMatrix(duration)).toEqual([2, 0, 1]);
   });
 });
 

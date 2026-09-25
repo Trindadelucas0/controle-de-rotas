@@ -320,6 +320,84 @@ export function orderStopsNearestFirst<T extends LatLng>(origin: LatLng, stops: 
   return [...stops].sort((a, b) => haversineMeters(origin, a) - haversineMeters(origin, b));
 }
 
+function durationCell(duration: Array<Array<number | null>>, from: number, to: number): number {
+  const value = duration[from]?.[to];
+  if (value == null || !Number.isFinite(value)) return Number.POSITIVE_INFINITY;
+  return value;
+}
+
+function durationPathCost(order: number[], duration: Array<Array<number | null>>): number {
+  let total = 0;
+  let prev = 0;
+  for (const stopIndex of order) {
+    const cost = durationCell(duration, prev, stopIndex + 1);
+    if (!Number.isFinite(cost)) return Number.POSITIVE_INFINITY;
+    total += cost;
+    prev = stopIndex + 1;
+  }
+  return total;
+}
+
+function twoOptDuration(order: number[], duration: Array<Array<number | null>>): number[] {
+  const n = order.length;
+  if (n < 4) return order;
+  let improved = true;
+  let best = [...order];
+  let bestCost = durationPathCost(best, duration);
+  let guard = 0;
+  while (improved && guard < 200) {
+    improved = false;
+    guard += 1;
+    for (let i = 0; i < n - 1; i += 1) {
+      for (let k = i + 1; k < n; k += 1) {
+        const next = [...best];
+        const slice = next.slice(i, k + 1).reverse();
+        next.splice(i, k - i + 1, ...slice);
+        const cost = durationPathCost(next, duration);
+        if (cost + 0.5 < bestCost) {
+          best = next;
+          bestCost = cost;
+          improved = true;
+        }
+      }
+    }
+  }
+  return best;
+}
+
+/**
+ * Ordem das paradas (índices 0..n-1) pela duração OSRM.
+ * `duration[0]` é a origem; `duration[i + 1]` é a parada `i`.
+ * Vizinho mais próximo + 2-opt. Célula null conta como infinito.
+ */
+export function orderByDurationMatrix(duration: Array<Array<number | null>>): number[] {
+  const nStops = Math.max(0, duration.length - 1);
+  if (nStops <= 1) return Array.from({ length: nStops }, (_, i) => i);
+
+  const remaining = new Set(Array.from({ length: nStops }, (_, i) => i));
+  const order: number[] = [];
+  let current = 0;
+  while (remaining.size) {
+    let best = -1;
+    let bestCost = Number.POSITIVE_INFINITY;
+    for (const i of remaining) {
+      const cost = durationCell(duration, current, i + 1);
+      if (cost < bestCost) {
+        bestCost = cost;
+        best = i;
+      }
+    }
+    if (best < 0) {
+      order.push(...remaining);
+      break;
+    }
+    order.push(best);
+    remaining.delete(best);
+    current = best + 1;
+  }
+  return twoOptDuration(order, duration);
+}
+
 export function optimizeOrder(origin: LatLng, visits: GeoStop[]): number[] {
   const n = visits.length;
   if (n <= 1) return visits.map((_, i) => i);

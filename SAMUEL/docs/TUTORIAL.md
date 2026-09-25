@@ -173,7 +173,7 @@ Em cada card: status, veículo, km/tempo, paradas, **mini-mapa** da linha planej
 
 ### 6.2 Iniciar rota (wizard)
 
-Passos: localização (**Permitir localização** — no iPhone só depois do toque; se o GPS falhar, **Continuar com origem planejada**) → resumo (ordem mais perto → mais longe se houver GPS) → escolher veículo (último km/combustível; carro em uso por outro não aparece) → **Km inicial**, **Combustível** e **foto do odômetro** (**Tirar foto** abre a câmera; **Galeria** se precisar de arquivo; a foto é comprimida) → confirmar **▶ Iniciar rota** (botão vira **Iniciando…**).
+Passos: localização (**Permitir localização** — no iPhone só depois do toque; se o GPS falhar, **Continuar com origem planejada**) → resumo (km em linha reta; a ordem definitiva no Play é a mais rápida pelas ruas) → escolher veículo (último km/combustível; carro em uso por outro não aparece) → **Km inicial**, **Combustível** e **foto do odômetro** (**Tirar foto** abre a câmera; **Galeria** se precisar de arquivo; a foto é comprimida) → confirmar **▶ Iniciar rota** (botão vira **Iniciando…**).
 
 Ao **concluir**, o modal pede km final, combustível e outra foto. O app **não** avisa fraude; o gestor vê no perfil.
 

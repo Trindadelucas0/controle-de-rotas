@@ -502,7 +502,7 @@ export function FieldStartRoutePage() {
               ? 'A gravação começa no seu GPS. Marque um ponto em cada fazenda nova e finalize quando quiser.'
               : gpsFallback
               ? 'Sem GPS neste endereço HTTP (o celular só libera localização em HTTPS ou o PC em localhost). Ordem = planejada. Origem do Play = 1ª parada.'
-              : 'Entregas ordenadas da mais perto para a mais longe a partir de onde você está. A ordem definitiva é gravada ao confirmar o início.'}
+              : 'A ordem definitiva no Play segue as ruas mais rápidas. Se o mapa não responder, fica a mais perto em linha reta.'}
           </p>
           {regionPreview}
           {route.recordNewCustomer ? null : previewMap}
@@ -518,7 +518,6 @@ export function FieldStartRoutePage() {
                     {dist != null && !gpsFallback ? (
                       <span className="ml-1 text-xs text-[var(--muted)]">
                         · {formatMeters(dist)}
-                        {index === 0 ? ' (mais perto)' : ''}
                       </span>
                     ) : null}
                   </span>

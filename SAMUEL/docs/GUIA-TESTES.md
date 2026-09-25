@@ -266,7 +266,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 - [ ] No card da rota publicada, clique em **▶ Iniciar rota**.
 - [ ] Se pedir localização, **Permitir**. No iPhone, toque em **Permitir localização e continuar** (não espera sozinho).
 - [ ] Se ficar em “Obtendo GPS…” ou der timeout, toque **Continuar com origem planejada**.
-- [ ] Passo resumo: confira a ordem (com GPS, a 1ª é a mais perto). Clique **Continuar**.
+- [ ] Passo resumo: a lista mostra km em linha reta (sem “mais perto”). A ordem das ruas entra no Play. Clique **Continuar**.
 - [ ] Escolha o **veículo**. **Continuar**.
 - [ ] Preencha **Km inicial do veículo** e **Combustível**. No celular, **Tirar foto** (câmera) ou **Galeria**. **Continuar** / **Revisar**.
 - [ ] Clique em **▶ Iniciar rota**.

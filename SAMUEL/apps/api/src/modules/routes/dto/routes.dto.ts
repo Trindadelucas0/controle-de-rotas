@@ -201,7 +201,7 @@ export class RerouteRouteDto {
   @IsNumber()
   longitude!: number;
 
-  /** Se true, reordena paradas pendentes mais perto → mais longe. */
+  /** Se true, reordena pendentes pela duração OSRM (fallback: mais perto → mais longe). */
   @IsBoolean()
   reorderRemaining!: boolean;
 }

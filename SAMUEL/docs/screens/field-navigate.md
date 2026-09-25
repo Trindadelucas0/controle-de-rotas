@@ -8,7 +8,7 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §5.
 
 - Rota: `/field/navigate`
 - Papéis: EMPLOYEE com rota `IN_PROGRESS`
-- Objetivo: navegação tela cheia — mapa, manobra, HUD, GPS contínuo; **origem = posição GPS atual**; 1ª parada pendente = **mais perto** (recálculo no 1º fix / Play)
+- Objetivo: navegação tela cheia — mapa, manobra, HUD, GPS contínuo; **origem = posição GPS atual**; 1ª parada pendente = **mais rápida pelas ruas** (recálculo no 1º fix / Play; se o mapa falhar, a mais perto em linha reta)
 - Arquivos: `FieldNavigatePage.tsx`, layout `(field-nav)` sem AppHeader/AppNav
 
 ### 2. Componentes
@@ -62,7 +62,7 @@ Sem GPS: banner âmbar “Localização necessária” só para HTTP inseguro, p
 
 | Gatilho | `reorderRemaining` | Efeito |
 | --- | --- | --- |
-| 1º fix GPS (sempre) | `true` | `POST /routes/:id/reroute` — origem = GPS; pendentes mais perto → mais longe; nova geometry/steps |
+| 1º fix GPS (sempre) | `true` | `POST /routes/:id/reroute` — origem = GPS; pendentes pela duração OSRM (fallback: mais perto → mais longe); nova geometry/steps |
 | Off-route sustentado (~2 samples e ≥2,5 s) + cooldown 8 s | `false` | Só redesenha traçado/manobras; **não** embaralha a ordem |
 
 Banner “Recalculando…” enquanto a API responde; durante o recálculo / fora da rota **não** pinta a geometria velha (U-turn) — mostra conector GPS → próxima parada. Em erro, mantém o conector e mostra a mensagem.
@@ -73,7 +73,7 @@ Botão **Centralizar** (alvo): ancorado **acima** do bloco inferior (marcos opci
 
 Contraste do HUD: não usar `bg-brand-900` + `text-amber-50` (depois do remap, `brand-900` é tinta clara). Banner de marco = superfície + **OK** ou **Sim/Não** `ops-btn-primary`/`secondary`. Cheguei = `#121212` + branco. Texto sobre âmbar = `#121212`.
 
-**Linha menta:** recorte no cliente até a parada corrente (`clipLineToNextStop` em `nav-geometry.ts`). Com GPS, o **primeiro ponto é sempre a posição do carro** (trecho já percorrido some); fim = fim do leg OSRM dessa parada (a linha termina no pin). Pinos das paradas seguintes permanecem. Trilha `CustomerAccessPath`: cada parada com trilha ACTIVE desenha ruas até o ponto mais perto dessa trilha e, dali, o GPS gravado até a fazenda. `start`/`reroute` recortam a geometria a partir do GPS; o HUD de km/tempo segue a posição e a velocidade ao vivo. Sem trilha, comportamento atual (OSRM ou reta até o pin).
+**Linha menta:** recorte no cliente até a parada corrente (`clipLineToNextStop` em `nav-geometry.ts`). Com GPS, o **primeiro ponto é sempre a posição do carro** (trecho já percorrido some); fim = fim do leg OSRM dessa parada (a linha termina no pin). Pinos das paradas seguintes permanecem. Trilha `CustomerAccessPath`: só se o OSRM da rota falhar; aí a perna segue o GPS gravado (passo “Siga o caminho gravado”). Com mapa ok, a linha é a rua até o pin e a trilha gravada não é desenhada. `start`/`reroute` pedem OSRM a partir do GPS; o HUD de km/tempo segue a posição e a velocidade ao vivo. Sem mapa e sem trilha, reta até o pin.
 
 ### 5. Filtros e busca
 

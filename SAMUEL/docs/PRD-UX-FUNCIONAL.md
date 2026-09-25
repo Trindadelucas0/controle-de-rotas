@@ -601,7 +601,7 @@ Ficha: [field-pwa-gate.md](screens/field-pwa-gate.md)
 
 **Componentes:** gate (+ faixa HTTP se inseguro) → header (KPI dia + Status GPS) · erro `role=alert` · card Tracking HTTP se IN_PROGRESS · articles por rota (status, veículo, km/tempo, **mini-mapa** com polyline, paradas, botões).
 
-**Informação:** Publicada / Em andamento · placa · duração/distância planejadas · N paradas · cliente + OS # — título. Sequência após Play = mais perto → mais longe.
+**Informação:** Publicada / Em andamento · placa · duração/distância planejadas · N paradas · cliente + OS # — título. Sequência após Play = duração das ruas (fallback: mais perto → mais longe).
 
 **KPI:** `{N} rota(s) em dd/mm/aaaa` · `~duração` soma planned · km soma planned. Por rota: duração · distância · paradas.
 
@@ -651,7 +651,7 @@ Ficha: [field-fuel.md](screens/field-fuel.md)
 | # | id | Conteúdo |
 | --- | --- | --- |
 | 1 | gps | pedido rápido de GPS (iOS só no toque); HTTP LAN **pula**; fallback **Continuar com origem planejada** |
-| 2 | summary | com GPS: pin **pessoa** + mais perto→mais longe + km; em HTTP: ordem planejada |
+| 2 | summary | com GPS: pin **pessoa** + km em linha reta; ordem definitiva no Play = ruas; em HTTP: ordem planejada |
 | 3 | vehicle | pin **carro**; `GET /field/vehicles?routeId=` |
 | 4 | checklist | pin carro; Km inicial * · Combustível * · Foto do odômetro * · Observação max 500 |
 | 5 | confirm | pin carro; resumo placa, km, combustível, foto, 1ª parada |
@@ -691,7 +691,7 @@ Missão **Gravar região**: máscara escura fora do raio + borda laranja traceja
 
 Sem GPS: banner âmbar “Localização necessária” (HTTP inseguro / permissão negada / indisponível após fallback rede). TIMEOUT transitório não trava — seed coarse + GPS fino. “Chegando” (~80 m) e “Fora da rota” (~50 m; ignora accuracy pior) = UX, **não** prova de visita.
 
-**Recálculo:** no 1º fix GPS (sempre) → `POST /routes/:id/reroute` com `reorderRemaining: true` (origem = GPS; pendentes mais perto → mais longe). Off-route sustentado (~2,5 s / 2 samples, cooldown 8 s) → mesmo endpoint com `reorderRemaining: false` (só redesenha). Banner “Recalculando…” durante a API; geometria velha (U-turn) não fica pintada.
+**Recálculo:** no 1º fix GPS (sempre) → `POST /routes/:id/reroute` com `reorderRemaining: true` (origem = GPS; pendentes pela duração OSRM, fallback mais perto → mais longe). Off-route sustentado (~2,5 s / 2 samples, cooldown 8 s) → mesmo endpoint com `reorderRemaining: false` (só redesenha). Banner “Recalculando…” durante a API; geometria velha (U-turn) não fica pintada.
 
 **Ações:** Encerrar → `/field/my-route` (rota **permanece** IN_PROGRESS) · **Cheguei** (banner ~80 m) → `/field/visits/[id]` · arrastar para concluir → modal (desabilitado se visita aberta; banner + link) · arrastar mapa desliga follow (toque simples não) · botão alvo religa follow · GPS watch → tracking · reroute automático. `beforeunload` / popstate avisam.
 

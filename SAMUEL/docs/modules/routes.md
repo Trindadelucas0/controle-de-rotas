@@ -4,7 +4,7 @@ Rotas por **visitas** (fluxo legado do planejador) e por **clientes** (dispatch 
 
 Campo novo no modelo `routes`: `planned_steps_json` (`plannedStepsJson`) — manobras OSRM (`steps=true`) ou fallback linha reta, gravadas no publish por clientes para a PWA não depender do OSRM no Play.
 
-Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s no servidor) na navegação, enfileira pontos no celular e no check-in/check-out consolida trilha em `CustomerAccessPath`. Unique parcial: um ACTIVE por (empresa, cliente). Modelos `customer_access_paths` e `customer_landmarks` (tema 21 / v0.15.3). **Uso da trilha gravada:** cada parada com `CustomerAccessPath` ACTIVE é alcançada pelo mapa até o ponto mais perto dessa trilha, e dali o carro segue o GPS gravado até a fazenda — isso vale em **qualquer rota** (1 ou várias paradas), não só rotas de 1 cliente. Aproximação por OSRM se > 50 m da trilha; se falhar, reta. Volta à empresa sempre pelo mapa.
+Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s no servidor) na navegação, enfileira pontos no celular e no check-in/check-out consolida trilha em `CustomerAccessPath`. Unique parcial: um ACTIVE por (empresa, cliente). Modelos `customer_access_paths` e `customer_landmarks` (tema 21 / v0.15.3). **Uso da trilha gravada:** o cálculo pede OSRM `/route` até o pin; a trilha ACTIVE só entra se essa chamada falhar (timeout, HTTP ou `code` diferente de Ok). Sem trilha e sem mapa, a perna é reta. Volta à empresa: OSRM quando a rota inteira responde; no fallback, reta até o pin E.
 
 `record_new_customer` (`recordNewCustomer`) — missão **Gravar cliente** (v0.18.0): o gestor encaminha sessão sem lista de clientes; cada **Adicionar ponto** cria um `Customer` no GPS; **complete** só fecha a sessão. Placeholder `recordSessionShell` nunca vai ao mapa. Plano: [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
 
@@ -159,7 +159,7 @@ Navegação com Gravar viagem → banner **Ainda existe …?** → **Não, retir
 - `recordTrip`: default false; grava trilha no check-in de cada cliente
 - Não cria OS/visita/rota
 - Split: carga balanceada (±1), proximidade a partir da origem escolhida, clusters por ângulo se todos no E
-- Ordem das paradas: **mais perto → mais longe** a partir da origem escolhida; traçado OSRM `/route` (ordem fixa), **CustomerAccessPath ACTIVE** (1 parada, geometria recortada a partir da origem GPS — não a trilha inteira da gravação) ou linha reta; roundtrip volta ao pin da empresa (**E**)
+- Ordem das paradas: duração OSRM (`/table/v1/driving`, vizinho mais próximo + 2-opt); se a tabela falhar, **mais perto → mais longe** em linha reta. Traçado: OSRM `/route` na ordem fixa; se falhar, `CustomerAccessPath` ACTIVE recortada a partir da origem (passo **Caminho gravado**) ou linha reta. Roundtrip volta ao pin da empresa (**E**).
 - Cada assignment inclui `startOrigin`: `{ source: live|tracking_history|company|company_fallback, name, latitude, longitude, recordedAt }`
 - Play (`POST /routes/:id/start`) e `reroute`: mesma regra com o GPS real do celular; HUD de navegação calcula Tempo/ETA com a velocidade ao vivo
 - Erro: `ROUTE_RECORD_TRIP_NO_CUSTOMERS` (só se `recordTrip` sem clientes)
@@ -344,7 +344,7 @@ Formato interno de `plannedStepsJson`:
 }
 ```
 
-- `reorderRemaining: true` — paradas a mais de ~80 m do GPS ordenadas **mais perto → mais longe**; `false` — mantém a ordem das pendentes
+- `reorderRemaining: true` — pendentes ordenadas pela duração OSRM (fallback: mais perto → mais longe em linha reta); `false` — mantém a ordem das pendentes e só redesenha (OSRM; trilha só se o mapa falhar)
 - Paradas a ≤80 m do GPS saem do traçado (ficam no fim da sequência)
 - Persiste: `plannedGeometryJson`, `plannedStepsJson`, totais, `originLatitude/Longitude` (posição atual). **Não** altera `startLatitude/startLongitude`
 - Respostas:

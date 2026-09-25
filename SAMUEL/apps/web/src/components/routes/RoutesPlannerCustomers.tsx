@@ -839,7 +839,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
             </div>
           ) : selectedCustomerIds.length === 0 ? (
             <p className="mt-2 text-xs text-[var(--muted)]">
-              A ordem exibida será a do servidor ({startSequenceLabel} → mais perto → mais longe),
+              A ordem exibida será a do servidor ({startSequenceLabel} → ruas mais rápidas; se o mapa falhar, mais perto → mais longe),
               não a do clique.
             </p>
           ) : (

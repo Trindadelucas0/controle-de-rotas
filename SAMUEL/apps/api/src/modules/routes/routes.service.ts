@@ -50,22 +50,21 @@ import {
 } from './route-complete.util';
 import {
   GeoStop,
+  LatLng,
   OptimizedStop,
   OptimizedTrip,
   OsrmRouteResponse,
   OsrmTripResponse,
   PlannedNavJson,
-  PlannedNavStep,
   RouteOrigin,
   haversineMeters,
   legFromAccessPath,
-  legWithAccessPath,
   lineStringWkt,
+  orderByDurationMatrix,
   orderStopsNearestFirst,
   routeFromOsrm,
   straightLineTrip,
   straightLineTripAlongOrder,
-  tripFromAccessPath,
   tripFromOsrm,
 } from './routes-geo';
 import { validateRecordTripCustomers, sanitizeTrailPoints } from '../customers/access-path.util';
@@ -1426,7 +1425,7 @@ export class RoutesService {
       longitude: s.longitude,
     }));
 
-    const orderedGeoStops = orderStopsNearestFirst(employeeOrigin, geoStops);
+    const orderedGeoStops = await this.orderStopsByOsrmDuration(employeeOrigin, geoStops);
     const companyHome = routeWithStops.roundtrip
       ? await this.loadCompanyOrigin(user.companyId).catch(() => null)
       : null;
@@ -1548,7 +1547,7 @@ export class RoutesService {
 
   /**
    * Recalcula geometria + manobras a partir da posição GPS atual (navegação estilo Maps).
-   * reorderRemaining=true: pendentes mais perto → mais longe.
+   * reorderRemaining=true: pendentes pela duração OSRM (fallback: mais perto → mais longe).
    * reorderRemaining=false: mantém ordem das pendentes (só redesenha o traçado).
    */
   async reroute(user: AuthUser, id: string, dto: RerouteRouteDto) {
@@ -1658,7 +1657,7 @@ export class RoutesService {
 
     const pendingGeo = pending.map(toGeo);
     const orderedPendingGeo = dto.reorderRemaining
-      ? orderStopsNearestFirst(employeeOrigin, pendingGeo)
+      ? await this.orderStopsByOsrmDuration(employeeOrigin, pendingGeo)
       : pendingGeo;
 
     const companyHome = routeWithStops.roundtrip
@@ -2404,7 +2403,7 @@ export class RoutesService {
             longitude: employee.position.longitude,
             address: null,
           };
-      const ordered = orderStopsNearestFirst(employee.position, group);
+      const ordered = await this.orderStopsByOsrmDuration(employeeOrigin, group);
       const trip = await this.routeAlongFixedOrder(
         employeeOrigin,
         ordered,
@@ -2806,6 +2805,54 @@ export class RoutesService {
     }
   }
 
+  private async orderStopsByOsrmDuration<T extends LatLng>(origin: LatLng, stops: T[]): Promise<T[]> {
+    if (stops.length <= 1) return stops;
+    const matrix = await this.tryOsrmDurationTable(origin, stops);
+    if (!matrix) return orderStopsNearestFirst(origin, stops);
+    const indexes = orderByDurationMatrix(matrix);
+    if (indexes.length !== stops.length) return orderStopsNearestFirst(origin, stops);
+    return indexes.map((index) => stops[index]);
+  }
+
+  /** Matriz de duração (s). Índice 0 = origem; 1..n = paradas na ordem recebida. */
+  private async tryOsrmDurationTable(
+    origin: LatLng,
+    stops: LatLng[],
+  ): Promise<Array<Array<number | null>> | null> {
+    const base =
+      this.config.get<string>('OSRM_URL')?.replace(/\/$/, '') ||
+      'https://router.project-osrm.org';
+    const coords = [
+      `${origin.longitude},${origin.latitude}`,
+      ...stops.map((stop) => `${stop.longitude},${stop.latitude}`),
+    ].join(';');
+    const url = new URL(`${base}/table/v1/driving/${coords}`);
+    url.searchParams.set('annotations', 'duration');
+
+    try {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS);
+      const res = await fetch(url.toString(), {
+        signal: controller.signal,
+        headers: { Accept: 'application/json' },
+      });
+      clearTimeout(timer);
+      if (!res.ok) return null;
+      const data = (await res.json()) as {
+        code?: string;
+        durations?: Array<Array<number | null>>;
+      };
+      const n = stops.length + 1;
+      if (data.code !== 'Ok' || !Array.isArray(data.durations) || data.durations.length !== n) {
+        return null;
+      }
+      if (data.durations.some((row) => !Array.isArray(row) || row.length !== n)) return null;
+      return data.durations;
+    } catch {
+      return null;
+    }
+  }
+
   private async routeAlongFixedOrder(
     origin: RouteOrigin,
     orderedVisits: GeoStop[],
@@ -2817,11 +2864,10 @@ export class RoutesService {
       return straightLineTripAlongOrder(origin, orderedVisits, roundtrip, returnTo);
     }
 
-    // Carregar trilhas ACTIVE uma vez
-    const accessPaths = new Map<
-      string,
-      { geometryJson: unknown; distanceMeters: number | null }
-    >();
+    const osrm = await this.tryOsrmRoute(origin, orderedVisits, roundtrip, returnTo);
+    if (osrm) return osrm;
+
+    const accessPaths = new Map<string, { type: 'LineString'; coordinates: [number, number][] }>();
     if (companyId) {
       const paths = await this.prisma.customerAccessPath.findMany({
         where: {
@@ -2829,172 +2875,59 @@ export class RoutesService {
           customerId: { in: orderedVisits.map((v) => v.customerId) },
           status: CustomerAccessPathStatus.ACTIVE,
         },
-        select: { customerId: true, geometryJson: true, distanceMeters: true },
+        select: { customerId: true, geometryJson: true },
       });
-      for (const p of paths) {
-        accessPaths.set(p.customerId, {
-          geometryJson: p.geometryJson,
-          distanceMeters: p.distanceMeters,
-        });
-      }
-    }
-
-    // Caso especial: 1 cliente com trilha — mantém comportamento de tripFromAccessPath
-    if (orderedVisits.length === 1) {
-      const stop = orderedVisits[0];
-      const access = accessPaths.get(stop.customerId);
-      if (access) {
-        const geo = access.geometryJson as
+      for (const path of paths) {
+        const geo = path.geometryJson as
           | { type?: string; coordinates?: [number, number][] }
           | null
           | undefined;
         if (geo?.type === 'LineString' && Array.isArray(geo.coordinates) && geo.coordinates.length >= 2) {
-          return tripFromAccessPath(
-            origin,
-            stop,
-            { type: 'LineString', coordinates: geo.coordinates },
-            access.distanceMeters,
-            roundtrip,
-            returnTo,
-          );
+          accessPaths.set(path.customerId, { type: 'LineString', coordinates: geo.coordinates });
         }
       }
-      const osrm = await this.tryOsrmRoute(origin, orderedVisits, roundtrip, returnTo);
-      if (osrm) return osrm;
-      return straightLineTripAlongOrder(origin, orderedVisits, roundtrip, returnTo);
     }
 
-    // Múltiplas paradas: montar perna a perna
     let currentOrigin: RouteOrigin | GeoStop = origin;
-    let totalGeometry: [number, number][] = [];
+    const totalGeometry: [number, number][] = [];
     let totalDist = 0;
     let totalDur = 0;
     const stops: OptimizedStop[] = [];
     const legs: PlannedNavJson['legs'] = [];
 
     for (const stop of orderedVisits) {
-      const access = accessPaths.get(stop.customerId);
-      const geo = access?.geometryJson as
-        | { type?: string; coordinates?: [number, number][] }
-        | null
-        | undefined;
-
-      let legGeometry: [number, number][];
-      let legDist: number;
-      let legDur: number;
-      let legSteps: PlannedNavStep[];
-
-      // Se tem trilha ACTIVE
-      if (access && geo?.type === 'LineString' && Array.isArray(geo.coordinates) && geo.coordinates.length >= 2) {
-        const accessLeg = legFromAccessPath(currentOrigin, stop, { type: 'LineString', coordinates: geo.coordinates });
-        legGeometry = accessLeg.geometry;
-        legDist = accessLeg.distanceMeters;
-        legSteps = accessLeg.steps;
-
-        // Se longe da trilha, pedir OSRM até o ponto mais perto
-        const { needsApproach } = legWithAccessPath(currentOrigin, stop, { type: 'LineString', coordinates: geo.coordinates });
-        if (needsApproach) {
-          const approxOsrm = await this.tryOsrmRouteSingleLeg(currentOrigin, stop);
-          if (approxOsrm) {
-            // Colar geometria OSRM (ou reta) na frente + trilha depois
-            const approxGeom = approxOsrm.geometry.coordinates;
-            const approxDist = approxOsrm.totals.distanceMeters;
-            const approxDur = approxOsrm.totals.durationSeconds;
-            const approxSteps = approxOsrm.plannedSteps.legs[0]?.steps || [];
-
-            // Emenda: aproximação + trilha
-            totalGeometry.push(...approxGeom);
-            totalDist += approxDist;
-            totalDur += approxDur;
-            legs.push({
-              distanceMeters: approxDist,
-              durationSeconds: approxDur,
-              steps: approxSteps,
-            });
-
-            // Restante da trilha (a partir do ponto onde OSRM chegou)
-            totalGeometry.push(...legGeometry);
-            totalDist += legDist;
-            totalDur += Math.round(legDist / 11.1); // FALLBACK_SPEED_M_S
-            legs.push({
-              distanceMeters: legDist,
-              durationSeconds: Math.round(legDist / 11.1),
-              steps: legSteps,
-            });
-          } else {
-            // Sem OSRM: reta até o stop + trilha
-            totalGeometry.push([currentOrigin.longitude, currentOrigin.latitude]);
-            const straightDist = Math.round(haversineMeters(currentOrigin, stop));
-            const straightDur = Math.round(straightDist / 11.1);
-            totalGeometry.push(...legGeometry);
-            totalDist += straightDist + legDist;
-            totalDur += straightDur + Math.round(legDist / 11.1);
-
-            legs.push({
+      const trail = accessPaths.get(stop.customerId);
+      if (trail) {
+        const accessLeg = legFromAccessPath(currentOrigin, stop, trail);
+        totalGeometry.push(...accessLeg.geometry);
+        totalDist += accessLeg.distanceMeters;
+        const dur = Math.round(accessLeg.distanceMeters / 11.1);
+        totalDur += dur;
+        legs.push({
+          distanceMeters: accessLeg.distanceMeters,
+          durationSeconds: dur,
+          steps: accessLeg.steps,
+        });
+      } else {
+        const straightDist = Math.round(haversineMeters(currentOrigin, stop));
+        const straightDur = Math.round(straightDist / 11.1);
+        totalGeometry.push([currentOrigin.longitude, currentOrigin.latitude], [stop.longitude, stop.latitude]);
+        totalDist += straightDist;
+        totalDur += straightDur;
+        legs.push({
+          distanceMeters: straightDist,
+          durationSeconds: straightDur,
+          steps: [
+            {
               distanceMeters: straightDist,
               durationSeconds: straightDur,
-              steps: [
-                {
-                  distanceMeters: straightDist,
-                  durationSeconds: straightDur,
-                  name: stop.name,
-                  ref: null,
-                  lanes: null,
-                  maneuver: { type: 'arrive', modifier: null, location: [stop.longitude, stop.latitude] },
-                },
-              ],
-            });
-            legs.push({
-              distanceMeters: legDist,
-              durationSeconds: Math.round(legDist / 11.1),
-              steps: legSteps,
-            });
-          }
-        } else {
-          // Perto: só a trilha
-          totalGeometry.push(...legGeometry);
-          totalDist += legDist;
-          totalDur += Math.round(legDist / 11.1);
-          legs.push({
-            distanceMeters: legDist,
-            durationSeconds: Math.round(legDist / 11.1),
-            steps: legSteps,
-          });
-        }
-      } else {
-        // Sem trilha: OSRM ou reta
-        const osrmLeg = await this.tryOsrmRouteSingleLeg(currentOrigin, stop);
-        if (osrmLeg) {
-          totalGeometry.push(...osrmLeg.geometry.coordinates);
-          totalDist += osrmLeg.totals.distanceMeters;
-          totalDur += osrmLeg.totals.durationSeconds;
-          legs.push({
-            distanceMeters: osrmLeg.totals.distanceMeters,
-            durationSeconds: osrmLeg.totals.durationSeconds,
-            steps: osrmLeg.plannedSteps.legs[0]?.steps || [],
-          });
-        } else {
-          const straightDist = Math.round(haversineMeters(currentOrigin, stop));
-          const straightDur = Math.round(straightDist / 11.1);
-          totalGeometry.push([currentOrigin.longitude, currentOrigin.latitude]);
-          totalGeometry.push([stop.longitude, stop.latitude]);
-          totalDist += straightDist;
-          totalDur += straightDur;
-          legs.push({
-            distanceMeters: straightDist,
-            durationSeconds: straightDur,
-            steps: [
-              {
-                distanceMeters: straightDist,
-                durationSeconds: straightDur,
-                name: stop.name,
-                ref: null,
-                lanes: null,
-                maneuver: { type: 'arrive', modifier: null, location: [stop.longitude, stop.latitude] },
-              },
-            ],
-          });
-        }
+              name: stop.name,
+              ref: null,
+              lanes: null,
+              maneuver: { type: 'arrive', modifier: null, location: [stop.longitude, stop.latitude] },
+            },
+          ],
+        });
       }
 
       stops.push({
@@ -3003,8 +2936,6 @@ export class RoutesService {
         distanceMeters: totalDist,
         durationSeconds: totalDur,
       });
-
-      // Converter GeoStop em RouteOrigin para próxima iteração
       currentOrigin = {
         name: stop.name,
         latitude: stop.latitude,
@@ -3013,7 +2944,6 @@ export class RoutesService {
       };
     }
 
-    // Volta para a empresa se roundtrip
     const home = returnTo ?? origin;
     if (roundtrip && orderedVisits.length) {
       const backDist = Math.round(haversineMeters(currentOrigin, home));
@@ -3051,9 +2981,9 @@ export class RoutesService {
         distanceKm: Math.round((totalDist / 1000) * 10) / 10,
       },
       geometry: { type: 'LineString', coordinates: totalGeometry },
-      quality: 'road',
+      quality: accessPaths.size ? 'road' : 'straight_line',
       roundtrip,
-      plannedSteps: { provider: 'osrm', roundtrip, legs },
+      plannedSteps: { provider: 'straight_line', roundtrip, legs },
     };
   }
 
@@ -3097,40 +3027,6 @@ export class RoutesService {
     }
 
     return routeFromOsrm(origin, orderedVisits, roundtrip, data);
-  }
-
-  /** Calcula uma perna simples (origem → parada) com OSRM. */
-  private async tryOsrmRouteSingleLeg(
-    origin: RouteOrigin,
-    stop: GeoStop,
-  ): Promise<OptimizedTrip | null> {
-    const base =
-      this.config.get<string>('OSRM_URL')?.replace(/\/$/, '') ||
-      'https://router.project-osrm.org';
-
-    const url = new URL(
-      `${base}/route/v1/driving/${origin.longitude},${origin.latitude};${stop.longitude},${stop.latitude}`,
-    );
-    url.searchParams.set('geometries', 'geojson');
-    url.searchParams.set('overview', 'full');
-    url.searchParams.set('steps', 'true');
-
-    let data: OsrmRouteResponse;
-    try {
-      const controller = new AbortController();
-      const timer = setTimeout(() => controller.abort(), OSRM_TIMEOUT_MS);
-      const res = await fetch(url.toString(), {
-        signal: controller.signal,
-        headers: { Accept: 'application/json' },
-      });
-      clearTimeout(timer);
-      if (!res.ok) return null;
-      data = (await res.json()) as OsrmRouteResponse;
-    } catch {
-      return null;
-    }
-
-    return routeFromOsrm(origin, [stop], false, data);
   }
 
   private async optimizeTrip(

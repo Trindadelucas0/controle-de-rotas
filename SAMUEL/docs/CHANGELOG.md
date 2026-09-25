@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.21.3 — 2026-09-25
+
+### Cálculo de rota — rua primeiro, trilha só se o mapa falhar
+
+- Sintoma: a linha menta repetia o GPS gravado (ruas a mais, retas cruzando o mapa) mesmo quando havia rua pública
+- Causa: `routeAlongFixedOrder` usava `CustomerAccessPath` antes do OSRM (1 cliente sempre; várias paradas emendavam trilha + rua)
+- Correção: `tryOsrmRoute` primeiro; trilha ACTIVE só se a chamada falhar. Ordem em `start`, `reroute` (`reorderRemaining`) e preview por clientes via `/table` (`orderByDurationMatrix`); tabela falhou → `orderStopsNearestFirst`
+- Como validar: cliente com trilha e OSRM ok → linha nas ruas, sem “Siga o caminho gravado”; derrubar OSRM → volta a trilha ou reta; 3 paradas com durações diferentes da distância em linha reta mudam a ordem
+
 ## v0.21.2 — 2026-09-25
 
 ### Fix — Publicar missão de gravar coberta pela barra no PWA

@@ -13,7 +13,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - Card do passo atual
 - Campos:
   - **GPS** — pedido rápido (rede/Wi‑Fi ~8 s, depois GPS fino ~15 s). No iPhone **não** dispara sozinho (só no toque). Se falhar: **Continuar com origem planejada** (1ª parada ou pin da missão)
-  - **Resumo** — mini-mapa Dark Matter com polyline menta + pin **pessoa**; paradas da mais perto para a mais longe + km (preview local; ordem definitiva no Play). Missão **Gravar região**: mapa do círculo no lugar da polyline.
+  - **Resumo** — mini-mapa Dark Matter com polyline menta + pin **pessoa**; lista local com km em linha reta (a ordem definitiva no Play é a duração das ruas). Missão **Gravar região**: mapa do círculo no lugar da polyline.
   - **Veículo** — pin vira **carro**; select (`GET /field/vehicles`); pré-seleciona veículo da rota se houver; mostra último km/combustível; omite carro em uso por outro
   - **Km inicial** — number, obrigatório, > 0 (pré-preenchido com o último km do veículo)
   - **Combustível** — select: Vazio, 1/4, 1/2, 3/4, Cheio (pré-preenchido)
@@ -37,8 +37,8 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
 - Como testar:
   1. Publicar rota para funcionário → Minha rota → **Iniciar rota**
   2. Negar GPS → mensagem; permitir ou **Continuar com origem planejada** → avança
-  3. No passo Resumo, conferir ordem por proximidade (1 = mais perto)
+  3. No passo Resumo, a lista local mostra km em linha reta; a ordem definitiva (ruas mais rápidas) só entra no Play
   4. Escolher veículo, preencher km e combustível, **Tirar foto** (câmera) → Revisar → confirmar
-  5. Ver redirect para navegação com mapa centralizado na 1ª parada (mais perto)
+  5. Ver redirect para navegação com mapa centralizado na 1ª parada (a mais rápida pelas ruas, se o mapa responder)
   6. Tentar abrir wizard de rota já `IN_PROGRESS` → redireciona para `/field/navigate`
   7. Com outra rota `IN_PROGRESS` (mesmo de outro dia) → alerta + “Ir para Minha rota e concluir”
