@@ -8,7 +8,7 @@ import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useSessionUser } from '@/lib/session-context';
-import { ROUTE_EXECUTED_GLOW, ROUTE_EXECUTED_LINE, ROUTE_GLOW, ROUTE_LINE, getRasterStyleForTheme, type MapCustomerPin } from '@/lib/map-style';
+import { ROUTE_EXECUTED_GLOW, ROUTE_EXECUTED_LINE, ROUTE_GLOW, ROUTE_LINE, cartoTransformRequest, getRasterStyleForTheme, type MapCustomerPin } from '@/lib/map-style';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { toDateInputValue } from '@/lib/ops-labels';
 import {
@@ -1113,6 +1113,7 @@ export function OperationalMap() {
             ref={mapRef}
             initialViewState={initialView}
             mapStyle={mapStyle}
+            transformRequest={cartoTransformRequest}
             style={{ width: '100%', height: '100%' }}
             attributionControl
             onClick={(e) => {

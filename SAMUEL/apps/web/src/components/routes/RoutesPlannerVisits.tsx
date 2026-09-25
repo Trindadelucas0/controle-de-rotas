@@ -7,7 +7,7 @@ import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useSessionUser } from '@/lib/session-context';
-import { osmRasterStyle } from '@/lib/map-style';
+import { cartoTransformRequest, osmRasterStyle } from '@/lib/map-style';
 import { VISIT_STATUS_LABELS, addDaysYmd, labelOf, toDateInputValue } from '@/lib/ops-labels';
 import {
   type CompanyOrigin,
@@ -634,6 +634,7 @@ export function RoutesPlannerVisits({ company }: Props) {
           ref={mapRef}
           initialViewState={initialView}
           mapStyle={osmRasterStyle}
+          transformRequest={cartoTransformRequest}
           style={{ width: '100%', height: '100%' }}
           attributionControl
         >

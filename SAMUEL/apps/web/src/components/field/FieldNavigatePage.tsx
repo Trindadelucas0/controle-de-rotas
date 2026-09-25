@@ -35,7 +35,7 @@ import {
 } from '@/lib/use-mark-customer-landmark';
 import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
 import { toDateInputValue } from '@/lib/ops-labels';
-import { cartoDarkRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
+import { cartoDarkRasterStyle, cartoTransformRequest, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import {
   bearingDegrees,
   formatRegionKm,
@@ -1505,6 +1505,7 @@ export function FieldNavigatePage() {
           ref={mapRef}
           initialViewState={initialView}
           mapStyle={cartoDarkRasterStyle}
+          transformRequest={cartoTransformRequest}
           style={{ width: '100%', height: '100%' }}
           attributionControl={false}
           onLoad={() => {

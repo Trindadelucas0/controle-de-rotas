@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import Map, { Layer, Marker, NavigationControl, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { osmRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
+import { cartoTransformRequest, osmRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import { LivePositionMarker, type LiveMarkerKind } from '@/components/map/LivePositionMarker';
 import { useSmoothedLngLat } from '@/hooks/useSmoothedLngLat';
 
@@ -77,6 +77,7 @@ export function StartRoutePreviewMap({ gps, stops, markerKind }: StartRoutePrevi
         ref={mapRef}
         initialViewState={initialView}
         mapStyle={osmRasterStyle}
+        transformRequest={cartoTransformRequest}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
       >

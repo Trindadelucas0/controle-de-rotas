@@ -1,53 +1,12 @@
-const CARTO_SUBDOMAINS = ['a', 'b', 'c', 'd'] as const;
+import type { RequestTransformFunction } from 'maplibre-gl';
 
-/** Chave pública de cota dos basemaps CARTO (visível no Network das tiles). */
-function cartoTileUrls(style: 'dark_all' | 'voyager'): string[] {
-  const key = process.env.NEXT_PUBLIC_CARTO_BASEMAPS_KEY?.trim();
-  const qs = key ? `?key=${encodeURIComponent(key)}` : '';
-  return CARTO_SUBDOMAINS.map(
-    (s) => `https://${s}.basemaps.cartocdn.com/rastertiles/${style}/{z}/{x}/{y}.png${qs}`,
-  );
-}
+const CARTO_KEY = process.env.NEXT_PUBLIC_CARTO_BASEMAPS_KEY?.trim() ?? '';
 
-/** Menta — somente polyline / glow de rota. */
-export const ROUTE_LINE = '#2EE6C7';
-export const ROUTE_GLOW = '#2EE6C7';
-/** Trilha GPS real (congelada) — âmbar, distinta do plano. */
-export const ROUTE_EXECUTED_LINE = '#F5A524';
-export const ROUTE_EXECUTED_GLOW = '#F5A524';
+/** Estilo MapLibre — CARTO Dark Matter vetorial. */
+export const osmRasterStyle = 'https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json';
 
-function buildRasterStyle(style: 'dark_all' | 'voyager', background: string) {
-  return {
-    version: 8 as const,
-    sources: {
-      osm: {
-        type: 'raster' as const,
-        tiles: cartoTileUrls(style),
-        tileSize: 256,
-        attribution: '© OpenStreetMap © CARTO',
-        maxzoom: 20,
-      },
-    },
-    layers: [
-      {
-        id: 'background',
-        type: 'background' as const,
-        paint: { 'background-color': background },
-      },
-      {
-        id: 'osm',
-        type: 'raster' as const,
-        source: 'osm',
-      },
-    ],
-  };
-}
-
-/** Estilo MapLibre v8 — CARTO Dark Matter. */
-export const osmRasterStyle = buildRasterStyle('dark_all', '#0d0d0d');
-
-/** Estilo claro — CARTO Voyager. */
-export const osmLightRasterStyle = buildRasterStyle('voyager', '#f4f4f5');
+/** Estilo claro — CARTO Voyager vetorial. */
+export const osmLightRasterStyle = 'https://basemaps.cartocdn.com/gl/voyager-gl-style/style.json';
 
 /**
  * Navegação GPS — mesmo Dark Matter (campo permanece escuro).
@@ -57,6 +16,22 @@ export const cartoDarkRasterStyle = osmRasterStyle;
 export function getRasterStyleForTheme(theme: 'dark' | 'light') {
   return theme === 'light' ? osmLightRasterStyle : osmRasterStyle;
 }
+
+/** Acrescenta a chave pública de cota em pedidos cartocdn.com. */
+export const cartoTransformRequest: RequestTransformFunction = (url) => {
+  if (!CARTO_KEY) return { url };
+  if (!url.includes('cartocdn.com')) return { url };
+  if (/[?&]key=/.test(url)) return { url };
+  const sep = url.includes('?') ? '&' : '?';
+  return { url: `${url}${sep}key=${encodeURIComponent(CARTO_KEY)}` };
+};
+
+/** Menta — somente polyline / glow de rota. */
+export const ROUTE_LINE = '#2EE6C7';
+export const ROUTE_GLOW = '#2EE6C7';
+/** Trilha GPS real (congelada) — âmbar, distinta do plano. */
+export const ROUTE_EXECUTED_LINE = '#F5A524';
+export const ROUTE_EXECUTED_GLOW = '#F5A524';
 
 export type MapCustomerPin = {
   id: string;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react';
 import Map, { Layer, Marker, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { osmRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
+import { cartoTransformRequest, osmRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import { parseGeometryJson, type LngLat } from '@/lib/nav-geometry';
 
 type PreviewStop = {
@@ -85,6 +85,7 @@ export function FieldRoutePreviewMap({ geometryJson, stops }: FieldRoutePreviewM
         ref={mapRef}
         initialViewState={initialView}
         mapStyle={osmRasterStyle}
+        transformRequest={cartoTransformRequest}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
         scrollZoom={false}

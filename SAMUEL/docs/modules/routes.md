@@ -386,7 +386,7 @@ Formato interno de `plannedStepsJson`:
   - **422** `EMPLOYEE_NOT_DISPATCHABLE` / `VEHICLE_NOT_AVAILABLE`
   - **404** `VEHICLE_NOT_FOUND`
 - Side effects: cliente placeholder `recordSessionShell` (nome interno, sem pin); OS “Gravar acesso {data}”; visita no pin da empresa
-- Como testar: `/routes` aba Gravar cliente → Publicar → Minha rota do funcionário mostra **Gravar acesso**
+- Como testar: `/routes` aba Gravar cliente → no celular o botão fica acima da barra inferior → Publicar → Minha rota do funcionário mostra **Gravar acesso**
 
 ## Endpoint POST /api/v1/routes/dispatch-region-mission
 

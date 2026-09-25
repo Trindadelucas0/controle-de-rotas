@@ -12,7 +12,7 @@ import type { MapLayerMouseEvent, MapRef, MarkerDragEvent } from 'react-map-gl/m
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { useSessionUser } from '@/lib/session-context';
-import { getRasterStyleForTheme } from '@/lib/map-style';
+import { cartoTransformRequest, getRasterStyleForTheme } from '@/lib/map-style';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { ActionButton } from '@/components/ui/ActionButton';
@@ -286,6 +286,7 @@ export function RoutesPlannerRegionMission() {
           ref={mapRef}
           initialViewState={BRASIL}
           mapStyle={mapStyle}
+          transformRequest={cartoTransformRequest}
           style={{ width: '100%', height: '100%' }}
           attributionControl
           onLoad={handleMapLoad}

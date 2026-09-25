@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.21.2 — 2026-09-25
+
+### Fix — Publicar missão de gravar coberta pela barra no PWA
+
+- Sintoma: em `/routes` Planejador → Gravar, no celular o botão **Publicar missão de gravar** ficava atrás da bottom nav; o toque não chegava nele
+- Causa: o `ActionButton` estava no fluxo do card, abaixo da faixa coberta por `AppBottomNav` (`fixed` `z-40`)
+- Correção: `RoutesPlannerRecordMission` envolve o botão com `MobileActionBar` (sticky acima da nav, mesmo padrão dos CRUDs)
+- Como validar: PWA ou viewport &lt; 768px, escolher funcionário e veículo; o botão fica visível acima de Início/Agenda/Mapa/Rotas/Mais e publica
+
+## v0.21.1 — 2026-09-24
+
+### Fix — mapa vazio no zoom (ruas)
+
+- Sintoma: ao dar zoom o fundo some (sem rua, sem região); só a cor de fundo
+- Causa: estilo raster PNG (`rastertiles/dark_all` / `voyager`) pedia um arquivo novo a cada nível; enquanto o PNG não chegava o canvas ficava liso
+- Correção: `map-style.ts` usa os estilos vetoriais CARTO (`dark-matter-gl-style` / `voyager-gl-style`); `cartoTransformRequest` acrescenta `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` nos pedidos `cartocdn.com`
+- Como validar: `/map` e `/field/navigate` — zoom várias vezes; ruas continuam visíveis
+
 ## v0.21.0 — 2026-09-22
 
 ### PWA mobile-first (chrome app-like)

@@ -44,7 +44,7 @@ Resumo compacto no trilho (total, em rota, parado, offline, available se >0, inS
 
 ### 6. Estados / permissões / poll
 
-Iguais à v0.9: loading pins, empty seleção, live fail silencioso, poll 3s / snapshot 15s. Live `presence: stale` (>30 s sem update) deixa o carro mais apagado. Criar OS só ADMIN/MANAGER (PLATFORM_ADMIN herda). Tema claro usa basemap Voyager.
+Iguais à v0.9: loading pins, empty seleção, live fail silencioso, poll 3s / snapshot 15s. Live `presence: stale` (>30 s sem update) deixa o carro mais apagado. Criar OS só ADMIN/MANAGER (PLATFORM_ADMIN herda). Tema claro usa basemap Voyager vetorial; escuro usa Dark Matter vetorial.
 
 ### 7. Fora de escopo
 

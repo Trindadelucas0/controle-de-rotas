@@ -18,7 +18,7 @@
 
 **Dev origins:** `next.config.js` inclui `localhost`, `127.0.0.1`, `[::1]` e IPs da LAN em `allowedDevOrigins`. Sem isso o Next 15 bloqueia `/_next/*` e o browser mostra “Application error: a client-side exception…”.
 
-**Mapa (CARTO Voyager):** defina `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` em `apps/web/.env.local` (chave do e-mail CARTO Basemaps). Sem ela o mapa carrega com watermark “API KEY REQUIRED”. Depois de gravar a env, **reinicie** `npm run dev` e faça hard refresh (CDN/browser cacheiam tiles antigos).
+**Mapa (CARTO vetorial):** defina `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` em `apps/web/.env.local` (chave do e-mail CARTO Basemaps). Sem ela o pedido ao CDN sai sem `key`. Depois de gravar a env, **reinicie** `npm run dev` e faça hard refresh.
 
 ## Um comando
 
@@ -148,6 +148,6 @@ pm2 save
 
 Público: `https://rotas.avadesk.com.br` (túnel → `http://localhost:3468`). Login seed: `admin@demo.local` / `ChangeMe123!`. `COOKIE_SECURE=true`; `CORS_ORIGIN` no servidor aponta para esse hostname.
 
-Mapa: `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` em `apps/web/.env.local` **no servidor**, depois `API_PROXY_TARGET=http://127.0.0.1:3469 npm run web:build` e `pm2 restart analise-web`. Sem a chave no build, as tiles CARTO mostram “API KEY REQUIRED”.
+Mapa: `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` em `apps/web/.env.local` **no servidor**, depois `API_PROXY_TARGET=http://127.0.0.1:3469 npm run web:build` e `pm2 restart analise-web`. Sem a chave no build, os tiles vetoriais CARTO saem sem `key`.
 
 Túnel: o Cloudflare manda `Host: localhost:3468`. O middleware lê `x-forwarded-host` para redirects HTTPS em `rotas.avadesk.com.br` (não `https://localhost:3468/login`).

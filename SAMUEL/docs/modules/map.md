@@ -1,6 +1,6 @@
 # Módulo — Mapa
 
-Mapa operacional do Rotas: **MapLibre GL JS** + tiles raster **CARTO Voyager** (`NEXT_PUBLIC_CARTO_BASEMAPS_KEY`) + **PostGIS** (Docker). Attribution: © OpenStreetMap © CARTO.
+Mapa operacional do Rotas: **MapLibre GL JS** + estilo vetorial **CARTO** Dark Matter (escuro) / Voyager (claro) (`NEXT_PUBLIC_CARTO_BASEMAPS_KEY`, `cartoTransformRequest`) + **PostGIS** (Docker). Attribution: © OpenStreetMap © CARTO.
 
 ## Endpoints
 

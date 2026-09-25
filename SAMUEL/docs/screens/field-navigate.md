@@ -67,7 +67,7 @@ Sem GPS: banner âmbar “Localização necessária” só para HTTP inseguro, p
 
 Banner “Recalculando…” enquanto a API responde; durante o recálculo / fora da rota **não** pinta a geometria velha (U-turn) — mostra conector GPS → próxima parada. Em erro, mantém o conector e mostra a mensagem.
 
-**Mapa:** tiles CARTO Dark Matter (`dark_all`) com `?key=` via `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` (não OSM.org). **Com GPS:** no 1º fix (ou se o GPS já existir no `onLoad`) a câmera faz `jumpTo` **direto no carro** em zoom ~16 (look-ahead); follow ligado por padrão e acompanha o **ícone interpolado**; overview da rota inteira **não** compete com o follow. Pinça de zoom desliga follow (o GPS não força zoom 15 de volta). **Sem GPS:** `fitBounds` na rota ao carregar (evita tela preta); missão Gravar região enquadra o círculo. Sem a env, a CARTO desenha watermark “API KEY REQUIRED”.
+**Mapa:** estilo vetorial CARTO Dark Matter (`dark-matter-gl-style`) com `?key=` via `NEXT_PUBLIC_CARTO_BASEMAPS_KEY` e `cartoTransformRequest` (não OSM.org, não PNG `dark_all`). **Com GPS:** no 1º fix (ou se o GPS já existir no `onLoad`) a câmera faz `jumpTo` **direto no carro** em zoom ~16 (look-ahead); follow ligado por padrão e acompanha o **ícone interpolado**; overview da rota inteira **não** compete com o follow. Pinça de zoom desliga follow (o GPS não força zoom 15 de volta). **Sem GPS:** `fitBounds` na rota ao carregar (evita tela preta); missão Gravar região enquadra o círculo. Sem a env, os pedidos ao CDN saem sem chave.
 
 Botão **Centralizar** (alvo): ancorado **acima** do bloco inferior (marcos opcionais + HUD), alinhado à coluna `max-w-md`; sobe junto quando os chips de marco aparecem.
 

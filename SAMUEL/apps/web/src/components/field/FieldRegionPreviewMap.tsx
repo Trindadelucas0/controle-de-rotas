@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import Map, { Layer, Marker, ScaleControl, Source } from 'react-map-gl/maplibre';
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { osmRasterStyle } from '@/lib/map-style';
+import { cartoTransformRequest, osmRasterStyle } from '@/lib/map-style';
 import { regionCircleBounds, regionCirclePolygon } from '@/lib/region-circle';
 
 type FieldRegionPreviewMapProps = {
@@ -37,6 +37,7 @@ export function FieldRegionPreviewMap({
         ref={mapRef}
         initialViewState={{ latitude, longitude, zoom: 11 }}
         mapStyle={osmRasterStyle}
+        transformRequest={cartoTransformRequest}
         style={{ width: '100%', height: '100%' }}
         attributionControl={false}
         scrollZoom={false}

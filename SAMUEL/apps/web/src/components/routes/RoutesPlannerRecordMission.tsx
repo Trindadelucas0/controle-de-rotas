@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { apiFetch, ApiError } from '@/lib/api-client';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { ActionButton } from '@/components/ui/ActionButton';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 
 type EmployeeOption = { id: string; name: string; status?: string; userId?: string | null };
 type VehicleOption = { id: string; plate: string; status?: string };
@@ -135,14 +136,17 @@ export function RoutesPlannerRecordMission({ companyName }: Props) {
         </select>
       </label>
 
-      <ActionButton
-        type="button"
-        loading={publishing}
-        disabled={!employeeId || !vehicleId}
-        onClick={() => void publish()}
-      >
-        Publicar missão de gravar
-      </ActionButton>
+      <MobileActionBar>
+        <ActionButton
+          type="button"
+          loading={publishing}
+          disabled={!employeeId || !vehicleId}
+          onClick={() => void publish()}
+          className="w-full justify-center"
+        >
+          Publicar missão de gravar
+        </ActionButton>
+      </MobileActionBar>
     </div>
   );
 }

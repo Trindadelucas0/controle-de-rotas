@@ -195,7 +195,7 @@ No celular, o menu fica atrás do **☰**. No computador, à esquerda.
 **Quem:** ADMIN/MANAGER publica; EMPLOYEE executa.
 
 - [ ] **Rotas → Planejador → Gravar cliente**.
-- [ ] Data de hoje, funcionário com login, veículo. **Publicar missão de gravar**.
+- [ ] Data de hoje, funcionário com login, veículo. No celular, **Publicar missão de gravar** fica acima da barra inferior. Publicar.
 - [ ] Aba **Rotas de hoje**: card **Gravar acesso** (não “Sessão de gravação”).
 - [ ] Login EMPLOYEE → **Campo** → **▶ Iniciar gravação** → Play (km + foto).
 - [ ] Navegação: título **GRAVAR**. Sem GPS, **Adicionar ponto** fica desabilitado.

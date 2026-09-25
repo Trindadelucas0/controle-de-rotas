@@ -15,7 +15,7 @@ apps/web (Next.js PWA + MapLibre)  --credentials-->  apps/api (NestJS MVC)
 | Camada | Tecnologia |
 | --- | --- |
 | Web | Next.js 15, React, TypeScript, Tailwind, PWA |
-| Mapa | **MapLibre GL JS** + raster CARTO Voyager (`NEXT_PUBLIC_CARTO_BASEMAPS_KEY`) |
+| Mapa | **MapLibre GL JS** + CARTO vetorial Dark Matter / Voyager (`NEXT_PUBLIC_CARTO_BASEMAPS_KEY`) |
 | Rotas | **OSRM** (`OSRM_URL` no backend) + fallback geodésico |
 | API | NestJS MVC + Prisma |
 | Banco | **PostGIS** via Docker `postgis/postgis:16-3.5` (host 5433) |

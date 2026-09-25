@@ -4,7 +4,7 @@ import { useEffect, useRef } from 'react';
 import Map, { Marker, NavigationControl } from 'react-map-gl/maplibre';
 import type { MapRef, MapLayerMouseEvent, MarkerDragEvent } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
-import { getRasterStyleForTheme } from '@/lib/map-style';
+import { cartoTransformRequest, getRasterStyleForTheme } from '@/lib/map-style';
 import { useTheme } from '@/components/theme/ThemeProvider';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 3.8 };
@@ -120,6 +120,7 @@ export function CustomerLocationMap({
               : BRASIL
           }
           mapStyle={mapStyle}
+          transformRequest={cartoTransformRequest}
           style={{ width: '100%', height: '100%' }}
           attributionControl
           onLoad={resizeMap}
