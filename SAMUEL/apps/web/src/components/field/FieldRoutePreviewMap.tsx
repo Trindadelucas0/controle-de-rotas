@@ -6,6 +6,7 @@ import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { cartoTransformRequest, osmRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import { parseGeometryJson, type LngLat } from '@/lib/nav-geometry';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 
 type PreviewStop = {
   id: string;
@@ -97,6 +98,7 @@ export function FieldRoutePreviewMap({ geometryJson, stops }: FieldRoutePreviewM
         keyboard={false}
         onLoad={fitPreview}
       >
+        <CustomerRegionCircles />
         {geojson ? (
           <Source id="preview-route" type="geojson" data={geojson}>
             <Layer

@@ -34,6 +34,7 @@ import {
   type CreatedCustomerLandmark,
 } from '@/lib/use-mark-customer-landmark';
 import { FieldLandmarkButtons } from '@/components/field/FieldLandmarkButtons';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 import { toDateInputValue } from '@/lib/ops-labels';
 import { cartoDarkRasterStyle, cartoTransformRequest, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import {
@@ -1552,6 +1553,7 @@ export function FieldNavigatePage() {
             setSelectedLandmarkId(null);
           }}
         >
+          <CustomerRegionCircles />
           {regionMission ? (
             <ScaleControl position="bottom-left" unit="metric" maxWidth={100} />
           ) : null}

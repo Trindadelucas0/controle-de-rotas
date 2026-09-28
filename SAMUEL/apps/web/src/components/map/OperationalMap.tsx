@@ -24,6 +24,7 @@ import {
 import { parseGeometryJson, type LngLat } from '@/lib/nav-geometry';
 import { LiveVehicleMarker, type OpsLiveVehicle } from '@/components/map/LiveVehicleMarker';
 import { LandmarkMapMarker } from '@/components/map/LandmarkMapMarker';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 4 };
 const LIVE_POLL_MS = 3_000;
@@ -1123,6 +1124,7 @@ export function OperationalMap() {
             }}
           >
             <NavigationControl position="bottom-right" />
+            <CustomerRegionCircles />
 
             {showRouteLayer && routeGeoJson ? (
               <Source id="admin-live-route" type="geojson" data={routeGeoJson}>

@@ -6,6 +6,7 @@ import MapLibreMap, { Layer, Marker, NavigationControl, Source } from 'react-map
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 import { useSessionUser } from '@/lib/session-context';
 import { cartoTransformRequest, osmRasterStyle } from '@/lib/map-style';
 import { VISIT_STATUS_LABELS, addDaysYmd, labelOf, toDateInputValue } from '@/lib/ops-labels';
@@ -639,6 +640,7 @@ export function RoutesPlannerVisits({ company }: Props) {
           attributionControl
         >
           <NavigationControl position="bottom-right" />
+          <CustomerRegionCircles />
           {geojson ? (
             <Source id="route-line" type="geojson" data={geojson}>
               <Layer

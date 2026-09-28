@@ -122,11 +122,12 @@ PageHeader + EntityContextPanel
 | Latitude / Longitude | sim (pin) | digitação ou mapa; sincronizados |
 | Endereço (rua…) | não | geocode opcional |
 | Rua, Número, Complemento, Bairro, Cidade, UF | não | |
-| Local no mapa | **sim** | view: pin fixo; edit: clique/arraste |
+| Local no mapa | **sim** | view: pin fixo; edit: clique/arraste; círculos das regiões salvas |
+| Região do cliente | não | Sem região, região já cadastrada, ou Criar nova (nome + raio 0,5–50 km; centro = pin). Nome repetido bloqueia o Salvar |
 | Categoria, Prioridade, Observações | não | |
 | Status | ACTIVE / INACTIVE | |
 
-Erro sem pin: “Marque o local no mapa…”
+Erro sem pin: “Marque o local no mapa…”. Criar região nova sem pin: “Marque o pin do cliente para criar a região.” Nome de região já usado: mensagem sob o nome, cliente não grava. Ficha mostra **Região** com nome e km.
 
 ### 4. KPI / totais
 

@@ -14,8 +14,8 @@ import { apiFetch, ApiError } from '@/lib/api-client';
 import { useSessionUser } from '@/lib/session-context';
 import { cartoTransformRequest, getRasterStyleForTheme } from '@/lib/map-style';
 import { useTheme } from '@/components/theme/ThemeProvider';
-import { toDateInputValue } from '@/lib/ops-labels';
 import { ActionButton } from '@/components/ui/ActionButton';
+import { CustomerRegionCircles, type CustomerRegionPin } from '@/components/map/CustomerRegionCircles';
 import {
   DEFAULT_REGION_RADIUS_METERS,
   formatRegionKm,
@@ -25,8 +25,6 @@ import {
   regionCirclePolygon,
 } from '@/lib/region-circle';
 
-type EmployeeOption = { id: string; name: string; status?: string; userId?: string | null };
-type VehicleOption = { id: string; plate: string; status?: string };
 type NearbyPin = { id: string; name: string; latitude: number; longitude: number };
 type AddressSuggestion = { label: string; latitude: number; longitude: number };
 type AddressHint = 'idle' | 'loading' | 'ok' | 'not_found' | 'error' | 'rate_limit';
@@ -41,6 +39,10 @@ function addressHintMessage(hint: AddressHint): string | null {
   return null;
 }
 
+function sliderRadius(meters: number): number {
+  return Math.min(MAX_REGION_RADIUS_METERS, Math.max(MIN_REGION_RADIUS_METERS, meters));
+}
+
 export function RoutesPlannerRegionMission() {
   const user = useSessionUser();
   const { theme } = useTheme();
@@ -51,62 +53,64 @@ export function RoutesPlannerRegionMission() {
   const addressAbort = useRef<AbortController | null>(null);
   const appliedLabelRef = useRef<string | null>(null);
 
-  const canPublish =
-    user?.role === 'ADMIN' || user?.role === 'PLATFORM_ADMIN' || user?.role === 'MANAGER';
+  const canSave =
+    user?.role === 'ADMIN' ||
+    user?.role === 'PLATFORM_ADMIN' ||
+    user?.role === 'MANAGER' ||
+    user?.role === 'SUPERVISOR';
 
-  const [employees, setEmployees] = useState<EmployeeOption[]>([]);
-  const [vehicles, setVehicles] = useState<VehicleOption[]>([]);
-  const [employeeId, setEmployeeId] = useState('');
-  const [vehicleId, setVehicleId] = useState('');
-  const [routeDate, setRouteDate] = useState(() => toDateInputValue());
+  const [regions, setRegions] = useState<CustomerRegionPin[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
   const [radiusMeters, setRadiusMeters] = useState(DEFAULT_REGION_RADIUS_METERS);
+  const [storedRadiusMeters, setStoredRadiusMeters] = useState<number | null>(null);
   const [regionName, setRegionName] = useState('');
-  const [nameTouched, setNameTouched] = useState(false);
   const [addressQ, setAddressQ] = useState('');
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [addressHint, setAddressHint] = useState<AddressHint>('idle');
   const [nearby, setNearby] = useState<NearbyPin[]>([]);
   const [loading, setLoading] = useState(true);
-  const [publishing, setPublishing] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   const hasCenter = latitude != null && longitude != null;
-  const defaultName = `Raio ${formatRegionKm(radiusMeters)}`;
   radiusMetersRef.current = radiusMeters;
   const addressMsg = addressHintMessage(addressHint);
+  const kmValue = radiusMeters / 1000;
 
   const circle = useMemo(() => {
     if (!hasCenter) return null;
     return regionCirclePolygon(latitude!, longitude!, radiusMeters);
   }, [hasCenter, latitude, longitude, radiusMeters]);
 
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [e, v] = await Promise.all([
-        apiFetch<{ employees: EmployeeOption[] }>('/api/v1/employees?status=ACTIVE'),
-        apiFetch<{ vehicles: VehicleOption[] }>('/api/v1/vehicles'),
-      ]);
-      setEmployees(
-        e.employees.filter((x) => (!x.status || x.status === 'ACTIVE') && Boolean(x.userId)),
-      );
-      setVehicles(
-        v.vehicles.filter((x) => !x.status || x.status === 'AVAILABLE' || x.status === 'IN_USE'),
-      );
-      setError(null);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Falha ao carregar funcionários/veículos');
-    } finally {
-      setLoading(false);
-    }
+  const loadRegions = useCallback(async () => {
+    const r = await apiFetch<{ regions: CustomerRegionPin[] }>('/api/v1/customer-regions');
+    setRegions(r.regions ?? []);
+    return r.regions ?? [];
   }, []);
 
   useEffect(() => {
-    void load();
-  }, [load]);
+    let cancelled = false;
+    setLoading(true);
+    loadRegions()
+      .then(() => {
+        if (!cancelled) setError(null);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(err instanceof ApiError ? err.message : 'Falha ao carregar regiões');
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadRegions]);
 
   useEffect(() => {
     const el = containerRef.current;
@@ -127,16 +131,6 @@ export function RoutesPlannerRegionMission() {
     });
   }, []);
 
-  const resetMapToBrasil = useCallback(() => {
-    const map = mapRef.current;
-    if (!map) return;
-    map.getMap()?.resize();
-    map.jumpTo({
-      center: [BRASIL.longitude, BRASIL.latitude],
-      zoom: BRASIL.zoom,
-    });
-  }, []);
-
   useEffect(() => {
     if (!hasCenter || !mapRef.current) return;
     fitMapToCenter(latitude!, longitude!);
@@ -147,9 +141,10 @@ export function RoutesPlannerRegionMission() {
       setNearby([]);
       return;
     }
+    const queryRadius = Math.min(radiusMeters, MAX_REGION_RADIUS_METERS);
     const t = window.setTimeout(() => {
       void apiFetch<{ customers: NearbyPin[] }>(
-        `/api/v1/map/customers/nearby?lat=${encodeURIComponent(String(latitude))}&lng=${encodeURIComponent(String(longitude))}&radiusMeters=${encodeURIComponent(String(radiusMeters))}`,
+        `/api/v1/map/customers/nearby?lat=${encodeURIComponent(String(latitude))}&lng=${encodeURIComponent(String(longitude))}&radiusMeters=${encodeURIComponent(String(queryRadius))}`,
       )
         .then((r) => setNearby(r.customers ?? []))
         .catch(() => setNearby([]));
@@ -210,22 +205,29 @@ export function RoutesPlannerRegionMission() {
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  function resetForm() {
-    appliedLabelRef.current = null;
-    addressAbort.current?.abort();
+  function startNew() {
+    setSelectedId(null);
+    setStoredRadiusMeters(null);
+    setRegionName('');
     setLatitude(null);
     setLongitude(null);
+    setRadiusMeters(DEFAULT_REGION_RADIUS_METERS);
     setAddressQ('');
     setSuggestions([]);
-    setNearby([]);
-    setAddressHint('idle');
-    setRadiusMeters(DEFAULT_REGION_RADIUS_METERS);
-    setRegionName('');
-    setNameTouched(false);
-    setEmployeeId('');
-    setVehicleId('');
     setError(null);
-    resetMapToBrasil();
+    setMsg(null);
+  }
+
+  function selectRegion(region: CustomerRegionPin) {
+    setSelectedId(region.id);
+    setRegionName(region.name);
+    setLatitude(region.latitude);
+    setLongitude(region.longitude);
+    setRadiusMeters(sliderRadius(region.radiusMeters));
+    setStoredRadiusMeters(region.radiusMeters);
+    setError(null);
+    setMsg(null);
+    fitMapToCenter(region.latitude, region.longitude);
   }
 
   function handleClick(e: MapLayerMouseEvent) {
@@ -243,34 +245,71 @@ export function RoutesPlannerRegionMission() {
     }
   }
 
-  async function publish() {
-    if (!canPublish || !employeeId || !vehicleId || !hasCenter || publishing) return;
-    setPublishing(true);
+  async function save() {
+    if (!canSave || saving) return;
+    const name = regionName.trim();
+    if (!name) {
+      setError('Informe o nome da região.');
+      return;
+    }
+    if (!hasCenter) {
+      setError('Clique no mapa ou busque um endereço para definir o centro.');
+      return;
+    }
+    setSaving(true);
     setError(null);
     setMsg(null);
+    const body = {
+      name,
+      latitude,
+      longitude,
+      radiusMeters,
+    };
     try {
-      await apiFetch('/api/v1/routes/dispatch-region-mission', {
-        method: 'POST',
-        body: JSON.stringify({
-          date: routeDate,
-          employeeId,
-          vehicleId,
-          latitude,
-          longitude,
-          radiusMeters,
-          regionName: (nameTouched ? regionName : defaultName).trim() || undefined,
-        }),
+      const path = selectedId
+        ? `/api/v1/customer-regions/${selectedId}`
+        : '/api/v1/customer-regions';
+      const r = await apiFetch<{ region: CustomerRegionPin }>(path, {
+        method: selectedId ? 'PATCH' : 'POST',
+        body: JSON.stringify(body),
       });
-      setMsg('Missão de gravar região publicada. O funcionário vê a área em Minha rota.');
-      resetForm();
+      const list = await loadRegions();
+      const saved = list.find((item) => item.id === r.region.id) ?? r.region;
+      setSelectedId(saved.id);
+      setRegionName(saved.name);
+      setStoredRadiusMeters(saved.radiusMeters);
+      setRadiusMeters(sliderRadius(saved.radiusMeters));
+      setReloadToken((n) => n + 1);
+      setMsg(
+        saved.radiusMeters > radiusMeters
+          ? `Região salva. O raio ficou em ${formatRegionKm(saved.radiusMeters)} para cobrir os clientes.`
+          : 'Região salva. O círculo permanece no mapa.',
+      );
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Falha ao publicar missão');
+      setError(err instanceof ApiError ? err.message : 'Falha ao salvar região');
     } finally {
-      setPublishing(false);
+      setSaving(false);
     }
   }
 
-  const kmValue = radiusMeters / 1000;
+  async function remove() {
+    if (!canSave || !selectedId || saving) return;
+    if (!window.confirm('Excluir esta região? Os clientes ficam sem região.')) return;
+    setSaving(true);
+    setError(null);
+    setMsg(null);
+    try {
+      await apiFetch(`/api/v1/customer-regions/${selectedId}`, { method: 'DELETE' });
+      await loadRegions();
+      setReloadToken((n) => n + 1);
+      startNew();
+      setMsg('Região excluída. Os clientes ficaram sem região.');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Falha ao excluir região');
+    } finally {
+      setSaving(false);
+    }
+  }
 
   if (loading) {
     return <div className="h-40 animate-pulse rounded-2xl bg-surface" />;
@@ -290,24 +329,26 @@ export function RoutesPlannerRegionMission() {
           style={{ width: '100%', height: '100%' }}
           attributionControl
           onLoad={handleMapLoad}
-          onClick={handleClick}
-          cursor="crosshair"
+          onClick={canSave ? handleClick : undefined}
+          cursor={canSave ? 'crosshair' : 'grab'}
         >
           <NavigationControl position="bottom-right" />
           <ScaleControl position="bottom-left" unit="metric" maxWidth={120} />
+          <CustomerRegionCircles reloadToken={reloadToken} />
           {circle ? (
-            <Source id="region-circle" type="geojson" data={circle}>
+            <Source id="region-draft" type="geojson" data={circle}>
               <Layer
-                id="region-circle-fill"
+                id="region-draft-fill"
                 type="fill"
                 paint={{ 'fill-color': '#FF5722', 'fill-opacity': 0.14 }}
               />
               <Layer
-                id="region-circle-line"
+                id="region-draft-line"
                 type="line"
                 paint={{
                   'line-color': '#FF5722',
                   'line-width': 2,
+                  'line-dasharray': [2, 1],
                   'line-opacity': 0.95,
                 }}
               />
@@ -346,7 +387,7 @@ export function RoutesPlannerRegionMission() {
               latitude={latitude!}
               longitude={longitude!}
               anchor="bottom"
-              draggable
+              draggable={canSave}
               onDragEnd={handleDragEnd}
             >
               <div
@@ -360,11 +401,10 @@ export function RoutesPlannerRegionMission() {
 
       <aside className="ops-surface order-2 flex w-full shrink-0 flex-col gap-3 overflow-auto rounded-[10px] p-4 lg:order-1 lg:w-[26rem]">
         <div>
-          <h2 className="text-lg font-semibold text-brand-900">Gravar região</h2>
+          <h2 className="text-lg font-semibold text-brand-900">Região</h2>
           <p className="mt-1 text-sm text-[var(--muted)]">
-            Clique no mapa ou busque um endereço para o centro. Raio padrão 5 km. O funcionário
-            grava pontos como na missão Gravar cliente. Clientes já no círculo só aparecem no mapa
-            (não viram paradas).
+            Marque o pin e o raio. A região fica no mapa. No cadastro do cliente, escolha essa
+            região. Se o cliente cair fora, o km aumenta até o pin dele.
           </p>
         </div>
 
@@ -376,6 +416,38 @@ export function RoutesPlannerRegionMission() {
         {msg ? (
           <p className="rounded-[8px] bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{msg}</p>
         ) : null}
+
+        <div>
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <span className="text-sm font-medium text-brand-900">Regiões salvas</span>
+            {canSave ? (
+              <button type="button" className="text-xs font-medium text-brand-700 underline" onClick={startNew}>
+                Nova região
+              </button>
+            ) : null}
+          </div>
+          {regions.length === 0 ? (
+            <p className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
+              Nenhuma região
+            </p>
+          ) : (
+            <ul className="max-h-36 space-y-1 overflow-auto text-sm">
+              {regions.map((region) => (
+                <li key={region.id}>
+                  <button
+                    type="button"
+                    className={`w-full rounded-[6px] px-2 py-1.5 text-left hover:bg-surface ${
+                      selectedId === region.id ? 'bg-surface font-medium text-brand-900' : ''
+                    }`}
+                    onClick={() => selectRegion(region)}
+                  >
+                    {region.name} · {formatRegionKm(region.radiusMeters)}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
 
         {!hasCenter ? (
           <p className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
@@ -405,6 +477,7 @@ export function RoutesPlannerRegionMission() {
             placeholder="Rua, cidade…"
             className="w-full ops-input text-sm"
             autoComplete="off"
+            disabled={!canSave}
           />
         </label>
         {addressMsg && addressHint !== 'ok' ? (
@@ -428,7 +501,7 @@ export function RoutesPlannerRegionMission() {
 
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-brand-900">
-            Raio ({formatRegionKm(radiusMeters)})
+            Raio ({formatRegionKm(storedRadiusMeters != null && storedRadiusMeters > radiusMeters ? storedRadiusMeters : radiusMeters)})
           </span>
           <input
             type="range"
@@ -436,84 +509,58 @@ export function RoutesPlannerRegionMission() {
             max={MAX_REGION_RADIUS_METERS / 1000}
             step={0.5}
             value={kmValue}
-            onChange={(e) => setRadiusMeters(Math.round(Number(e.target.value) * 1000))}
+            onChange={(e) => {
+              setStoredRadiusMeters(null);
+              setRadiusMeters(Math.round(Number(e.target.value) * 1000));
+            }}
             className="w-full"
             aria-valuemin={0.5}
             aria-valuemax={50}
             aria-valuenow={kmValue}
+            disabled={!canSave}
           />
         </label>
+        {storedRadiusMeters != null && storedRadiusMeters > MAX_REGION_RADIUS_METERS ? (
+          <p className="text-xs text-[var(--muted)]">
+            O círculo salvo está em {formatRegionKm(storedRadiusMeters)} porque há cliente fora do
+            slider de 50 km.
+          </p>
+        ) : null}
 
         <label className="block text-sm">
           <span className="mb-1 block font-medium text-brand-900">Nome da região</span>
           <input
             type="text"
             maxLength={200}
-            value={nameTouched ? regionName : defaultName}
-            onChange={(e) => {
-              setNameTouched(true);
-              setRegionName(e.target.value);
-            }}
+            value={regionName}
+            onChange={(e) => setRegionName(e.target.value)}
             className="w-full ops-input text-sm"
+            disabled={!canSave}
           />
         </label>
 
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-brand-900">Data</span>
-          <input
-            type="date"
-            value={routeDate}
-            onChange={(e) => setRouteDate(e.target.value)}
-            className="w-full ops-input text-sm"
-          />
-        </label>
-
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-brand-900">Funcionário</span>
-          <select
-            value={employeeId}
-            onChange={(e) => setEmployeeId(e.target.value)}
-            className="w-full ops-input text-sm"
-          >
-            <option value="">Selecione…</option>
-            {employees.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.name}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-brand-900">Veículo</span>
-          <select
-            value={vehicleId}
-            onChange={(e) => setVehicleId(e.target.value)}
-            className="w-full ops-input text-sm"
-          >
-            <option value="">Selecione…</option>
-            {vehicles.map((v) => (
-              <option key={v.id} value={v.id}>
-                {v.plate}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        {canPublish ? (
-          <ActionButton
-            type="button"
-            loading={publishing}
-            disabled={!employeeId || !vehicleId || !hasCenter}
-            onClick={() => void publish()}
-          >
-            Publicar missão
-          </ActionButton>
-        ) : (
-          <p className="text-xs text-[var(--muted)]">
-            Preview disponível. Publicar exige perfil ADMIN ou MANAGER.
-          </p>
-        )}
+        {canSave ? (
+          <div className="flex flex-wrap gap-2">
+            <ActionButton
+              type="button"
+              loading={saving}
+              disabled={!hasCenter || !regionName.trim()}
+              onClick={() => void save()}
+            >
+              Salvar região
+            </ActionButton>
+            {selectedId ? (
+              <button
+                type="button"
+                className="ops-btn ops-btn-secondary"
+                disabled={saving}
+                onClick={() => void remove()}
+              >
+                Excluir
+              </button>
+            ) : null}
+          </div>
+        ) : null}
       </aside>
     </div>
   );

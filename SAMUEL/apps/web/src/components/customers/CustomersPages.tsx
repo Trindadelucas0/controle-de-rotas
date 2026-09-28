@@ -13,6 +13,12 @@ import {
 } from '@/components/ops/OperationalSummaryStrip';
 import { EntityContextPanel } from '@/components/ops/EntityContextPanel';
 import { formatOpsDate, type CustomerOpsContext, type CustomersSummary } from '@/lib/ops-types';
+import {
+  DEFAULT_REGION_RADIUS_METERS,
+  formatRegionKm,
+  MAX_REGION_RADIUS_METERS,
+  MIN_REGION_RADIUS_METERS,
+} from '@/lib/region-circle';
 
 export type CustomerDto = {
   id: string;
@@ -36,6 +42,13 @@ export type CustomerDto = {
   priority: string | null;
   notes: string | null;
   status: string;
+  customerRegion?: {
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    radiusMeters: number;
+  } | null;
 };
 
 type AddressSuggestion = {
@@ -271,6 +284,14 @@ function CustomerForm({
   const [addressHint, setAddressHint] = useState<LookupHint>('idle');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [regions, setRegions] = useState<NonNullable<CustomerDto['customerRegion']>[]>([]);
+  const [regionMode, setRegionMode] = useState<'none' | 'existing' | 'new'>(
+    initial?.customerRegion?.id ? 'existing' : 'none',
+  );
+  const [regionId, setRegionId] = useState(initial?.customerRegion?.id ?? '');
+  const [newRegionName, setNewRegionName] = useState('');
+  const [newRegionRadius, setNewRegionRadius] = useState(DEFAULT_REGION_RADIUS_METERS);
+  const [regionFieldError, setRegionFieldError] = useState<string | null>(null);
 
   const appliedCnpj = useRef<string | null>(
     initial?.document && digitsOnly(initial.document).length === 14
@@ -508,8 +529,27 @@ function CustomerForm({
     setAddressHint('ok');
   }
 
+  useEffect(() => {
+    apiFetch<{ regions: NonNullable<CustomerDto['customerRegion']>[] }>('/api/v1/customer-regions')
+      .then((r) => setRegions((r.regions ?? []).filter((item): item is NonNullable<CustomerDto['customerRegion']> => item != null)))
+      .catch(() => setRegions([]));
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setRegionFieldError(null);
+    if (regionMode === 'new' && !newRegionName.trim()) {
+      setRegionFieldError('Informe o nome da região.');
+      return;
+    }
+    if (regionMode === 'new' && (latitude == null || longitude == null)) {
+      setRegionFieldError('Marque o pin do cliente para criar a região.');
+      return;
+    }
+    if (regionMode === 'existing' && !regionId) {
+      setRegionFieldError('Selecione a região.');
+      return;
+    }
     if (latitude == null || longitude == null) {
       setError('Marque o local no mapa (clique) ou preencha CEP/endereço para posicionar o pin.');
       return;
@@ -537,9 +577,18 @@ function CustomerForm({
         priority: form.priority.trim() || null,
         notes: form.notes.trim() || null,
         status: form.status,
+        ...(regionMode === 'none' ? { customerRegionId: null } : {}),
+        ...(regionMode === 'existing' ? { customerRegionId: regionId } : {}),
+        ...(regionMode === 'new'
+          ? { newRegion: { name: newRegionName.trim(), radiusMeters: newRegionRadius } }
+          : {}),
       });
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Falha de rede');
+      if (err instanceof ApiError && err.code === 'REGIAO_JA_EXISTE') {
+        setRegionFieldError(err.message);
+      } else {
+        setError(err instanceof ApiError ? err.message : 'Falha de rede');
+      }
     } finally {
       setLoading(false);
     }
@@ -776,7 +825,98 @@ function CustomerForm({
             />
           </label>
         </FieldGrid>
-        <CustomerLocationMap latitude={latitude} longitude={longitude} onPinChange={setPin} />
+        <CustomerLocationMap
+          latitude={latitude}
+          longitude={longitude}
+          onPinChange={setPin}
+          showRegions
+        />
+        <fieldset className="space-y-2">
+          <legend className="ops-label">Região do cliente</legend>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="customer-region"
+              checked={regionMode === 'none'}
+              onChange={() => {
+                setRegionMode('none');
+                setRegionFieldError(null);
+              }}
+            />
+            Sem região
+          </label>
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="customer-region"
+              checked={regionMode === 'existing'}
+              onChange={() => {
+                setRegionMode('existing');
+                setRegionFieldError(null);
+              }}
+            />
+            Região já cadastrada
+          </label>
+          {regionMode === 'existing' ? (
+            <select
+              className="ops-input text-sm"
+              value={regionId}
+              aria-label="Região já cadastrada"
+              onChange={(e) => setRegionId(e.target.value)}
+            >
+              <option value="">Selecione…</option>
+              {regions.map((region) => (
+                <option key={region.id} value={region.id}>
+                  {region.name} · {formatRegionKm(region.radiusMeters)}
+                </option>
+              ))}
+            </select>
+          ) : null}
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="radio"
+              name="customer-region"
+              checked={regionMode === 'new'}
+              onChange={() => {
+                setRegionMode('new');
+                setRegionFieldError(null);
+              }}
+            />
+            Criar nova
+          </label>
+          {regionMode === 'new' ? (
+            <div className="space-y-2 pl-6">
+              <label className="block text-sm">
+                <span className="ops-label">Nome</span>
+                <input
+                  className="ops-input"
+                  maxLength={200}
+                  value={newRegionName}
+                  onChange={(e) => setNewRegionName(e.target.value)}
+                />
+              </label>
+              <label className="block text-sm">
+                <span className="ops-label">Raio ({formatRegionKm(newRegionRadius)})</span>
+                <input
+                  type="range"
+                  min={MIN_REGION_RADIUS_METERS / 1000}
+                  max={MAX_REGION_RADIUS_METERS / 1000}
+                  step={0.5}
+                  value={newRegionRadius / 1000}
+                  onChange={(e) => setNewRegionRadius(Math.round(Number(e.target.value) * 1000))}
+                  className="w-full"
+                  aria-label="Raio da região nova"
+                />
+              </label>
+              <p className="text-xs text-[var(--muted)]">O centro da região nova é o pin do cliente.</p>
+            </div>
+          ) : null}
+          {regionFieldError ? (
+            <p className="text-xs text-[var(--danger)]" role="alert">
+              {regionFieldError}
+            </p>
+          ) : null}
+        </fieldset>
       </FormSection>
 
       <FormSection title="Classificação">
@@ -863,11 +1003,21 @@ function CustomerDetailView({ data }: { data: CustomerDto }) {
             label="Longitude"
             value={data.longitude != null ? String(data.longitude) : null}
           />
+          <DetailItem
+            label="Região"
+            value={
+              data.customerRegion
+                ? `${data.customerRegion.name} · ${formatRegionKm(data.customerRegion.radiusMeters)}`
+                : null
+            }
+            className="sm:col-span-2"
+          />
         </dl>
         <CustomerLocationMap
           latitude={data.latitude}
           longitude={data.longitude}
           readOnly
+          showRegions
           title="Local no mapa"
         />
       </DetailSection>

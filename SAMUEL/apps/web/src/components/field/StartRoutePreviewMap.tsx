@@ -6,6 +6,7 @@ import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { cartoTransformRequest, osmRasterStyle, ROUTE_GLOW, ROUTE_LINE } from '@/lib/map-style';
 import { LivePositionMarker, type LiveMarkerKind } from '@/components/map/LivePositionMarker';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 import { useSmoothedLngLat } from '@/hooks/useSmoothedLngLat';
 
 type PreviewStop = {
@@ -82,6 +83,7 @@ export function StartRoutePreviewMap({ gps, stops, markerKind }: StartRoutePrevi
         attributionControl={false}
       >
         <NavigationControl position="bottom-right" showCompass={false} />
+        <CustomerRegionCircles />
         {routeLine ? (
           <Source id="start-preview-route" type="geojson" data={routeLine}>
             <Layer

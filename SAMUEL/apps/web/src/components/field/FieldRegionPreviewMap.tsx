@@ -6,6 +6,7 @@ import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { cartoTransformRequest, osmRasterStyle } from '@/lib/map-style';
 import { regionCircleBounds, regionCirclePolygon } from '@/lib/region-circle';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 
 type FieldRegionPreviewMapProps = {
   latitude: number;
@@ -57,6 +58,7 @@ export function FieldRegionPreviewMap({
           });
         }}
       >
+        <CustomerRegionCircles />
         <ScaleControl position="bottom-left" unit="metric" maxWidth={80} />
         <Source id="region-circle" type="geojson" data={circle}>
           <Layer

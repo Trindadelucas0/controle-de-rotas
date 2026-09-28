@@ -18,6 +18,7 @@ import { AuthUser } from '../auth/decorators/auth.decorators';
 import { httpError } from '../../common/errors/http-error';
 import { MapService } from '../map/map.service';
 import { PrismaService } from '../../common/prisma/prisma.service';
+import { CustomerRegionsService } from '../customer-regions/customer-regions.service';
 import {
   consolidateTrackingToLineString,
   evaluateAccessReadAuth,
@@ -60,6 +61,7 @@ export class CustomersService {
     private readonly customersRepository: CustomersRepository,
     private readonly mapService: MapService,
     private readonly prisma: PrismaService,
+    private readonly customerRegions: CustomerRegionsService,
   ) {}
 
   async list(user: AuthUser, query: ListCustomersQueryDto) {
@@ -73,32 +75,51 @@ export class CustomersService {
   }
 
   async create(user: AuthUser, dto: CreateCustomerDto) {
+    this.assertRegionWrite(user, dto);
     const latitude = dto.latitude ?? null;
     const longitude = dto.longitude ?? null;
-    const customer = await this.customersRepository.create({
-      company: { connect: { id: user.companyId } },
-      name: dto.name,
-      tradeName: dto.tradeName ?? null,
-      document: dto.document ?? null,
-      phone: dto.phone ?? null,
-      whatsapp: dto.whatsapp ?? null,
-      email: dto.email ?? null,
-      street: dto.street ?? null,
-      number: dto.number ?? null,
-      complement: dto.complement ?? null,
-      district: dto.district ?? null,
-      city: dto.city ?? null,
-      state: dto.state ?? null,
-      zipCode: dto.zipCode ?? null,
-      latitude,
-      longitude,
-      locationStatus: resolveLocationStatus(latitude, longitude),
-      category: dto.category ?? null,
-      priority: dto.priority ?? null,
-      notes: dto.notes ?? null,
-      status: dto.status,
+    return this.prisma.$transaction(async (tx) => {
+      const link = await this.customerRegions.applyCustomerLink(tx, user.companyId, {
+        customerRegionId: dto.customerRegionId,
+        newRegion: dto.newRegion,
+        latitude,
+        longitude,
+      });
+      const customer = await tx.customer.create({
+        data: {
+          company: { connect: { id: user.companyId } },
+          name: dto.name,
+          tradeName: dto.tradeName ?? null,
+          document: dto.document ?? null,
+          phone: dto.phone ?? null,
+          whatsapp: dto.whatsapp ?? null,
+          email: dto.email ?? null,
+          street: dto.street ?? null,
+          number: dto.number ?? null,
+          complement: dto.complement ?? null,
+          district: dto.district ?? null,
+          city: dto.city ?? null,
+          state: dto.state ?? null,
+          zipCode: dto.zipCode ?? null,
+          latitude,
+          longitude,
+          locationStatus: resolveLocationStatus(latitude, longitude),
+          category: dto.category ?? null,
+          priority: dto.priority ?? null,
+          notes: dto.notes ?? null,
+          status: dto.status,
+          ...(link.customerRegionId
+            ? { customerRegion: { connect: { id: link.customerRegionId } } }
+            : {}),
+        },
+        include: {
+          customerRegion: {
+            select: { id: true, name: true, latitude: true, longitude: true, radiusMeters: true },
+          },
+        },
+      });
+      return { customer, regionNotice: link.regionNotice };
     });
-    return { customer };
   }
 
   async getOne(user: AuthUser, id: string) {
@@ -135,6 +156,8 @@ export class CustomersService {
     if (existing.recordSessionShell) {
       throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
     }
+
+    this.assertRegionWrite(user, dto);
 
     if (user.role === UserRole.EMPLOYEE) {
       const employeeId = await this.myEmployeeId(user);
@@ -188,33 +211,85 @@ export class CustomersService {
       nextIncomplete = false;
     }
 
-    const customer = await this.customersRepository.update(id, user.companyId, {
-      ...(dto.name !== undefined ? { name: dto.name } : {}),
-      ...(dto.tradeName !== undefined ? { tradeName: dto.tradeName } : {}),
-      ...(dto.document !== undefined ? { document: dto.document } : {}),
-      ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
-      ...(dto.whatsapp !== undefined ? { whatsapp: dto.whatsapp } : {}),
-      ...(dto.email !== undefined ? { email: dto.email } : {}),
-      ...(dto.street !== undefined ? { street: dto.street } : {}),
-      ...(dto.number !== undefined ? { number: dto.number } : {}),
-      ...(dto.complement !== undefined ? { complement: dto.complement } : {}),
-      ...(dto.district !== undefined ? { district: dto.district } : {}),
-      ...(dto.city !== undefined ? { city: dto.city } : {}),
-      ...(dto.state !== undefined ? { state: dto.state } : {}),
-      ...(dto.zipCode !== undefined ? { zipCode: dto.zipCode } : {}),
-      ...(dto.latitude !== undefined ? { latitude: dto.latitude } : {}),
-      ...(dto.longitude !== undefined ? { longitude: dto.longitude } : {}),
-      ...(locationTouched
-        ? { locationStatus: resolveLocationStatus(latitude, longitude) }
-        : {}),
-      ...(dto.category !== undefined ? { category: dto.category } : {}),
-      ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
-      ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
-      ...(nextStatus !== undefined ? { status: nextStatus } : {}),
-      ...(nextIncomplete !== undefined ? { profileIncomplete: nextIncomplete } : {}),
-    });
+    return this.prisma.$transaction(async (tx) => {
+      const link = await this.customerRegions.applyCustomerLink(tx, user.companyId, {
+        customerRegionId: dto.customerRegionId,
+        newRegion: dto.newRegion,
+        latitude,
+        longitude,
+      });
+      const regionId =
+        link.customerRegionId !== undefined ? link.customerRegionId : existing.customerRegionId;
+      if (regionId && latitude != null && longitude != null) {
+        await this.customerRegions.expandStoredRadius(tx, user.companyId, regionId, {
+          latitude,
+          longitude,
+        });
+      }
 
-    return { customer };
+      const data = {
+        ...(dto.name !== undefined ? { name: dto.name } : {}),
+        ...(dto.tradeName !== undefined ? { tradeName: dto.tradeName } : {}),
+        ...(dto.document !== undefined ? { document: dto.document } : {}),
+        ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
+        ...(dto.whatsapp !== undefined ? { whatsapp: dto.whatsapp } : {}),
+        ...(dto.email !== undefined ? { email: dto.email } : {}),
+        ...(dto.street !== undefined ? { street: dto.street } : {}),
+        ...(dto.number !== undefined ? { number: dto.number } : {}),
+        ...(dto.complement !== undefined ? { complement: dto.complement } : {}),
+        ...(dto.district !== undefined ? { district: dto.district } : {}),
+        ...(dto.city !== undefined ? { city: dto.city } : {}),
+        ...(dto.state !== undefined ? { state: dto.state } : {}),
+        ...(dto.zipCode !== undefined ? { zipCode: dto.zipCode } : {}),
+        ...(dto.latitude !== undefined ? { latitude: dto.latitude } : {}),
+        ...(dto.longitude !== undefined ? { longitude: dto.longitude } : {}),
+        ...(locationTouched
+          ? { locationStatus: resolveLocationStatus(latitude, longitude) }
+          : {}),
+        ...(dto.category !== undefined ? { category: dto.category } : {}),
+        ...(dto.priority !== undefined ? { priority: dto.priority } : {}),
+        ...(dto.notes !== undefined ? { notes: dto.notes } : {}),
+        ...(nextStatus !== undefined ? { status: nextStatus } : {}),
+        ...(nextIncomplete !== undefined ? { profileIncomplete: nextIncomplete } : {}),
+        ...(link.customerRegionId !== undefined
+          ? { customerRegionId: link.customerRegionId }
+          : {}),
+      };
+
+      const updated = await tx.customer.updateMany({
+        where: { id, companyId: user.companyId },
+        data,
+      });
+      if (updated.count === 0) {
+        throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
+      }
+      const customer = await tx.customer.findFirst({
+        where: { id, companyId: user.companyId },
+        include: {
+          customerRegion: {
+            select: { id: true, name: true, latitude: true, longitude: true, radiusMeters: true },
+          },
+        },
+      });
+      if (!customer) {
+        throw httpError(HttpStatus.NOT_FOUND, 'CUSTOMER_NOT_FOUND', 'Cliente não encontrado.');
+      }
+      return { customer, regionNotice: link.regionNotice };
+    });
+  }
+
+  private assertRegionWrite(
+    user: AuthUser,
+    dto: { customerRegionId?: string | null; newRegion?: unknown },
+  ) {
+    const touches = dto.customerRegionId !== undefined || dto.newRegion != null;
+    if (user.role === UserRole.EMPLOYEE && touches) {
+      throw httpError(
+        HttpStatus.FORBIDDEN,
+        'CUSTOMER_PATCH_FORBIDDEN',
+        'Funcionário não altera a região do cliente.',
+      );
+    }
   }
 
   geocode(user: AuthUser, id: string) {

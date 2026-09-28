@@ -8,7 +8,47 @@ Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s
 
 `record_new_customer` (`recordNewCustomer`) — missão **Gravar cliente** (v0.18.0): o gestor encaminha sessão sem lista de clientes; cada **Adicionar ponto** cria um `Customer` no GPS; **complete** só fecha a sessão. Placeholder `recordSessionShell` nunca vai ao mapa. Plano: [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
 
-Campos opcionais `assignment_region_*` — missão **Gravar região** (v0.19.0): centro + raio na `Route`; origem = centro clicado. Identificação: `recordNewCustomer` + `assignmentRegionRadiusMeters != null`. Plano: [plans/23-gravar-regiao.md](../plans/23-gravar-regiao.md).
+Campos opcionais `assignment_region_*` — missão **Gravar região** já publicada (v0.19.0): centro + raio na `Route`. A aba Região não cria missão nova. Identificação no campo: `recordNewCustomer` + `assignmentRegionRadiusMeters != null`. Plano: [plans/23-gravar-regiao.md](../plans/23-gravar-regiao.md).
+
+Região nomeada do cliente (v0.22.0): tabela `customer_regions` (pin + raio) e `customers.customer_region_id` opcional. O raio gravado pode passar de 50 km quando um cliente vinculado fica fora do círculo.
+
+## Endpoint GET /api/v1/customer-regions
+
+- Auth: ADMIN, MANAGER, SUPERVISOR, EMPLOYEE (JWT), só a empresa do token
+- Rate limit: N/A
+- Body / Query: nenhum
+- Cookies set/clear: nenhum
+- 200: `{ "regions": [{ "id", "name", "latitude", "longitude", "radiusMeters" }] }`
+- Side effects: nenhum
+- Como testar: login e GET; outra empresa não aparece
+
+## Endpoint POST /api/v1/customer-regions
+
+- Auth: ADMIN, MANAGER, SUPERVISOR
+- Body: `{ "name", "latitude", "longitude", "radiusMeters" }` — raio 500–50000
+- 201: `{ "region": { ... } }`
+- 409: `{ "code": "REGIAO_JA_EXISTE", "message": "Essa região já está cadastrada. Selecione ela na lista." }`
+- 422: nome vazio ou raio fora da faixa
+- Side effects: insert em `customer_regions`. Índice único `(company_id, lower(name))`
+- Como testar: POST duas vezes com o mesmo nome → 201 e depois 409
+
+## Endpoint PATCH /api/v1/customer-regions/:id
+
+- Auth: ADMIN, MANAGER, SUPERVISOR
+- Body: nome, latitude, longitude e/ou radiusMeters (slider até 50 km)
+- 200: região; `radiusMeters` é o maior entre o slider e a distância do cliente vinculado mais longe
+- 404: `REGION_NOT_FOUND` se o id não é da empresa
+- Side effects: update. Não encolhe abaixo do cliente mais longe
+- Como testar: cliente a mais de 50 km → PATCH com 50000 devolve km maior
+
+## Endpoint DELETE /api/v1/customer-regions/:id
+
+- Auth: ADMIN, MANAGER, SUPERVISOR
+- 200: `{ "ok": true }`
+- Side effects: apaga a região; `customers.customer_region_id` fica nulo (`ON DELETE SET NULL`)
+- Como testar: excluir e ver o cliente sem região
+
+No `POST/PATCH /api/v1/customers`, campos opcionais `customerRegionId` ou `newRegion: { name, radiusMeters }` (não os dois). `newRegion` exige lat/lng do cliente (centro = pin). Nome repetido → 409 e o cliente não grava. Pin fora → o raio da região sobe na mesma transação. Sem pin, vincula e o raio não muda (`regionNotice: "NO_PIN"`).
 
 ## Telas
 

@@ -6,6 +6,7 @@ import type { MapRef, MapLayerMouseEvent, MarkerDragEvent } from 'react-map-gl/m
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { cartoTransformRequest, getRasterStyleForTheme } from '@/lib/map-style';
 import { useTheme } from '@/components/theme/ThemeProvider';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 
 const BRASIL = { latitude: -14.235, longitude: -51.9253, zoom: 3.8 };
 
@@ -23,6 +24,8 @@ type Props = {
   readOnly?: boolean;
   /** `form` (cadastro de clientes): mapa alto. `compact` (empresa): mini-mapa 280px. */
   size?: MapSize;
+  /** Círculos das regiões salvas. Desligado no mapa da empresa. */
+  showRegions?: boolean;
 };
 
 const SIZE_CLASS: Record<MapSize, string> = {
@@ -39,6 +42,7 @@ export function CustomerLocationMap({
   pinLabel = 'Pin do cliente',
   readOnly = false,
   size = 'form',
+  showRegions = false,
 }: Props) {
   const { theme } = useTheme();
   const mapStyle = getRasterStyleForTheme(theme);
@@ -128,6 +132,7 @@ export function CustomerLocationMap({
           cursor={readOnly ? 'default' : 'crosshair'}
         >
           <NavigationControl position="bottom-right" />
+          {showRegions ? <CustomerRegionCircles /> : null}
           {hasPin ? (
             <Marker
               latitude={latitude!}

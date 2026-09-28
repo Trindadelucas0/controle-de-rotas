@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.22.0 — 2026-09-28
+
+### Região do cliente no mapa
+
+- A aba **Rotas → Região** grava pin, raio e nome (`customer_regions`). O círculo permanece. Não publica mais missão.
+- No cadastro do cliente dá para escolher a região ou criar outra. Nome repetido na empresa bloqueia.
+- Se o pin do cliente fica fora, `radiusMeters` sobe até a distância e o centro não muda.
+- Círculos nos mapas de rotas, clientes e campo. Cliente antigo fica sem região. Missão já publicada continua no campo.
+
 ## v0.21.3 — 2026-09-25
 
 ### Cálculo de rota — rua primeiro, trilha só se o mapa falhar

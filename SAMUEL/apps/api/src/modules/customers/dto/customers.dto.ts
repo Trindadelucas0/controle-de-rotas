@@ -6,12 +6,15 @@ import {
   IsNumber,
   IsOptional,
   IsString,
+  IsUUID,
   Max,
   MaxLength,
   Min,
   MinLength,
+  ValidateNested,
 } from 'class-validator';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { NewCustomerRegionDto } from '../../customer-regions/dto/customer-regions.dto';
 
 export class CreateCustomerDto {
   @IsString()
@@ -105,6 +108,15 @@ export class CreateCustomerDto {
   @IsOptional()
   @IsEnum(CustomerStatus)
   status?: CustomerStatus;
+
+  @IsOptional()
+  @IsUUID()
+  customerRegionId?: string | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NewCustomerRegionDto)
+  newRegion?: NewCustomerRegionDto | null;
 }
 
 export class UpdateCustomerDto {
@@ -204,6 +216,15 @@ export class UpdateCustomerDto {
   @IsOptional()
   @IsBoolean()
   profileIncomplete?: boolean;
+
+  @IsOptional()
+  @IsUUID()
+  customerRegionId?: string | null;
+
+  @IsOptional()
+  @ValidateNested()
+  @Type(() => NewCustomerRegionDto)
+  newRegion?: NewCustomerRegionDto | null;
 }
 
 export class ListCustomersQueryDto {

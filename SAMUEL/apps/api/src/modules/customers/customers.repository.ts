@@ -1,6 +1,18 @@
 import { Injectable } from '@nestjs/common';
-import { Customer, CustomerStatus, Prisma } from '@prisma/client';
+import { CustomerStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
+
+const customerRegionInclude = {
+  customerRegion: {
+    select: {
+      id: true,
+      name: true,
+      latitude: true,
+      longitude: true,
+      radiusMeters: true,
+    },
+  },
+} as const;
 
 @Injectable()
 export class CustomersRepository {
@@ -11,7 +23,7 @@ export class CustomersRepository {
     q?: string;
     status?: CustomerStatus;
     document?: string;
-  }): Promise<Customer[]> {
+  }) {
     const where: Prisma.CustomerWhereInput = {
       companyId: params.companyId,
       recordSessionShell: false,
@@ -37,19 +49,22 @@ export class CustomersRepository {
     });
   }
 
-  findByIdInCompany(id: string, companyId: string): Promise<Customer | null> {
-    return this.prisma.customer.findFirst({ where: { id, companyId } });
+  findByIdInCompany(id: string, companyId: string) {
+    return this.prisma.customer.findFirst({
+      where: { id, companyId },
+      include: customerRegionInclude,
+    });
   }
 
-  create(data: Prisma.CustomerCreateInput): Promise<Customer> {
-    return this.prisma.customer.create({ data });
+  create(data: Prisma.CustomerCreateInput) {
+    return this.prisma.customer.create({ data, include: customerRegionInclude });
   }
 
   async update(
     id: string,
     companyId: string,
     data: Prisma.CustomerUpdateManyMutationInput,
-  ): Promise<Customer | null> {
+  ) {
     const result = await this.prisma.customer.updateMany({
       where: { id, companyId },
       data,

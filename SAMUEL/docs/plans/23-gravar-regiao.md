@@ -2,6 +2,8 @@
 
 **Status:** done (2026-09-17, software **v0.19.0**).
 
+**Atualização v0.22.0:** a aba Região grava `customer_regions` (pin + raio que permanece no mapa) e não chama mais `dispatch-region-mission`. Missões já publicadas continuam no campo.
+
 **Dependências:** Gravar cliente (22), planejador `/routes`, campo Play/record-point/complete.
 
 ## Escopo entregue
@@ -16,7 +18,7 @@
 
 | Tela | Arquivo | Papel |
 | --- | --- | --- |
-| `/routes` aba Região | `RoutesPlannerRegionMission.tsx` | ADMIN/MANAGER publicam; SUPERVISOR sem Publicar |
+| `/routes` aba Região | `RoutesPlannerRegionMission.tsx` | até v0.21: ADMIN/MANAGER publicavam. Desde v0.22.0: ADMIN/MANAGER/SUPERVISOR salvam a região no mapa |
 | `/routes` Rotas de hoje / Gerir | `RoutesTodayView.tsx`, `RouteManagePanel.tsx` | leitura da área |
 | `/field/my-route` | `FieldMyRoutePage.tsx` | EMPLOYEE |
 | `/field/start/:id` | `FieldStartRoutePage.tsx` | EMPLOYEE |

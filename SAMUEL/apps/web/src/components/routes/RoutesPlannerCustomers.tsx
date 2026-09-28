@@ -6,6 +6,7 @@ import MapLibreMap, { Layer, Marker, NavigationControl, Source } from 'react-map
 import type { MapRef } from 'react-map-gl/maplibre';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { apiFetch, ApiError } from '@/lib/api-client';
+import { CustomerRegionCircles } from '@/components/map/CustomerRegionCircles';
 import { useSessionUser } from '@/lib/session-context';
 import { cartoTransformRequest, osmRasterStyle } from '@/lib/map-style';
 import { toDateInputValue } from '@/lib/ops-labels';
@@ -942,6 +943,7 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
           attributionControl
         >
           <NavigationControl position="bottom-right" />
+          <CustomerRegionCircles />
           {linesGeoJson
             ? linesGeoJson.features.map((feature) => (
                 <Source

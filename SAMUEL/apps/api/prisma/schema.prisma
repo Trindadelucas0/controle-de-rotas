@@ -229,6 +229,7 @@ model Company {
   fuelFillEvidence     FuelFillEvidence[]
   vehicleCosts         VehicleCost[]
   odometerReadings     OdometerReading[]
+  customerRegions      CustomerRegion[]
 
   @@map("companies")
 }
@@ -323,11 +324,13 @@ model Customer {
   /// Placeholder interno da missão de gravar — nunca aparece no mapa.
   recordSessionShell Boolean    @default(false) @map("record_session_shell")
   recordedFromRouteId String?   @map("recorded_from_route_id") @db.Uuid
+  customerRegionId String?     @map("customer_region_id") @db.Uuid
   createdAt      DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt      DateTime       @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  company            Company        @relation(fields: [companyId], references: [id])
-  recordedFromRoute  Route?         @relation("RecordedFromRoute", fields: [recordedFromRouteId], references: [id], onDelete: SetNull)
+  company            Company         @relation(fields: [companyId], references: [id])
+  recordedFromRoute  Route?          @relation("RecordedFromRoute", fields: [recordedFromRouteId], references: [id], onDelete: SetNull)
+  customerRegion     CustomerRegion? @relation(fields: [customerRegionId], references: [id], onDelete: SetNull)
   serviceOrders      ServiceOrder[]
   visits             Visit[]
   accessPaths        CustomerAccessPath[]
@@ -339,7 +342,26 @@ model Customer {
   @@index([status])
   @@index([recordedFromRouteId])
   @@index([profileIncomplete])
+  @@index([customerRegionId])
   @@map("customers")
+}
+
+/// Região nomeada do cliente: pin + raio que permanece no mapa.
+model CustomerRegion {
+  id           String   @id @default(uuid()) @db.Uuid
+  companyId    String   @map("company_id") @db.Uuid
+  name         String   @db.VarChar(200)
+  latitude     Float
+  longitude    Float
+  radiusMeters Int      @map("radius_meters")
+  createdAt    DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  company   Company    @relation(fields: [companyId], references: [id])
+  customers Customer[]
+
+  @@index([companyId])
+  @@map("customer_regions")
 }
 
 model Vehicle {

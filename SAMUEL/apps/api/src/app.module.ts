@@ -9,6 +9,7 @@ import { CompaniesModule } from './modules/companies/companies.module';
 import { UsersModule } from './modules/users/users.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { CustomersModule } from './modules/customers/customers.module';
+import { CustomerRegionsModule } from './modules/customer-regions/customer-regions.module';
 import { VehiclesModule } from './modules/vehicles/vehicles.module';
 import { MapModule } from './modules/map/map.module';
 import { LookupsModule } from './modules/lookups/lookups.module';
@@ -36,6 +37,7 @@ import { CostsModule } from './modules/costs/costs.module';
     UsersModule,
     EmployeesModule,
     CustomersModule,
+    CustomerRegionsModule,
     VehiclesModule,
     MapModule,
     LookupsModule,
