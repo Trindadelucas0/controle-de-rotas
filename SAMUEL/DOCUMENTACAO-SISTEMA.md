@@ -32,7 +32,7 @@ Ver `docs/CHANGELOG.md` (atual: **v0.21.3**).
 
 ## 3. Mapa de telas / conexões
 
-Navegação: desktop = sidebar **Operação · Recursos · Administração** (`AppSidebar` + `NAV_GROUPS`). Mobile (&lt;768) = bottom nav (primários por papel) + sheet **Mais** (`nav-primary.ts`).
+Navegação: desktop = sidebar **Operação · Recursos · Administração** (`AppSidebar` + `NAV_GROUPS`). Mobile (&lt;768) = bottom nav (primários por papel) + sheet **Mais** (`nav-primary.ts`). No mobile o shell é uma coluna `h-dvh`: `html`/`body` travados, só o miolo rola, a bottom nav é o último filho **no fluxo** (não `fixed`) e o botão principal fica em `MobileActionBar` fixa acima dela — ver [`docs/screens/home-shell.md`](docs/screens/home-shell.md).
 
 ```
 Rotas

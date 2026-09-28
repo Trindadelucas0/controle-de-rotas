@@ -24,6 +24,7 @@ import {
 } from './route-origin-ui';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 type PlanVisit = {
   id: string;
   scheduledStart: string;
@@ -546,7 +547,7 @@ export function RoutesPlannerVisits({ company }: Props) {
                 ))}
               </select>
             </label>
-            <div className="flex flex-col gap-2">
+            <MobileActionBar className="md:flex-col md:items-stretch">
               <ActionButton
                 variant="secondary"
                 disabled={!preview || busy}
@@ -566,7 +567,7 @@ export function RoutesPlannerVisits({ company }: Props) {
               >
                 Publicar
               </ActionButton>
-            </div>
+            </MobileActionBar>
           </div>
         ) : (
           <p className="text-xs text-[var(--muted)]">

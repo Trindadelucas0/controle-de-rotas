@@ -29,6 +29,8 @@ div 100dvh (sem chrome do app)
 └── controles: Encerrar (confirm); botão alvo / Centralizar (follow) **acima do HUD** (`-top-14` / `sm:-top-16`, sobe com marcos)
 ```
 
+O bloco inferior é uma coluna `max-h-[min(70dvh,100%)]`: avisos (fora do raio, ponto gravado, Trecho/Total/pontos, “Finalize a visita…”) ficam numa faixa `min-h-0 overflow-y-auto`; **+ Adicionar ponto**, o slider **Arraste para concluir** e a grade Tempo/Restante/ETA/Vel. são `shrink-0` e permanecem colados na borda de baixo (safe-area). Texto longo rola dentro do HUD em vez de empurrar os botões para fora da tela.
+
 Missão `recordNewCustomer`: título **GRAVAR**; sem banner de manobra/Cheguei; pins = pontos marcados (✎ se cadastro em aberto); GPS denso como Gravar viagem. **Gravar viagem** clássica (cliente já cadastrado) **não** ganha Adicionar ponto. Missão **Gravar região** (`assignmentRegionRadiusMeters`): máscara escura fora do raio + fill interno + borda laranja 4 px tracejada + pin do centro; barra de escala métrica; HUD **GRAVAR REGIÃO** + dentro/fora (fora: seta rumo ao centro + km até a borda + km até o centro) + **Ver região** (pausa follow e enquadra círculo ∪ carro; **Centralizar** volta ao GPS); pinça no mapa pausa follow (igual arrastar); sem GPS, overview enquadra o círculo; GPS fora do raio avisa e **não** bloqueia Adicionar ponto. Círculos laranja das regiões salvas do cliente (`GET /api/v1/customer-regions`) aparecem no mesmo mapa e não substituem a máscara da missão já publicada.
 
 ### 3. Informação
@@ -124,7 +126,7 @@ Entrada: após `/field/start` ou “Continuar navegação”. Saída: Minha rota
 
 ### 10. Mobile / PWA
 
-`100dvh`, landscape ok; Wake Lock quando possível. HTTP LAN: faixa **NÃO ESTÁ EM HTTPS** no topo; GPS do browser segue bloqueado — **sem GPS não há recálculo**.
+`100dvh` com `overscroll-none` no layout `(field-nav)` (mais `html, body` travados em `<768px`): puxar o mapa não desloca o HUD. Landscape ok; Wake Lock quando possível. HTTP LAN: faixa **NÃO ESTÁ EM HTTPS** no topo; GPS do browser segue bloqueado — **sem GPS não há recálculo**.
 
 Pinch no mapa amplia a câmera MapLibre; HUD/botões ficam no tamanho 1:1 (a página não dá zoom).
 
@@ -151,3 +153,4 @@ Voz/TTS, trânsito ao vivo, Maps/Waze como UX principal. Check-in é na tela `/f
 13. Missão **Gravar cliente**: HUD GRAVAR + **Adicionar ponto**; após 2 pontos continua Gravando; Finalizar **não** pede nome; rota clássica com Gravar viagem **não** mostra Adicionar ponto.
 14. Missão **Gravar região**: área fora do raio escurecida + borda tracejada visível; **Ver região** enquadra o círculo e o carro (Centralizar volta ao GPS); pinça pausa follow; HUD fora do raio com seta + km até a borda; Adicionar ponto fora do raio continua permitido (aviso).
 15. Cheguei sem **Finalizar visita**: banner no HUD + arraste opaco; **Abrir visita** vai para `/field/visits/{id}`; o modal de km/foto **não** abre. Arraste até o fim sobre o mapa **não** volta ao início no meio do gesto.
+16. Missão Gravar com muitos pontos (lista longa em Trecho/Total): o texto rola dentro do HUD; **+ Adicionar ponto** e **Arraste para concluir** continuam visíveis na borda de baixo. Puxar o mapa não leva esses botões embora.

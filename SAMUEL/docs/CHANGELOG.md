@@ -1,5 +1,14 @@
 # Changelog
 
+## v0.22.1 — 2026-09-28
+
+### Fix — botões e barra de baixo pulavam ao rolar no PWA
+
+- Sintoma: no celular (funcionário e admin) era preciso puxar a tela para o botão principal aparecer embaixo; a barra Início/Agenda/Mapa/Rotas/Mais balançava com o elástico do scroll e o botão encostava nela, pulava ou ficava por baixo
+- Causa: quem rolava era o documento. `AppBottomNav` era `fixed inset-x-0 bottom-0 z-40` e `MobileActionBar` era `sticky` — no iOS/PWA os dois acompanham o elástico do `body`, e o botão só grudava embaixo depois que o conteúdo do card chegava lá
+- Correção: em `<768px` `html, body` ficam `height: 100%; overflow: hidden; overscroll-behavior: none` (`globals.css`); o shell vira coluna `h-dvh` (`(app)/layout.tsx`) com o miolo em `overflow-y-auto overscroll-y-contain`; `AppBottomNav` sai de `fixed` e vira último filho `shrink-0`; `MobileActionBar` vira `fixed` em `bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom))` com espaçador medido por `ResizeObserver` (prop `dock="screen"` para telas sem nav); `.app-main-pad` volta a `padding-bottom: 1rem` no mobile e `OperationalMap` usa `max-md:h-full`. CTAs de `RoutesPlannerCustomers` (Publicar rotas), `RoutesPlannerVisits` (Salvar rota / Publicar), `RoutesPlannerRegionMission` (Salvar região), `FieldStartRoutePage` (Continuar / Revisar / Voltar / ▶ Iniciar rota) e `FieldFuelPage` (Registrar / Cancelar) entram na `MobileActionBar`; `FieldVisitPage` ganha faixa `shrink-0` com **Cheguei** ou **Finalizar visita**; o HUD de `FieldNavigatePage` vira coluna `max-h-[min(70dvh,100%)]` com avisos roláveis e **+ Adicionar ponto** / arraste / grade `shrink-0`; `(auth)/layout.tsx` ganha scroll próprio no mobile
+- Como validar: viewport &lt;768 ou PWA — `/customers/new` mostra **Salvar** embaixo sem rolar e puxar a lista não move a nav; `/routes` → Planejador → Clientes/Visitas/Região com o CTA acima da nav; `/field/start/[id]` com Continuar/▶ Iniciar rota sempre visíveis; `/field/fuel-new` com Registrar fixo; `/field/visits/[id]` com Cheguei/Finalizar na faixa de baixo e o endereço rolando atrás; `/field/navigate` com **Arraste para concluir** e **+ Adicionar ponto** na borda; `/map` encosta na nav sem faixa vazia; em `md+` nada muda (sem bottom nav, Salvar no fim do form)
+
 ## v0.22.0 — 2026-09-28
 
 ### Região do cliente no mapa

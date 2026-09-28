@@ -55,6 +55,8 @@ MAPA: LineStrings + F (última loc.) + E (empresa, se roundtrip ou modo Empresa)
 
 KPI só do preview (`assignments` / `grandTotals`). Ausente → —.
 
+**Mobile / PWA (`<768px`):** o CTA de cada modo fica em `MobileActionBar`, fixa acima da barra Início/Agenda/Mapa/Rotas/Mais enquanto a lista do painel rola — **Publicar rotas** (Clientes), **Salvar rota** + **Publicar** (Visitas agendadas), **Publicar missão de gravar** (Gravar cliente) e **Salvar região** + **Excluir** (Região). Na aba **Mapa** do planejador o painel fica oculto e a barra some junto. Em `md+` nada muda: os botões seguem no fluxo do painel lateral.
+
 ### 5. Cores (inalteradas)
 
 azul `#1d4ed8` preview estrada; âmbar `#d97706` reta; E verde/laranja empresa; F pin do funcionário; teal operacional no mapa hub.
@@ -78,3 +80,4 @@ Play/GPS nesta tela; editar/cancelar/excluir rota `IN_PROGRESS`; criar OS no PAT
 7. ADMIN: **Excluir rota** em Planejada/Publicada/Concluída/Incompleta/Cancelada → some da lista; visitas ASSIGNED ficam livres.
 8. Aba **Gravar cliente** → funcionário + data + veículo → **Publicar missão de gravar** visível acima da barra inferior no celular → Rotas de hoje mostra **Gravar acesso** (sem “Sessão de gravação”).
 9. Aba **Região** → **Buscar endereço** (ex. Unaí) + Enter ou clique na sugestão → mapa no círculo; ou clique no mapa. Nome + raio → **Salvar região**. Recarregar a aba: o círculo continua. Salvar de novo com o mesmo nome → aviso de já cadastrada. Não há Data, Funcionário, Veículo nem **Publicar missão**.
+10. Celular, aba **Lista** do planejador: em Clientes, Visitas agendadas, Gravar cliente e Região o botão de publicar/salvar já aparece embaixo, acima da barra inferior, sem rolar o painel; trocar para a aba **Mapa** esconde esse botão.

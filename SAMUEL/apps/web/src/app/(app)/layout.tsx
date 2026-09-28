@@ -39,15 +39,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <SessionContext.Provider value={user}>
       <TooltipProvider>
-        <SidebarProvider className="min-h-screen bg-[var(--background)]">
+        <SidebarProvider className="min-h-screen bg-[var(--background)] max-md:h-dvh max-md:min-h-0 max-md:overflow-hidden">
           {user ? <AppSidebar user={user} /> : null}
-          <SidebarInset className="min-w-0 bg-[var(--background)] md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:shadow-none">
+          <SidebarInset className="min-w-0 bg-[var(--background)] max-md:h-dvh max-md:overflow-hidden md:peer-data-[variant=inset]:m-0 md:peer-data-[variant=inset]:rounded-none md:peer-data-[variant=inset]:shadow-none">
             <AppHeader user={user} loading={loading} />
             <div
               className={
                 fullBleed
-                  ? 'flex min-h-0 flex-1 flex-col px-0 py-0'
-                  : 'app-main-pad mx-auto w-full max-w-5xl flex-1 px-4 py-6 md:py-8 md:pb-8'
+                  ? 'flex min-h-0 flex-1 flex-col px-0 py-0 max-md:overflow-y-auto max-md:overscroll-y-contain'
+                  : 'app-main-pad mx-auto w-full max-w-5xl flex-1 px-4 py-6 max-md:min-h-0 max-md:overflow-y-auto max-md:overscroll-y-contain md:py-8 md:pb-8'
               }
             >
               {loading ? (

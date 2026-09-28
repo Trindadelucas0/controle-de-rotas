@@ -25,7 +25,7 @@ export default function FieldNavLayout({ children }: { children: React.ReactNode
 
   return (
     <SessionContext.Provider value={user}>
-      <div className="h-[100dvh] overflow-hidden bg-[#121212]">
+      <div className="h-[100dvh] overflow-hidden overscroll-none bg-[#121212]">
         <FieldPwaLocationGate>{children}</FieldPwaLocationGate>
       </div>
     </SessionContext.Provider>

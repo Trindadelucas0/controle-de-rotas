@@ -990,7 +990,7 @@ export function OperationalMap() {
   ];
 
   return (
-    <div className="flex h-[calc(100dvh-3.5rem-var(--app-bottom-nav-height)-var(--safe-bottom))] flex-col bg-canvas md:h-[calc(100dvh-3.5rem)]">
+    <div className="flex flex-col bg-canvas max-md:h-full max-md:min-h-0 md:h-[calc(100dvh-3.5rem)]">
       {/* Toolbar */}
       <form
         className="flex flex-wrap items-end gap-2 border-b border-brand-100 bg-surface px-3 py-2"

@@ -19,7 +19,7 @@ corpo: mapa MapLibre + trilho ~300px (desktop)
 mobile: mapa + abas Equipe | Detalhe; ☰ Equipe (drawer)
 ```
 
-**Mobile / PWA:** pinch no canvas MapLibre amplia a **câmera**; toolbar, abas e HUD não dão zoom (viewport global sem escala da página).
+**Mobile / PWA:** pinch no canvas MapLibre amplia a **câmera**; toolbar, abas e HUD não dão zoom (viewport global sem escala da página). Altura: em `<768px` a raiz é `h-full` dentro do miolo do shell (o espaço da bottom nav já é do flex, não se desconta de novo); em `md+` continua `100dvh - 3.5rem`.
 
 **Camadas visuais** (não filtros de negócio novos):
 
@@ -58,3 +58,4 @@ WebSocket; pintar N rotas do dia de uma vez (listagem sem geometry); inventar #O
 4. Pintar rota de um veículo → ícones de marcos dos clientes das paradas aparecem junto da linha.
 5. `/map?employeeId=` foca e abre detalhe.
 6. Cliente nascido de ponto gravado só com nome: pin âmbar com ✎; Completar cadastro tira o lápis. “Sessão de gravação” **não** aparece.
+7. Celular: o mapa encosta na bottom nav — sem faixa vazia embaixo e sem parte do mapa por baixo da barra.

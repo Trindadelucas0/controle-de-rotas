@@ -31,7 +31,7 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   - `GET /field/vehicles?routeId=`
   - `POST /routes/:id/start` — multipart `file` + `{ vehicleId, startOdometerKm, startFuelLevel, startNotes?, latitude, longitude }`
 - Redirects: sucesso → `/field/navigate`; `ROUTE_ALREADY_ACTIVE` → link Minha rota para concluir; erro fatal → link Minha rota
-- Mobile / PWA: HTTPS pede GPS (timeout curto; fallback de origem); HTTP LAN abre com faixa **NÃO ESTÁ EM HTTPS** e inicia sem GPS (1ª parada)
+- Mobile / PWA: HTTPS pede GPS (timeout curto; fallback de origem); HTTP LAN abre com faixa **NÃO ESTÁ EM HTTPS** e inicia sem GPS (1ª parada). Em `<768px` a fileira de ação do passo visível (Continuar / Voltar + Continuar / Voltar + Revisar / Voltar + ▶ Iniciar rota) fica em `MobileActionBar`, fixa acima da bottom nav; só o card do passo rola
 - Acessibilidade: erros com `role="alert"`; labels nos campos
 - Fora de escopo desta tela: edição de paradas, cancelamento da rota, OCR do km
 - Como testar:
@@ -42,3 +42,4 @@ Canônica completa: [field-start.md](field-start.md) e [`docs/PRD-UX-FUNCIONAL.m
   5. Ver redirect para navegação com mapa centralizado na 1ª parada (a mais rápida pelas ruas, se o mapa responder)
   6. Tentar abrir wizard de rota já `IN_PROGRESS` → redireciona para `/field/navigate`
   7. Com outra rota `IN_PROGRESS` (mesmo de outro dia) → alerta + “Ir para Minha rota e concluir”
+  8. Celular: em cada passo o botão da vez já aparece embaixo, acima de Início/Agenda/Campo, sem precisar rolar o card; o último campo do checklist não fica escondido atrás da barra ao chegar no fim do scroll

@@ -166,6 +166,17 @@ body {
   overflow-x: hidden;
 }
 
+/* No celular quem rola é o miolo do shell; o documento fica travado para o
+   elástico do scroll não deslocar a bottom nav nem a barra de ação. */
+@media (max-width: 767px) {
+  html,
+  body {
+    height: 100%;
+    overflow: hidden;
+    overscroll-behavior: none;
+  }
+}
+
 html {
   color-scheme: dark;
   touch-action: manipulation;
@@ -367,8 +378,9 @@ textarea {
   }
 
   @media (max-width: 767px) {
+    /* A bottom nav entra no fluxo do shell: o miolo não reserva mais a altura dela. */
     .app-main-pad {
-      padding-bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom) + 1rem);
+      padding-bottom: 1rem;
     }
 
     .app-main-pad-fullbleed {

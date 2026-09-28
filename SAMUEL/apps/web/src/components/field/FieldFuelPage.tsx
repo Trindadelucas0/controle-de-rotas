@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { apiFetch, apiUpload, ApiError } from '@/lib/api-client';
 import { formatMoney } from '@/lib/cost-metric';
 import { OdometerPhotoCapture } from '@/components/field/OdometerPhotoCapture';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 
 type VehicleOpt = { id: string; plate: string; odometerKm?: number | null; fuelType?: string | null };
 
@@ -127,12 +128,14 @@ export function FieldFuelPage() {
           onChange={setPhoto}
           required={receiptRequired}
         />
-        <button type="submit" disabled={saving} className="ops-btn ops-btn-primary w-full">
-          {saving ? 'Salvando…' : 'Registrar'}
-        </button>
-        <Link href="/field/my-route" className="block text-center text-sm ops-link">
-          Cancelar
-        </Link>
+        <MobileActionBar>
+          <button type="submit" disabled={saving} className="ops-btn ops-btn-primary w-full">
+            {saving ? 'Salvando…' : 'Registrar'}
+          </button>
+          <Link href="/field/my-route" className="block text-center text-sm ops-link">
+            Cancelar
+          </Link>
+        </MobileActionBar>
       </form>
     </section>
   );

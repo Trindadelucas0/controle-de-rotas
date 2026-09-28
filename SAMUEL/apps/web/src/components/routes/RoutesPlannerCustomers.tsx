@@ -30,6 +30,7 @@ import {
 } from './route-origin-ui';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 type CustomerOption = {
   id: string;
   name: string;
@@ -869,15 +870,17 @@ export function RoutesPlannerCustomers({ company, preselectCustomerId }: Props) 
         </div>
 
         {canPublish ? (
-          <ActionButton
-            disabled={!preview || publishing || loadingPreview}
-            loading={publishing}
-            loadingLabel="Publicando…"
-            onClick={() => void publishRoutes()}
-            className="w-full justify-center"
-          >
-            Publicar rotas
-          </ActionButton>
+          <MobileActionBar>
+            <ActionButton
+              disabled={!preview || publishing || loadingPreview}
+              loading={publishing}
+              loadingLabel="Publicando…"
+              onClick={() => void publishRoutes()}
+              className="w-full justify-center"
+            >
+              Publicar rotas
+            </ActionButton>
+          </MobileActionBar>
         ) : (
           <p className="text-xs text-[var(--muted)]">
             Preview disponível. Publicar exige perfil ADMIN ou MANAGER.

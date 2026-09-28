@@ -15,6 +15,8 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §5.
 
 Formulário coluna única: veículo (lista `GET /field/vehicles`), km, litros, R$/L, total calculado (não digitável), `OdometerPhotoCapture`, Registrar / Cancelar.
 
+**Mobile / PWA:** em `<768px` **Registrar** e o link **Cancelar** ficam em `MobileActionBar`, fixa acima da bottom nav; o comprovante e os campos rolam por baixo. Em `md+` continuam no fim do formulário.
+
 ### 7. Estados
 
 Sucesso: “Abastecimento registrado” + voltar para Minha rota. Validação 422 litros/preço/comprovante. 404 veículo de outro tenant.

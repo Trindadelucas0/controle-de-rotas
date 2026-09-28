@@ -19,6 +19,7 @@ import { FieldRegionPreviewMap } from './FieldRegionPreviewMap';
 import { formatRegionKm, isRegionMission } from '@/lib/region-circle';
 import { ActionButton } from '@/components/ui/ActionButton';
 import { LoadingOverlay } from '@/components/ui/LoadingOverlay';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 import { OdometerPhotoCapture } from './OdometerPhotoCapture';
 import { FUEL_LEVEL_OPTIONS, type FuelLevel } from '@/lib/field-fuel';
 import { isIosDevice } from '@/lib/pwa';
@@ -526,13 +527,15 @@ export function FieldStartRoutePage() {
             })}
           </ol>
           )}
-          <button
-            type="button"
-            onClick={() => setStep('vehicle')}
-            className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white"
-          >
-            Continuar
-          </button>
+          <MobileActionBar>
+            <button
+              type="button"
+              onClick={() => setStep('vehicle')}
+              className="w-full rounded-xl bg-brand-600 px-4 py-3 text-sm font-semibold text-white"
+            >
+              Continuar
+            </button>
+          </MobileActionBar>
         </div>
       ) : null}
 
@@ -581,7 +584,7 @@ export function FieldStartRoutePage() {
                 : ''}
             </p>
           ) : null}
-          <div className="flex gap-2">
+          <MobileActionBar className="max-md:flex-row md:flex-row">
             <button
               type="button"
               onClick={() => setStep('summary')}
@@ -597,7 +600,7 @@ export function FieldStartRoutePage() {
             >
               Continuar
             </button>
-          </div>
+          </MobileActionBar>
         </div>
       ) : null}
 
@@ -650,7 +653,7 @@ export function FieldStartRoutePage() {
             required
             disabled={submitting}
           />
-          <div className="flex gap-2">
+          <MobileActionBar className="max-md:flex-row md:flex-row">
             <button
               type="button"
               onClick={() => setStep('vehicle')}
@@ -666,7 +669,7 @@ export function FieldStartRoutePage() {
             >
               Revisar
             </button>
-          </div>
+          </MobileActionBar>
         </div>
       ) : null}
 
@@ -711,7 +714,7 @@ export function FieldStartRoutePage() {
               ? 'O mapa abre na 1ª parada. O pin ao vivo só aparece com GPS (HTTPS no celular ou localhost no PC).'
               : 'Ao iniciar, o mapa abrirá centralizado na sua posição atual e o rastreamento HTTP será ativado.'}
           </p>
-          <div className="flex gap-2">
+          <MobileActionBar className="max-md:flex-row md:flex-row">
             <button
               type="button"
               disabled={submitting}
@@ -729,7 +732,7 @@ export function FieldStartRoutePage() {
             >
               ▶ Iniciar rota
             </ActionButton>
-          </div>
+          </MobileActionBar>
         </div>
       ) : null}
     </section>

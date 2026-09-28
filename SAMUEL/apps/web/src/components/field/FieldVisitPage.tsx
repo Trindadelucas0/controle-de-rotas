@@ -838,7 +838,9 @@ export function FieldVisitPage() {
 
   return (
 
-    <div className="flex h-full min-h-0 flex-col overflow-auto bg-[#121212] px-4 pb-[max(1.5rem,var(--safe-bottom))] pt-[max(1rem,var(--safe-top))] text-white">
+    <div className="flex h-full min-h-0 flex-col bg-[#121212] text-white">
+
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-4 pb-[max(1.5rem,var(--safe-bottom))] pt-[max(1rem,var(--safe-top))]">
 
       <div className="mx-auto w-full max-w-md">
 
@@ -923,22 +925,6 @@ export function FieldVisitPage() {
               </p>
 
             )}
-
-            <button
-
-              type="button"
-
-              onClick={() => void handleCheckIn()}
-
-              disabled={checkingIn || !canCheckIn}
-
-              className="ops-btn ops-btn-primary w-full py-3 text-base"
-
-            >
-
-              {checkingIn ? 'Registrando…' : 'Cheguei — chegada verificada'}
-
-            </button>
 
           </div>
 
@@ -1276,24 +1262,6 @@ export function FieldVisitPage() {
 
             ) : null}
 
-
-
-            <button
-
-              type="button"
-
-              onClick={() => void handleFinish()}
-
-              disabled={finishing}
-
-              className="ops-btn ops-btn-primary w-full py-3 text-base"
-
-            >
-
-              {finishing ? 'Finalizando…' : 'Finalizar visita'}
-
-            </button>
-
           </div>
 
         ) : null}
@@ -1321,6 +1289,58 @@ export function FieldVisitPage() {
         ) : null}
 
       </div>
+
+      </div>
+
+      {!finished ? (
+
+        <div className="shrink-0 border-t border-white/10 bg-[#121212] px-4 pb-[max(0.75rem,var(--safe-bottom))] pt-3">
+
+          <div className="mx-auto w-full max-w-md">
+
+            {checkedIn ? (
+
+              <button
+
+                type="button"
+
+                onClick={() => void handleFinish()}
+
+                disabled={finishing}
+
+                className="ops-btn ops-btn-primary w-full py-3 text-base"
+
+              >
+
+                {finishing ? 'Finalizando…' : 'Finalizar visita'}
+
+              </button>
+
+            ) : (
+
+              <button
+
+                type="button"
+
+                onClick={() => void handleCheckIn()}
+
+                disabled={checkingIn || !canCheckIn}
+
+                className="ops-btn ops-btn-primary w-full py-3 text-base"
+
+              >
+
+                {checkingIn ? 'Registrando…' : 'Cheguei — chegada verificada'}
+
+              </button>
+
+            )}
+
+          </div>
+
+        </div>
+
+      ) : null}
 
     </div>
 

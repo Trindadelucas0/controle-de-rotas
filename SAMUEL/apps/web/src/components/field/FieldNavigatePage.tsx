@@ -2040,8 +2040,8 @@ export function FieldNavigatePage() {
         />
       ) : null}
 
-      <div className="absolute inset-x-0 bottom-0 z-10 p-3 pb-[max(0.75rem,var(--safe-bottom))]">
-        <div className="relative mx-auto max-w-md">
+      <div className="absolute inset-x-0 bottom-0 z-10 flex max-h-[min(70dvh,100%)] flex-col p-3 pb-[max(0.75rem,var(--safe-bottom))]">
+        <div className="relative mx-auto flex min-h-0 w-full max-w-md flex-col">
           <button
             type="button"
             onClick={reenableFollow}
@@ -2069,7 +2069,7 @@ export function FieldNavigatePage() {
             />
           ) : null}
           {route?.recordNewCustomer ? (
-            <div className="mb-2 space-y-2">
+            <div className="mb-2 min-h-0 shrink space-y-2 overflow-y-auto overscroll-y-contain">
               {regionOutside ? (
                 <p className="rounded-xl bg-amber-800/90 px-3 py-2 text-center text-xs font-semibold text-white">
                   Fora do raio — ainda é possível adicionar o ponto
@@ -2098,20 +2098,22 @@ export function FieldNavigatePage() {
                   ? `: ${route.recordedCustomers.map((c) => c.name).join(', ')}`
                   : ''}
               </p>
-              <button
-                type="button"
-                disabled={!gps || gpsBlocked || recordPointBusy}
-                onClick={() => {
-                  setRecordPointError(null);
-                  setShowRecordPoint(true);
-                }}
-                className="min-h-11 w-full rounded-xl bg-accent px-3 py-3 text-sm font-semibold text-white disabled:opacity-50"
-              >
-                + Adicionar ponto
-              </button>
             </div>
           ) : null}
-          <div className="mb-2">
+          {route?.recordNewCustomer ? (
+            <button
+              type="button"
+              disabled={!gps || gpsBlocked || recordPointBusy}
+              onClick={() => {
+                setRecordPointError(null);
+                setShowRecordPoint(true);
+              }}
+              className="mb-2 min-h-11 w-full shrink-0 rounded-xl bg-accent px-3 py-3 text-sm font-semibold text-white disabled:opacity-50"
+            >
+              + Adicionar ponto
+            </button>
+          ) : null}
+          <div className="mb-2 shrink-0">
             {blockCompleteForOpenVisit ? (
               <p
                 className="mb-2 rounded-xl bg-amber-950/90 px-3 py-2 text-center text-xs font-semibold text-amber-50"
@@ -2137,11 +2139,11 @@ export function FieldNavigatePage() {
             />
           </div>
           {route?.recordNewCustomer ? (
-            <p className="mb-2 rounded-2xl bg-black/70 px-3 py-3 text-center text-sm font-bold tabular-nums shadow-lg backdrop-blur">
+            <p className="mb-2 shrink-0 rounded-2xl bg-black/70 px-3 py-3 text-center text-sm font-bold tabular-nums shadow-lg backdrop-blur">
               {speed} km/h
             </p>
           ) : (
-          <div className="grid grid-cols-4 gap-2 rounded-2xl bg-black/70 px-3 py-3 text-center shadow-lg backdrop-blur">
+          <div className="grid shrink-0 grid-cols-4 gap-2 rounded-2xl bg-black/70 px-3 py-3 text-center shadow-lg backdrop-blur">
             <div>
               <p className="text-[10px] font-semibold uppercase tracking-wide text-white/55">Tempo</p>
               <p className="mt-0.5 text-sm font-bold tabular-nums">
@@ -2174,7 +2176,7 @@ export function FieldNavigatePage() {
             </div>
           </div>
           )}
-          <p className="mt-1.5 text-center text-[10px] text-white/45">
+          <p className="mt-1.5 shrink-0 text-center text-[10px] text-white/45">
             {gps ? gpsHint : 'Aguardando GPS para tempo e km reais'}
           </p>
         </div>

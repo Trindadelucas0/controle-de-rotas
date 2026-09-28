@@ -14,13 +14,16 @@ Documento consolidado: [`docs/PRD-UX-FUNCIONAL.md`](../PRD-UX-FUNCIONAL.md) §1.
 ### 2. Componentes
 
 ```
-SidebarProvider
+SidebarProvider (mobile: h-dvh + overflow-hidden)
 ├── AppSidebar (só md+): Rotas + empresa + grupos Lucide
-└── SidebarInset
+└── SidebarInset (mobile: h-dvh + overflow-hidden)
     ├── AppHeader: safe-area-top | UserMenu
     ├── conteúdo: full-bleed em `/` e `/map`; senão max-w-5xl + app-main-pad
-    └── AppBottomNav (só <md): primários + Mais → AppMoreSheet
+    │   mobile: overflow-y-auto + overscroll-y-contain (único trecho que rola)
+    └── AppBottomNav (só <md): último filho no fluxo (shrink-0), primários + Mais → AppMoreSheet
 ```
+
+No mobile o documento não rola: `globals.css` trava `html, body` (`height: 100%`, `overflow: hidden`, `overscroll-behavior: none`) em `max-width: 767px`. A bottom nav está **no fluxo** (não é mais `fixed`), então o elástico do scroll não a move. O botão principal da tela fica em `MobileActionBar`, `fixed` em `bottom: calc(var(--app-bottom-nav-height) + var(--safe-bottom))` com um espaçador de mesma altura no fluxo (`ResizeObserver`); a prop `dock="screen"` desconta só `--safe-bottom` para telas sem bottom nav.
 
 Chrome usa `--surface` / `--sidebar` e `data-theme`. Campo tela cheia (`field-nav`) permanece HUD escuro, **sem** `SidebarProvider`/bottom nav.
 
@@ -65,7 +68,8 @@ Campo `/field/navigate` e `/field/visits/[id]` usam layout `(field-nav)` sem est
 
 - **&lt;768px:** bottom nav + Mais (bottom sheet); sidebar **não** abre drawer.
 - Safe areas: header (`safe-pt`), bottom nav (`--safe-bottom`), sheets.
-- Conteúdo com `app-main-pad` reserva altura da bottom nav.
+- `html`/`body` travados; só o miolo rola. `app-main-pad` no mobile é `padding-bottom: 1rem` — a nav está no fluxo e não cobre mais o conteúdo.
+- Botão principal em `MobileActionBar` (`fixed`, `z-30`) acima da nav; `AppMoreSheet` (`z-50`) continua por cima dela.
 - Touch: `.ops-btn` / `.ops-input` / itens de menu ≥ ~44px.
 - Listagens CRUD: cards no mobile via `DataTable`.
 - PWA: `manifest` `display: standalone`, `start_url: "/"`, `viewportFit: cover`.
@@ -81,6 +85,7 @@ Top-nav horizontal desktop. Motion Icons. Blocos premium ReUI.
 2. EMPLOYEE mobile: Início, Agenda, Campo.
 3. Desktop md+: sidebar com três grupos; sem bottom nav.
 4. `/` e `/map` full-bleed; conteúdo não sob a bottom nav.
+4b. Mobile: puxar a lista para cima/baixo não move a barra Início/Agenda/Mapa/Rotas nem faz o botão principal pular; o botão já aparece embaixo sem rolar.
 5. Tema claro/escuro: header e bottom nav legíveis.
 6. Conta no header: menu Alterar senha / tema / Sair.
 7. `/field/navigate`: sem sidebar nem bottom nav.

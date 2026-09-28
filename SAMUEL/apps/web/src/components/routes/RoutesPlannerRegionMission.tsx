@@ -15,6 +15,7 @@ import { useSessionUser } from '@/lib/session-context';
 import { cartoTransformRequest, getRasterStyleForTheme } from '@/lib/map-style';
 import { useTheme } from '@/components/theme/ThemeProvider';
 import { ActionButton } from '@/components/ui/ActionButton';
+import { MobileActionBar } from '@/components/ui/MobileActionBar';
 import { CustomerRegionCircles, type CustomerRegionPin } from '@/components/map/CustomerRegionCircles';
 import {
   DEFAULT_REGION_RADIUS_METERS,
@@ -540,7 +541,7 @@ export function RoutesPlannerRegionMission() {
         </label>
 
         {canSave ? (
-          <div className="flex flex-wrap gap-2">
+          <MobileActionBar className="max-md:flex-row max-md:flex-wrap md:flex-wrap md:justify-start">
             <ActionButton
               type="button"
               loading={saving}
@@ -559,7 +560,7 @@ export function RoutesPlannerRegionMission() {
                 Excluir
               </button>
             ) : null}
-          </div>
+          </MobileActionBar>
         ) : null}
       </aside>
     </div>

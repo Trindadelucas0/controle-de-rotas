@@ -27,7 +27,7 @@ export function AppBottomNav({ user }: { user: SessionUser }) {
     <>
       <nav
         aria-label="Navegação principal"
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border)] bg-[var(--surface)] md:hidden"
+        className="shrink-0 border-t border-[var(--border)] bg-[var(--surface)] md:hidden"
         style={{ paddingBottom: 'var(--safe-bottom)' }}
       >
         <ul
