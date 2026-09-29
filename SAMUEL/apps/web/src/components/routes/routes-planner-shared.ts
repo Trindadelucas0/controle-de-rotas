@@ -20,6 +20,17 @@ export const ROUTE_LINE_COLORS = [
   '#067A6A',
 ] as const;
 
+export const ROUTE_STATUS_LABELS: Record<string, string> = {
+  DRAFT: 'Rascunho',
+  PLANNED: 'Planejada',
+  ASSIGNED: 'Atribuída',
+  PUBLISHED: 'Publicada',
+  IN_PROGRESS: 'Em andamento',
+  COMPLETED: 'Concluída',
+  INCOMPLETE: 'Incompleta',
+  CANCELLED: 'Cancelada',
+};
+
 export function formatDuration(sec: number) {
   if (sec < 60) return `${sec}s`;
   const m = Math.round(sec / 60);

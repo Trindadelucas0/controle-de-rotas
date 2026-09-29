@@ -113,7 +113,7 @@ export function RoutesPlanner() {
       ) : mode === 'record' ? (
         <RoutesPlannerRecordMission companyName={company.tradeName || company.name} />
       ) : (
-        <RoutesPlannerRegionMission />
+        <RoutesPlannerRegionMission company={company} />
       )}
     </div>
   );

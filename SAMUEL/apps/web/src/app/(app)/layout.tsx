@@ -1,12 +1,13 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { AppBottomNav } from '@/components/layout/AppBottomNav';
 import { AppHeader } from '@/components/layout/AppHeader';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ApiError } from '@/lib/api-client';
 import { fetchMe, type SessionUser } from '@/lib/auth';
 import { SessionContext } from '@/lib/session-context';
 
@@ -16,15 +17,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [user, setUser] = useState<SessionUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [sessionError, setSessionError] = useState(false);
 
-  useEffect(() => {
+  const loadSession = useCallback(() => {
     let cancelled = false;
+    setLoading(true);
+    setSessionError(false);
     fetchMe()
       .then((u) => {
         if (!cancelled) setUser(u);
       })
-      .catch(() => {
-        // api-client limpa cookies e redireciona se sessão inválida
+      .catch((err) => {
+        // 401: api-client limpa cookies e redireciona para o login.
+        if (cancelled || (err instanceof ApiError && err.status === 401)) return;
+        setSessionError(true);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -33,6 +39,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => loadSession(), [loadSession]);
 
   const fullBleed = FULL_BLEED.has(pathname);
 
@@ -52,6 +60,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             >
               {loading ? (
                 <div className="m-4 h-40 animate-pulse rounded-[10px] bg-surface" aria-busy="true" />
+              ) : !user && sessionError ? (
+                <div className="m-4 space-y-3 rounded-[10px] border border-brand-100 p-4" role="alert">
+                  <p className="text-sm font-medium text-brand-900">
+                    Não foi possível carregar sua sessão.
+                  </p>
+                  <p className="text-sm text-[var(--muted)]">A API pode estar reiniciando.</p>
+                  <button type="button" className="ops-btn ops-btn-primary" onClick={() => loadSession()}>
+                    Tentar de novo
+                  </button>
+                </div>
               ) : (
                 children
               )}

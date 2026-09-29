@@ -25,7 +25,11 @@ import {
   regionCircleBounds,
   regionCirclePolygon,
 } from '@/lib/region-circle';
+import type { CompanyOrigin } from './routes-planner-shared';
+import { RoutesPlannerRegionDispatch, type RegionDispatchPin } from './RoutesPlannerRegionDispatch';
+import { regionMeta, RoutesPlannerRegionList, type RegionListItem } from './RoutesPlannerRegionList';
 
+type RegionPanel = 'browse' | 'create' | 'edit' | 'dispatch';
 type NearbyPin = { id: string; name: string; latitude: number; longitude: number };
 type AddressSuggestion = { label: string; latitude: number; longitude: number };
 type AddressHint = 'idle' | 'loading' | 'ok' | 'not_found' | 'error' | 'rate_limit';
@@ -44,7 +48,7 @@ function sliderRadius(meters: number): number {
   return Math.min(MAX_REGION_RADIUS_METERS, Math.max(MIN_REGION_RADIUS_METERS, meters));
 }
 
-export function RoutesPlannerRegionMission() {
+export function RoutesPlannerRegionMission({ company }: { company: CompanyOrigin }) {
   const user = useSessionUser();
   const { theme } = useTheme();
   const mapStyle = getRasterStyleForTheme(theme);
@@ -60,8 +64,9 @@ export function RoutesPlannerRegionMission() {
     user?.role === 'MANAGER' ||
     user?.role === 'SUPERVISOR';
 
-  const [regions, setRegions] = useState<CustomerRegionPin[]>([]);
+  const [regions, setRegions] = useState<RegionListItem[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [panel, setPanel] = useState<RegionPanel>('browse');
   const [reloadToken, setReloadToken] = useState(0);
   const [latitude, setLatitude] = useState<number | null>(null);
   const [longitude, setLongitude] = useState<number | null>(null);
@@ -72,12 +77,16 @@ export function RoutesPlannerRegionMission() {
   const [suggestions, setSuggestions] = useState<AddressSuggestion[]>([]);
   const [addressHint, setAddressHint] = useState<AddressHint>('idle');
   const [nearby, setNearby] = useState<NearbyPin[]>([]);
+  const [dispatchPins, setDispatchPins] = useState<RegionDispatchPin[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
   const hasCenter = latitude != null && longitude != null;
+  const editing = canSave && (panel === 'create' || panel === 'edit');
+  const selectedRegion = regions.find((r) => r.id === selectedId) ?? null;
+  const visibleDispatchPins = panel === 'dispatch' && selectedId ? dispatchPins : [];
   radiusMetersRef.current = radiusMeters;
   const addressMsg = addressHintMessage(addressHint);
   const kmValue = radiusMeters / 1000;
@@ -88,7 +97,7 @@ export function RoutesPlannerRegionMission() {
   }, [hasCenter, latitude, longitude, radiusMeters]);
 
   const loadRegions = useCallback(async () => {
-    const r = await apiFetch<{ regions: CustomerRegionPin[] }>('/api/v1/customer-regions');
+    const r = await apiFetch<{ regions: RegionListItem[] }>('/api/v1/customer-regions');
     setRegions(r.regions ?? []);
     return r.regions ?? [];
   }, []);
@@ -206,7 +215,7 @@ export function RoutesPlannerRegionMission() {
     containerRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
-  function startNew() {
+  function clearDraft() {
     setSelectedId(null);
     setStoredRadiusMeters(null);
     setRegionName('');
@@ -215,20 +224,61 @@ export function RoutesPlannerRegionMission() {
     setRadiusMeters(DEFAULT_REGION_RADIUS_METERS);
     setAddressQ('');
     setSuggestions([]);
-    setError(null);
-    setMsg(null);
   }
 
-  function selectRegion(region: CustomerRegionPin) {
-    setSelectedId(region.id);
+  function fillFromRegion(region: CustomerRegionPin) {
     setRegionName(region.name);
     setLatitude(region.latitude);
     setLongitude(region.longitude);
     setRadiusMeters(sliderRadius(region.radiusMeters));
     setStoredRadiusMeters(region.radiusMeters);
+    setAddressQ('');
+    setSuggestions([]);
+  }
+
+  function startNew() {
+    clearDraft();
+    setError(null);
+    setMsg(null);
+    setPanel('create');
+  }
+
+  function selectRegion(region: RegionListItem) {
+    setSelectedId(region.id);
+    fillFromRegion(region);
     setError(null);
     setMsg(null);
     fitMapToCenter(region.latitude, region.longitude);
+  }
+
+  /** Descarta o rascunho não salvo e volta ao círculo gravado. */
+  function restoreSelected() {
+    if (selectedRegion) fillFromRegion(selectedRegion);
+    else clearDraft();
+  }
+
+  function backToList() {
+    restoreSelected();
+    setError(null);
+    setMsg(null);
+    setPanel('browse');
+  }
+
+  function openDispatch(region: RegionListItem) {
+    selectRegion(region);
+    setPanel('dispatch');
+  }
+
+  function openEdit(region: RegionListItem) {
+    selectRegion(region);
+    setPanel('edit');
+  }
+
+  function editToDispatch() {
+    restoreSelected();
+    setError(null);
+    setMsg(null);
+    setPanel('dispatch');
   }
 
   function handleClick(e: MapLayerMouseEvent) {
@@ -247,7 +297,7 @@ export function RoutesPlannerRegionMission() {
   }
 
   async function save() {
-    if (!canSave || saving) return;
+    if (!editing || saving) return;
     const name = regionName.trim();
     if (!name) {
       setError('Informe o nome da região.');
@@ -266,26 +316,29 @@ export function RoutesPlannerRegionMission() {
       longitude,
       radiusMeters,
     };
+    const isEdit = panel === 'edit' && selectedId != null;
     try {
-      const path = selectedId
+      const path = isEdit
         ? `/api/v1/customer-regions/${selectedId}`
         : '/api/v1/customer-regions';
-      const r = await apiFetch<{ region: CustomerRegionPin }>(path, {
-        method: selectedId ? 'PATCH' : 'POST',
+      const r = await apiFetch<{ region: CustomerRegionPin; linkedCount?: number }>(path, {
+        method: isEdit ? 'PATCH' : 'POST',
         body: JSON.stringify(body),
       });
       const list = await loadRegions();
       const saved = list.find((item) => item.id === r.region.id) ?? r.region;
       setSelectedId(saved.id);
-      setRegionName(saved.name);
-      setStoredRadiusMeters(saved.radiusMeters);
-      setRadiusMeters(sliderRadius(saved.radiusMeters));
+      fillFromRegion(saved);
       setReloadToken((n) => n + 1);
-      setMsg(
+      setPanel('browse');
+      const linkedCount = r.linkedCount ?? 0;
+      const radiusNote =
         saved.radiusMeters > radiusMeters
-          ? `Região salva. O raio ficou em ${formatRegionKm(saved.radiusMeters)} para cobrir os clientes.`
-          : 'Região salva. O círculo permanece no mapa.',
-      );
+          ? ` O raio ficou em ${formatRegionKm(saved.radiusMeters)} para cobrir os clientes.`
+          : '';
+      const linkedNote =
+        linkedCount > 0 ? ` ${linkedCount} cliente(s) do círculo entraram na região.` : '';
+      setMsg(`Região salva.${radiusNote}${linkedNote}`);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao salvar região');
     } finally {
@@ -294,7 +347,7 @@ export function RoutesPlannerRegionMission() {
   }
 
   async function remove() {
-    if (!canSave || !selectedId || saving) return;
+    if (!canSave || panel !== 'edit' || !selectedId || saving) return;
     if (!window.confirm('Excluir esta região? Os clientes ficam sem região.')) return;
     setSaving(true);
     setError(null);
@@ -303,7 +356,8 @@ export function RoutesPlannerRegionMission() {
       await apiFetch(`/api/v1/customer-regions/${selectedId}`, { method: 'DELETE' });
       await loadRegions();
       setReloadToken((n) => n + 1);
-      startNew();
+      clearDraft();
+      setPanel('browse');
       setMsg('Região excluída. Os clientes ficaram sem região.');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Falha ao excluir região');
@@ -330,8 +384,8 @@ export function RoutesPlannerRegionMission() {
           style={{ width: '100%', height: '100%' }}
           attributionControl
           onLoad={handleMapLoad}
-          onClick={canSave ? handleClick : undefined}
-          cursor={canSave ? 'crosshair' : 'grab'}
+          onClick={editing ? handleClick : undefined}
+          cursor={editing ? 'crosshair' : 'grab'}
         >
           <NavigationControl position="bottom-right" />
           <ScaleControl position="bottom-left" unit="metric" maxWidth={120} />
@@ -355,12 +409,25 @@ export function RoutesPlannerRegionMission() {
               />
             </Source>
           ) : null}
-          {nearby.map((c) => (
+          {nearby
+            .filter((c) => !visibleDispatchPins.some((p) => p.id === c.id))
+            .map((c) => (
             <Marker key={c.id} latitude={c.latitude} longitude={c.longitude} anchor="bottom">
               <div
                 className="h-3 w-3 rounded-full border border-white bg-neutral-400 shadow"
                 title={c.name}
                 aria-label={`Cliente no raio: ${c.name}`}
+              />
+            </Marker>
+          ))}
+          {visibleDispatchPins.map((p) => (
+            <Marker key={`dispatch-${p.id}`} latitude={p.latitude} longitude={p.longitude} anchor="bottom">
+              <div
+                className={`h-3.5 w-3.5 rounded-full border-2 border-white shadow ${
+                  p.selected ? 'bg-accent' : 'bg-neutral-500 opacity-60'
+                }`}
+                title={p.name}
+                aria-label={`${p.selected ? 'Na visita' : 'Fora desta visita'}: ${p.name}`}
               />
             </Marker>
           ))}
@@ -388,7 +455,7 @@ export function RoutesPlannerRegionMission() {
               latitude={latitude!}
               longitude={longitude!}
               anchor="bottom"
-              draggable={canSave}
+              draggable={editing}
               onDragEnd={handleDragEnd}
             >
               <div
@@ -401,13 +468,22 @@ export function RoutesPlannerRegionMission() {
       </div>
 
       <aside className="ops-surface order-2 flex w-full shrink-0 flex-col gap-3 overflow-auto rounded-[10px] p-4 lg:order-1 lg:w-[26rem]">
-        <div>
-          <h2 className="text-lg font-semibold text-brand-900">Região</h2>
-          <p className="mt-1 text-sm text-[var(--muted)]">
-            Marque o pin e o raio. A região fica no mapa. No cadastro do cliente, escolha essa
-            região. Se o cliente cair fora, o km aumenta até o pin dele.
-          </p>
-        </div>
+        {panel === 'browse' ? (
+          <div>
+            <h2 className="text-lg font-semibold text-brand-900">Região</h2>
+            <p className="mt-1 text-sm text-[var(--muted)]">
+              Escolha uma região para enviar funcionários ou crie uma nova.
+            </p>
+          </div>
+        ) : (
+          <button
+            type="button"
+            className="self-start text-sm font-medium text-brand-700 hover:underline"
+            onClick={backToList}
+          >
+            ← Voltar às regiões
+          </button>
+        )}
 
         {error ? (
           <p className="rounded-[8px] bg-red-500/10 px-3 py-2 text-sm text-red-300" role="alert">
@@ -418,149 +494,171 @@ export function RoutesPlannerRegionMission() {
           <p className="rounded-[8px] bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">{msg}</p>
         ) : null}
 
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <span className="text-sm font-medium text-brand-900">Regiões salvas</span>
-            {canSave ? (
-              <button type="button" className="text-xs font-medium text-brand-700 underline" onClick={startNew}>
-                Nova região
-              </button>
-            ) : null}
-          </div>
-          {regions.length === 0 ? (
-            <p className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
-              Nenhuma região
-            </p>
-          ) : (
-            <ul className="max-h-36 space-y-1 overflow-auto text-sm">
-              {regions.map((region) => (
-                <li key={region.id}>
-                  <button
-                    type="button"
-                    className={`w-full rounded-[6px] px-2 py-1.5 text-left hover:bg-surface ${
-                      selectedId === region.id ? 'bg-surface font-medium text-brand-900' : ''
-                    }`}
-                    onClick={() => selectRegion(region)}
-                  >
-                    {region.name} · {formatRegionKm(region.radiusMeters)}
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-
-        {!hasCenter ? (
-          <p className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
-            Clique no mapa ou busque um endereço para definir o centro.
-          </p>
-        ) : (
-          <p className="font-mono text-xs text-[var(--muted)]">
-            Centro {latitude!.toFixed(5)}, {longitude!.toFixed(5)} · {nearby.length} cliente(s) no
-            raio
-          </p>
-        )}
-
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-brand-900">Buscar endereço (opcional)</span>
-          <input
-            type="search"
-            value={addressQ}
-            onChange={(e) => {
-              appliedLabelRef.current = null;
-              setAddressQ(e.target.value);
-            }}
-            onKeyDown={(e) => {
-              if (e.key !== 'Enter') return;
-              e.preventDefault();
-              if (suggestions[0]) applyAddress(suggestions[0]);
-            }}
-            placeholder="Rua, cidade…"
-            className="w-full ops-input text-sm"
-            autoComplete="off"
-            disabled={!canSave}
+        {panel === 'browse' ? (
+          <RoutesPlannerRegionList
+            regions={regions}
+            selectedId={selectedId}
+            canSave={canSave}
+            onSelect={selectRegion}
+            onDispatch={openDispatch}
+            onEdit={openEdit}
+            onCreate={startNew}
           />
-        </label>
-        {addressMsg && addressHint !== 'ok' ? (
-          <p className="text-xs text-[var(--warn)]">{addressMsg}</p>
         ) : null}
-        {suggestions.length > 0 ? (
-          <ul className="max-h-40 space-y-1 overflow-auto text-sm">
-            {suggestions.map((s) => (
-              <li key={`${s.label}-${s.latitude}-${s.longitude}`}>
+
+        {panel === 'dispatch' && selectedRegion ? (
+          <>
+            <div className="flex items-start justify-between gap-2 rounded-xl border border-accent bg-accent/10 px-3 py-2 text-sm">
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-brand-900">{selectedRegion.name}</p>
+                <p className="mt-0.5 text-xs text-[var(--muted)]">{regionMeta(selectedRegion)}</p>
+              </div>
+              {canSave ? (
                 <button
                   type="button"
-                  className="w-full rounded-[6px] px-2 py-1.5 text-left hover:bg-surface"
-                  onClick={() => applyAddress(s)}
+                  className="ops-btn ops-btn-secondary shrink-0 px-3 text-xs"
+                  onClick={() => setPanel('edit')}
                 >
-                  {s.label}
+                  Editar
                 </button>
-              </li>
-            ))}
-          </ul>
+              ) : null}
+            </div>
+            <RoutesPlannerRegionDispatch
+              key={selectedRegion.id}
+              company={company}
+              customerRegionId={selectedRegion.id}
+              onPinsChange={setDispatchPins}
+            />
+          </>
         ) : null}
 
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-brand-900">
-            Raio ({formatRegionKm(storedRadiusMeters != null && storedRadiusMeters > radiusMeters ? storedRadiusMeters : radiusMeters)})
-          </span>
-          <input
-            type="range"
-            min={MIN_REGION_RADIUS_METERS / 1000}
-            max={MAX_REGION_RADIUS_METERS / 1000}
-            step={0.5}
-            value={kmValue}
-            onChange={(e) => {
-              setStoredRadiusMeters(null);
-              setRadiusMeters(Math.round(Number(e.target.value) * 1000));
-            }}
-            className="w-full"
-            aria-valuemin={0.5}
-            aria-valuemax={50}
-            aria-valuenow={kmValue}
-            disabled={!canSave}
-          />
-        </label>
-        {storedRadiusMeters != null && storedRadiusMeters > MAX_REGION_RADIUS_METERS ? (
-          <p className="text-xs text-[var(--muted)]">
-            O círculo salvo está em {formatRegionKm(storedRadiusMeters)} porque há cliente fora do
-            slider de 50 km.
-          </p>
-        ) : null}
+        {editing ? (
+          <>
+            <div>
+              <h2 className="text-lg font-semibold text-brand-900">
+                {panel === 'edit' && selectedRegion ? `Editar "${selectedRegion.name}"` : 'Nova região'}
+              </h2>
+              <p className="mt-1 text-sm text-[var(--muted)]">
+                Clique no mapa ou busque um endereço, ajuste o raio e dê um nome. Ao salvar, os
+                clientes ativos sem região dentro do círculo entram nela. Se um cliente da região
+                cair fora, o km aumenta até o pin dele.
+              </p>
+            </div>
 
-        <label className="block text-sm">
-          <span className="mb-1 block font-medium text-brand-900">Nome da região</span>
-          <input
-            type="text"
-            maxLength={200}
-            value={regionName}
-            onChange={(e) => setRegionName(e.target.value)}
-            className="w-full ops-input text-sm"
-            disabled={!canSave}
-          />
-        </label>
+            {!hasCenter ? (
+              <p className="rounded-[8px] border border-dashed border-[var(--border)] px-3 py-2 text-sm text-[var(--muted)]">
+                Clique no mapa ou busque um endereço para definir o centro.
+              </p>
+            ) : (
+              <p className="font-mono text-xs text-[var(--muted)]">
+                Centro {latitude!.toFixed(5)}, {longitude!.toFixed(5)} · {nearby.length} cliente(s)
+                no raio
+              </p>
+            )}
 
-        {canSave ? (
-          <MobileActionBar className="max-md:flex-row max-md:flex-wrap md:flex-wrap md:justify-start">
-            <ActionButton
-              type="button"
-              loading={saving}
-              disabled={!hasCenter || !regionName.trim()}
-              onClick={() => void save()}
-            >
-              Salvar região
-            </ActionButton>
-            {selectedId ? (
-              <button
-                type="button"
-                className="ops-btn ops-btn-secondary"
-                disabled={saving}
-                onClick={() => void remove()}
-              >
-                Excluir
-              </button>
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-brand-900">Buscar endereço (opcional)</span>
+              <input
+                type="search"
+                value={addressQ}
+                onChange={(e) => {
+                  appliedLabelRef.current = null;
+                  setAddressQ(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key !== 'Enter') return;
+                  e.preventDefault();
+                  if (suggestions[0]) applyAddress(suggestions[0]);
+                }}
+                placeholder="Rua, cidade…"
+                className="w-full ops-input text-sm"
+                autoComplete="off"
+              />
+            </label>
+            {addressMsg && addressHint !== 'ok' ? (
+              <p className="text-xs text-[var(--warn)]">{addressMsg}</p>
             ) : null}
-          </MobileActionBar>
+            {suggestions.length > 0 ? (
+              <ul className="max-h-40 space-y-1 overflow-auto text-sm">
+                {suggestions.map((s) => (
+                  <li key={`${s.label}-${s.latitude}-${s.longitude}`}>
+                    <button
+                      type="button"
+                      className="w-full rounded-[6px] px-2 py-1.5 text-left hover:bg-surface"
+                      onClick={() => applyAddress(s)}
+                    >
+                      {s.label}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-brand-900">
+                Raio ({formatRegionKm(storedRadiusMeters != null && storedRadiusMeters > radiusMeters ? storedRadiusMeters : radiusMeters)})
+              </span>
+              <input
+                type="range"
+                min={MIN_REGION_RADIUS_METERS / 1000}
+                max={MAX_REGION_RADIUS_METERS / 1000}
+                step={0.5}
+                value={kmValue}
+                onChange={(e) => {
+                  setStoredRadiusMeters(null);
+                  setRadiusMeters(Math.round(Number(e.target.value) * 1000));
+                }}
+                className="w-full"
+                aria-valuemin={0.5}
+                aria-valuemax={50}
+                aria-valuenow={kmValue}
+              />
+            </label>
+            {storedRadiusMeters != null && storedRadiusMeters > MAX_REGION_RADIUS_METERS ? (
+              <p className="text-xs text-[var(--muted)]">
+                O círculo salvo está em {formatRegionKm(storedRadiusMeters)} porque há cliente fora
+                do slider de 50 km.
+              </p>
+            ) : null}
+
+            <label className="block text-sm">
+              <span className="mb-1 block font-medium text-brand-900">Nome da região</span>
+              <input
+                type="text"
+                maxLength={200}
+                value={regionName}
+                onChange={(e) => setRegionName(e.target.value)}
+                className="w-full ops-input text-sm"
+              />
+            </label>
+
+            <MobileActionBar className="max-md:flex-row max-md:flex-wrap md:flex-wrap md:justify-start">
+              <ActionButton
+                type="button"
+                loading={saving}
+                disabled={!hasCenter || !regionName.trim()}
+                onClick={() => void save()}
+              >
+                Salvar região
+              </ActionButton>
+            </MobileActionBar>
+
+            {panel === 'edit' ? (
+              <div className="flex flex-wrap items-center gap-3">
+                <button
+                  type="button"
+                  className="ops-btn ops-btn-secondary"
+                  disabled={saving}
+                  onClick={() => void remove()}
+                >
+                  Excluir
+                </button>
+                <button type="button" className="ops-link text-sm" onClick={editToDispatch}>
+                  Enviar para visitar
+                </button>
+              </div>
+            ) : null}
+          </>
         ) : null}
       </aside>
     </div>

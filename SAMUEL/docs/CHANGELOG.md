@@ -1,5 +1,44 @@
 # Changelog
 
+## v0.23.3 — 2026-09-29
+
+### Sessão não carregada não esconde mais os botões de gestor
+
+- `app/(app)/layout.tsx`: se `GET /api/v1/auth/me` falhar sem ser 401 (API reiniciando), o layout mostra “Não foi possível carregar sua sessão. A API pode estar reiniciando.” com **Tentar de novo**, em vez de renderizar a página com usuário nulo. Antes, o planejador abria como se o perfil não pudesse publicar (“Publicar exige perfil ADMIN ou MANAGER.”) e o menu lateral sumia
+- 401 continua redirecionando para o login (`api-client.ts`). Sem mudança de API, permissão ou dado
+- Como validar: com `/auth/me` falhando, abrir `/routes` → aviso; com a API de volta, **Tentar de novo** → planejador com **Publicar rotas** para ADMIN/PLATFORM_ADMIN/MANAGER
+
+## v0.23.2 — 2026-09-29
+
+### Região — “já em rota ativa” diz em qual rota e o erro diz qual cliente
+
+- `GET /routes/region-customers` passa a devolver `activeRoute` (`employeeName`, `status`, `date`) ao lado de `onActiveRoute`, ou `null` quando o cliente não está em rota ativa. `RoutesService.customerIdsOnActiveRoute` virou `activeRouteByCustomer`
+- Em **Enviar para visitar**, a linha do cliente troca “já em rota ativa” por “já em rota ativa · {funcionário ou ‘sem funcionário’} · {status}” (ex.: “já em rota ativa · Campo Demo · Publicada”). Os rótulos de status vêm de `ROUTE_STATUS_LABELS` (`routes-planner-shared.ts`)
+- `preview-region-customers` / `dispatch-region-customers`: o 422 `ROUTE_VISIT_ALREADY_ASSIGNED` troca “Uma ou mais visitas já estão em outra rota ativa.” por “{nome} já está em outra rota ativa.” (vários: “{n1}, {n2} já estão em outra rota ativa.”, até 3 nomes e depois “ e mais N”). O código do erro não muda
+- Sem migração. Campo novo só adicionado à resposta
+- Como validar: `docs/screens/routes.md` passo 9b
+
+## v0.23.1 — 2026-09-29
+
+### Região — cards, + Nova região e clientes do círculo
+
+- Aba **Rotas → Região** abre em lista: **+ Nova região** (ADMIN/MANAGER/SUPERVISOR) e cards das regiões salvas (nome, “Raio N km · N cliente(s)” / “Nenhum cliente”), com **Enviar para visitar** e **Editar** em cada card; busca **Buscar região…** com 7+ regiões (sem acento/maiúscula). Novo `RoutesPlannerRegionList`; a lista `max-h-36` de texto saiu
+- `RoutesPlannerRegionMission` ganha estado `panel` (`browse` / `create` / `edit` / `dispatch`): o formulário (endereço, raio, nome, Salvar, Excluir) só aparece em Nova região/Editar, com **← Voltar às regiões**; clique no mapa e arraste do pin só nesses dois estados (antes qualquer clique movia o centro da região selecionada). Selecionar o card não abre mais o despacho sozinho. Uma `MobileActionBar` por estado (Salvar região / Publicar rotas / nenhuma na lista)
+- `GET /customer-regions` devolve `customerCount` (clientes ACTIVE vinculados, sem placeholder)
+- `POST` / `PATCH /customer-regions` vinculam, na mesma transação, os clientes ACTIVE **sem região** com pin dentro do círculo (`ST_DWithin`, raio final) e devolvem `linkedCount`; a tela mostra “N cliente(s) do círculo entraram na região.”. Cliente de outra região não muda; a região criada pela ficha do cliente não vincula vizinhos
+- `GET /routes/region-customers` soma aos vinculados os ACTIVE sem região dentro do círculo (`inCircleOnly: true`, linha “· no círculo”), sem gravar nada; `preview-region-customers` / `dispatch-region-customers` aceitam a mesma união (fora dela continua 422 `ROUTE_CUSTOMER_NOT_IN_REGION`). Texto vazio: “Nenhum cliente ativo nesta região nem dentro do círculo.”
+- Sem migração. Regiões já salvas mostram os clientes livres do círculo na visita imediatamente; o vínculo no cadastro acontece no próximo **Salvar região**
+- Como validar: `docs/screens/routes.md` passos 9, 9b e 10
+
+## v0.23.0 — 2026-09-28
+
+### Região — enviar funcionários para visitar os clientes
+
+- Aba **Rotas → Região**: com uma região salva selecionada, **Enviar para visitar** lista os clientes ACTIVE com essa região no cadastro (`GET /routes/region-customers`), todos marcados; desmarcar tira só desta publicação (não altera `customer_region_id`)
+- Publicação por `POST /routes/preview-region-customers` e `POST /routes/dispatch-region-customers`: conferem região (`ROUTE_CUSTOMER_NOT_IN_REGION`) e rota ativa (`ROUTE_VISIT_ALREADY_ASSIGNED`) e reusam `previewCustomers` / `dispatchCustomers` (vários funcionários, data, volta, Gravar viagem, origem)
+- Cliente da região sem pin fica em **Sem pin no mapa** e não entra. Aba Clientes sem mudança
+- Como validar: `docs/screens/routes.md` passo 9b
+
 ## v0.22.1 — 2026-09-28
 
 ### Fix — botões e barra de baixo pulavam ao rolar no PWA

@@ -8,7 +8,7 @@ Também: `record_trip` (`recordTrip`) — quando true, densifica GPS (~5 m / 2 s
 
 `record_new_customer` (`recordNewCustomer`) — missão **Gravar cliente** (v0.18.0): o gestor encaminha sessão sem lista de clientes; cada **Adicionar ponto** cria um `Customer` no GPS; **complete** só fecha a sessão. Placeholder `recordSessionShell` nunca vai ao mapa. Plano: [plans/22-gravar-cliente-missao.md](../plans/22-gravar-cliente-missao.md).
 
-Campos opcionais `assignment_region_*` — missão **Gravar região** já publicada (v0.19.0): centro + raio na `Route`. A aba Região não cria missão nova. Identificação no campo: `recordNewCustomer` + `assignmentRegionRadiusMeters != null`. Plano: [plans/23-gravar-regiao.md](../plans/23-gravar-regiao.md).
+Campos opcionais `assignment_region_*` — missão **Gravar região** já publicada (v0.19.0): centro + raio na `Route`. A aba Região não cria missão nova; o botão **Enviar para visitar** do card publica rotas de visita para os clientes vinculados e os ACTIVE sem região dentro do círculo (endpoints `region-customers` abaixo). Identificação no campo: `recordNewCustomer` + `assignmentRegionRadiusMeters != null`. Plano: [plans/23-gravar-regiao.md](../plans/23-gravar-regiao.md).
 
 Região nomeada do cliente (v0.22.0): tabela `customer_regions` (pin + raio) e `customers.customer_region_id` opcional. O raio gravado pode passar de 50 km quando um cliente vinculado fica fora do círculo.
 
@@ -18,28 +18,28 @@ Região nomeada do cliente (v0.22.0): tabela `customer_regions` (pin + raio) e `
 - Rate limit: N/A
 - Body / Query: nenhum
 - Cookies set/clear: nenhum
-- 200: `{ "regions": [{ "id", "name", "latitude", "longitude", "radiusMeters" }] }`
+- 200: `{ "regions": [{ "id", "name", "latitude", "longitude", "radiusMeters", "customerCount" }] }` — `customerCount` = clientes ACTIVE (sem placeholder de gravação) com `customer_region_id` igual
 - Side effects: nenhum
-- Como testar: login e GET; outra empresa não aparece
+- Como testar: login e GET; outra empresa não aparece; `customerCount` bate com os clientes ACTIVE vinculados
 
 ## Endpoint POST /api/v1/customer-regions
 
 - Auth: ADMIN, MANAGER, SUPERVISOR
 - Body: `{ "name", "latitude", "longitude", "radiusMeters" }` — raio 500–50000
-- 201: `{ "region": { ... } }`
+- 201: `{ "region": { "id", "name", "latitude", "longitude", "radiusMeters" }, "linkedCount": 2 }`
 - 409: `{ "code": "REGIAO_JA_EXISTE", "message": "Essa região já está cadastrada. Selecione ela na lista." }`
 - 422: nome vazio ou raio fora da faixa
-- Side effects: insert em `customer_regions`. Índice único `(company_id, lower(name))`
-- Como testar: POST duas vezes com o mesmo nome → 201 e depois 409
+- Side effects: insert em `customer_regions`. Índice único `(company_id, lower(name))`. Na mesma transação, `UPDATE customers SET customer_region_id = região, updated_at = now()` para os clientes da empresa com `status = ACTIVE`, `record_session_shell = false`, `customer_region_id IS NULL`, `location` não nula e `ST_DWithin(location, centro, radius_meters)`; `linkedCount` = linhas alteradas. Cliente de outra região não muda. A região criada pela ficha do cliente (`newRegion`) não faz esse vínculo
+- Como testar: POST duas vezes com o mesmo nome → 201 e depois 409; POST sobre 2 clientes ACTIVE sem região → `linkedCount: 2` e os dois com `customerRegionId`
 
 ## Endpoint PATCH /api/v1/customer-regions/:id
 
 - Auth: ADMIN, MANAGER, SUPERVISOR
 - Body: nome, latitude, longitude e/ou radiusMeters (slider até 50 km)
-- 200: região; `radiusMeters` é o maior entre o slider e a distância do cliente vinculado mais longe
+- 200: `{ "region": { ... }, "linkedCount": 0 }`; `radiusMeters` é o maior entre o slider e a distância do cliente vinculado mais longe
 - 404: `REGION_NOT_FOUND` se o id não é da empresa
-- Side effects: update. Não encolhe abaixo do cliente mais longe
-- Como testar: cliente a mais de 50 km → PATCH com 50000 devolve km maior
+- Side effects: update. Não encolhe abaixo do cliente mais longe. Depois do update, mesmo vínculo dos clientes livres do POST, usando o raio final (já crescido)
+- Como testar: cliente a mais de 50 km → PATCH com 50000 devolve km maior; aumentar o raio sobre um cliente ACTIVE sem região → `linkedCount: 1`
 
 ## Endpoint DELETE /api/v1/customer-regions/:id
 
@@ -47,6 +47,27 @@ Região nomeada do cliente (v0.22.0): tabela `customer_regions` (pin + raio) e `
 - 200: `{ "ok": true }`
 - Side effects: apaga a região; `customers.customer_region_id` fica nulo (`ON DELETE SET NULL`)
 - Como testar: excluir e ver o cliente sem região
+
+## Endpoint GET /api/v1/routes/region-customers
+
+- Auth: ADMIN, MANAGER, SUPERVISOR (PLATFORM_ADMIN pelo `RolesGuard`)
+- Query: `customerRegionId` (UUID)
+- 200: `{ "customers": [{ "id", "name", "tradeName", "city", "latitude", "longitude", "onActiveRoute", "activeRoute", "inCircleOnly"? }], "withoutPin": [{ "id", "name" }] }` — clientes ACTIVE (sem placeholder) com `customer_region_id` igual **ou** sem região com `location` dentro do círculo (`ST_DWithin`); estes vêm com `inCircleOnly: true`. `onActiveRoute` = parada em rota DRAFT/PLANNED/ASSIGNED/PUBLISHED/IN_PROGRESS. `activeRoute` = `{ "employeeName": string | null, "status": RouteStatus, "date": "YYYY-MM-DD" }` dessa rota, ou `null` quando `onActiveRoute` é `false`
+- 404: `REGION_NOT_FOUND` se a região não é da empresa
+- Side effects: nenhum (não grava vínculo)
+- Como testar: cliente com a região e pin aparece em `customers`; sem pin em `withoutPin`; cliente ACTIVE sem região dentro do círculo aparece com `inCircleOnly: true`; cliente de outra região não aparece
+
+## Endpoint POST /api/v1/routes/preview-region-customers · POST /api/v1/routes/dispatch-region-customers
+
+- Auth: preview ADMIN, MANAGER, SUPERVISOR; dispatch ADMIN, MANAGER (SUPERVISOR → 403)
+- Body: igual a `preview-customers` (`customerIds`, `employeeIds`, `roundtrip`, `date`, `recordTrip`, `originMode`) + `customerRegionId`
+- 200: mesma resposta de `preview-customers` / `dispatch-customers`
+- 404: `REGION_NOT_FOUND`
+- 422: `ROUTE_CUSTOMER_NOT_IN_REGION` (cliente sem essa região no cadastro e fora da regra “ACTIVE sem região dentro do círculo” — ex.: cliente de outra região), `ROUTE_VISIT_ALREADY_ASSIGNED` com o nome do cliente (`tradeName` ou `name`): “{nome} já está em outra rota ativa.” para um; “{n1}, {n2} já estão em outra rota ativa.” para vários (até 3 nomes, depois “ e mais N”), `CUSTOMER_NO_PIN`, e os erros de `preview-customers` (`ROUTE_TOO_MANY_STOPS`, `ROUTE_TOO_MANY_EMPLOYEES`, `ROUTE_NOT_ENOUGH_VEHICLES`)
+- Side effects: dispatch cria OS + visitas + rotas PUBLISHED como `dispatch-customers`. Não altera `customers.customer_region_id` (desmarcar só tira desta publicação)
+- Como testar: publicar a região; mandar de novo o mesmo cliente → 422 `ROUTE_VISIT_ALREADY_ASSIGNED` com “{nome} já está em outra rota ativa.”
+
+`POST /api/v1/routes/dispatch-customers` (aba Clientes) continua sem checar rota ativa nem região.
 
 No `POST/PATCH /api/v1/customers`, campos opcionais `customerRegionId` ou `newRegion: { name, radiusMeters }` (não os dois). `newRegion` exige lat/lng do cliente (centro = pin). Nome repetido → 409 e o cliente não grava. Pin fora → o raio da região sobe na mesma transação. Sem pin, vincula e o raio não muda (`regionNotice: "NO_PIN"`).
 

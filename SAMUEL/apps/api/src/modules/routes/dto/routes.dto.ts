@@ -159,6 +159,22 @@ export class DispatchCustomersRouteDto extends PreviewCustomersRouteDto {
   @IsIn([...ROUTE_ORIGIN_MODES])
   declare originMode?: RouteOriginMode;
 }
+
+export class RegionCustomersQueryDto {
+  @IsUUID('4')
+  customerRegionId!: string;
+}
+
+/** Envio pela aba Região: só clientes vinculados a `customerRegionId` e fora de rota ativa. */
+export class PreviewRegionCustomersDto extends PreviewCustomersRouteDto {
+  @IsUUID('4')
+  customerRegionId!: string;
+
+  @IsOptional()
+  @IsIn([...ROUTE_ORIGIN_MODES])
+  declare originMode?: RouteOriginMode;
+}
+
 export const ROUTE_START_FUEL_LEVELS = [
   'EMPTY',
   'QUARTER',

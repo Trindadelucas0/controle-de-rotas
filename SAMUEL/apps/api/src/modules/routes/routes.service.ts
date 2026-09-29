@@ -36,6 +36,7 @@ import {
   DispatchRegionMissionDto,
   ListRoutesQueryDto,
   PreviewCustomersRouteDto,
+  PreviewRegionCustomersDto,
   PreviewRouteDto,
   RecordPointDto,
   RerouteRouteDto,
@@ -116,6 +117,12 @@ const DAY_ACTIVE_ROUTE_STATUSES: RouteStatus[] = [
   RouteStatus.PUBLISHED,
   RouteStatus.IN_PROGRESS,
 ];
+
+type ActiveRouteSummary = {
+  employeeName: string | null;
+  status: RouteStatus;
+  date: string;
+};
 
 export type RouteStopDto = {
   sequence: number;
@@ -782,6 +789,169 @@ export class RoutesService {
       recordTrip: prepared.recordTrip,
       routes,
     };
+  }
+
+  async listRegionCustomers(user: AuthUser, customerRegionId: string) {
+    const region = await this.findRegionCircle(user.companyId, customerRegionId);
+    const inCircleIds = await this.freeCustomerIdsInCircle(user.companyId, region);
+
+    const rows = await this.prisma.customer.findMany({
+      where: {
+        companyId: user.companyId,
+        status: CustomerStatus.ACTIVE,
+        recordSessionShell: false,
+        OR: [{ customerRegionId }, { id: { in: inCircleIds } }],
+      },
+      select: {
+        id: true,
+        name: true,
+        tradeName: true,
+        city: true,
+        latitude: true,
+        longitude: true,
+        customerRegionId: true,
+      },
+      orderBy: { name: 'asc' },
+    });
+
+    const withPin = rows.filter((c) => customerHasPin(c));
+    const activeRoutes = await this.activeRouteByCustomer(
+      user.companyId,
+      withPin.map((c) => c.id),
+    );
+
+    return {
+      customers: withPin.map((c) => ({
+        id: c.id,
+        name: c.name,
+        tradeName: c.tradeName,
+        city: c.city,
+        latitude: c.latitude,
+        longitude: c.longitude,
+        onActiveRoute: activeRoutes.has(c.id),
+        activeRoute: activeRoutes.get(c.id) ?? null,
+        ...(c.customerRegionId !== customerRegionId ? { inCircleOnly: true } : {}),
+      })),
+      withoutPin: rows
+        .filter((c) => !customerHasPin(c))
+        .map((c) => ({ id: c.id, name: c.tradeName || c.name })),
+    };
+  }
+
+  async previewRegionCustomers(user: AuthUser, dto: PreviewRegionCustomersDto) {
+    await this.assertRegionCustomersDispatchable(user.companyId, dto);
+    return this.previewCustomers(user, dto);
+  }
+
+  async dispatchRegionCustomers(user: AuthUser, dto: PreviewRegionCustomersDto) {
+    await this.assertRegionCustomersDispatchable(user.companyId, dto);
+    return this.dispatchCustomers(user, dto);
+  }
+
+  private async assertRegionCustomersDispatchable(
+    companyId: string,
+    dto: PreviewRegionCustomersDto,
+  ) {
+    const region = await this.findRegionCircle(companyId, dto.customerRegionId);
+
+    const customerIds = [...new Set(dto.customerIds)];
+    const linked = await this.prisma.customer.findMany({
+      where: {
+        companyId,
+        id: { in: customerIds },
+        customerRegionId: dto.customerRegionId,
+        recordSessionShell: false,
+      },
+      select: { id: true },
+    });
+    const allowed = new Set(linked.map((c) => c.id));
+    if (allowed.size !== customerIds.length) {
+      for (const id of await this.freeCustomerIdsInCircle(companyId, region)) allowed.add(id);
+    }
+    if (customerIds.some((id) => !allowed.has(id))) {
+      throw httpError(
+        HttpStatus.UNPROCESSABLE_ENTITY,
+        'ROUTE_CUSTOMER_NOT_IN_REGION',
+        'Um ou mais clientes não pertencem a esta região.',
+      );
+    }
+
+    const activeRoutes = await this.activeRouteByCustomer(companyId, customerIds);
+    if (!activeRoutes.size) return;
+
+    const busy = await this.prisma.customer.findMany({
+      where: { companyId, id: { in: [...activeRoutes.keys()] } },
+      select: { name: true, tradeName: true },
+      orderBy: { name: 'asc' },
+    });
+    throw httpError(
+      HttpStatus.UNPROCESSABLE_ENTITY,
+      'ROUTE_VISIT_ALREADY_ASSIGNED',
+      busyCustomersMessage(busy.map((c) => c.tradeName || c.name)),
+    );
+  }
+
+  private async findRegionCircle(companyId: string, customerRegionId: string) {
+    const region = await this.prisma.customerRegion.findFirst({
+      where: { id: customerRegionId, companyId },
+      select: { id: true, latitude: true, longitude: true, radiusMeters: true },
+    });
+    if (!region) {
+      throw httpError(HttpStatus.NOT_FOUND, 'REGION_NOT_FOUND', 'Região não encontrada.');
+    }
+    return region;
+  }
+
+  /** Clientes ACTIVE sem região cujo pin cai dentro do círculo (mesma regra do vínculo ao salvar). */
+  private async freeCustomerIdsInCircle(
+    companyId: string,
+    region: { latitude: number; longitude: number; radiusMeters: number },
+  ): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ id: string }[]>`
+      SELECT id::text
+      FROM customers
+      WHERE company_id = ${companyId}::uuid
+        AND customer_region_id IS NULL
+        AND status = 'ACTIVE'
+        AND record_session_shell = false
+        AND location IS NOT NULL
+        AND ST_DWithin(
+          location::geography,
+          ST_SetSRID(ST_MakePoint(${region.longitude}, ${region.latitude}), 4326)::geography,
+          ${region.radiusMeters}
+        )
+    `;
+    return rows.map((r) => r.id);
+  }
+
+  private async activeRouteByCustomer(
+    companyId: string,
+    customerIds: string[],
+  ): Promise<Map<string, ActiveRouteSummary>> {
+    const byCustomer = new Map<string, ActiveRouteSummary>();
+    if (!customerIds.length) return byCustomer;
+    const stops = await this.prisma.routeStop.findMany({
+      where: {
+        companyId,
+        route: { companyId, status: { in: ACTIVE_ROUTE_STATUSES } },
+        visit: { customerId: { in: customerIds } },
+      },
+      select: {
+        visit: { select: { customerId: true } },
+        route: {
+          select: { status: true, date: true, employee: { select: { name: true } } },
+        },
+      },
+    });
+    for (const s of stops) {
+      if (byCustomer.has(s.visit.customerId)) continue;
+      byCustomer.set(s.visit.customerId, {
+        employeeName: s.route.employee?.name ?? null,
+        status: s.route.status,
+        date: s.route.date.toISOString().slice(0, 10),
+      });
+    }
+    return byCustomer;
   }
 
   async list(user: AuthUser, query: ListRoutesQueryDto) {
@@ -3093,4 +3263,13 @@ function uniqueOrThrow(ids: string[], code: string, message: string): string[] {
 
 function utcDateIso(value?: string): string {
   return businessDayYmd(value);
+}
+
+const MAX_BUSY_NAMES = 3;
+
+function busyCustomersMessage(names: string[]): string {
+  if (names.length <= 1) return `${names[0] ?? 'Cliente'} já está em outra rota ativa.`;
+  const shown = names.slice(0, MAX_BUSY_NAMES).join(', ');
+  const rest = names.length - MAX_BUSY_NAMES;
+  return `${shown}${rest > 0 ? ` e mais ${rest}` : ''} já estão em outra rota ativa.`;
 }

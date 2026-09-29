@@ -225,11 +225,17 @@ Cadastro só com nome fica com **lápis** no Mapa. Gestor e o funcionário dono 
 
 **Gravar viagem** (checkbox no modo Clientes, cliente já cadastrado) continua como estava — sem o botão Adicionar ponto.
 
-### 6.7 Missão Gravar região
+### 6.7 Região: salvar e enviar para visitar
 
-No planejador, aba **Região**: clique no mapa **ou** use **Buscar endereço** (digite a cidade/rua, Enter ou clique na sugestão — o mapa vai até o círculo). Raio **5 km** (ajustável), funcionário, data, veículo → **Publicar missão**. Nome da região é opcional. Depois de publicar, o painel limpa (a data fica) para a próxima região. A barra de escala mostra km reais; ao puxar o slider o círculo cresce no mesmo zoom.
+No planejador, aba **Região**: aparece o botão **+ Nova região** e um card para cada região salva, com o nome e “Raio N km · N cliente(s)” (ou “Nenhum cliente”). Com 7 ou mais regiões aparece **Buscar região…** (ex.: “armag” acha “regiao armagurada”). Clicar no card só seleciona: o card fica com borda laranja e o mapa vai até o círculo. Clicar no mapa aqui **não** mexe na região.
 
-No campo o card chama **Gravar região** e mostra **Você foi designado para {nome} · raio N km** + mini-mapa com o círculo. Play, **Adicionar ponto** e **Finalizar por completo** são iguais à missão Gravar cliente. Na navegação, a área fora do raio fica escurecida e a borda laranja aparece no mapa; **Ver região** mostra o círculo inteiro; **Centralizar** volta a acompanhar o GPS. Fora do raio o HUD mostra seta e km até a borda; ainda dá para gravar o ponto. Clientes já cadastrados no círculo no planejador não entram como paradas.
+**Criar:** clique **+ Nova região** → clique no mapa **ou** use **Buscar endereço** (digite a cidade/rua, Enter ou clique na sugestão — o mapa vai até o círculo). Ajuste o raio (padrão **5 km**), dê um nome e clique **Salvar região**. Volta para a lista com a região nova selecionada. O círculo fica no mapa. A barra de escala mostra km reais; ao puxar o slider o círculo cresce no mesmo zoom. Os clientes **ativos sem região** que estão dentro do círculo entram nela; a mensagem diz “N cliente(s) do círculo entraram na região.”. Cliente que já tem outra região continua com a dele.
+
+**Editar / Excluir:** no card, **Editar** → mude pin, raio ou nome → **Salvar região** (também puxa os clientes livres do novo círculo). **← Voltar às regiões** sai sem salvar. **Excluir** fica dentro do Editar.
+
+**Enviar para visitar:** no card, clique **Enviar para visitar**. Aparece o card da região (com **Editar**) e a lista com os clientes que têm essa região no cadastro **e** os ativos sem região dentro do círculo (esses mostram “no círculo”) — todos marcados (ponto menta no mapa). Desmarque quem não vai **nesta** visita (fica cinza; o cadastro não muda). **← Voltar às regiões** volta para os cards. Cliente com “já em rota ativa” vem desmarcado; se marcar, **Publicar rotas** recusa. Clientes sem pin aparecem em **Sem pin no mapa** e não entram. Escolha data, **Voltar para a empresa no fim**, **Gravar viagem**, origem do cálculo e um ou mais funcionários → confira o **Resumo** → **Publicar rotas** (ADMIN/MANAGER). Deve aparecer “N rota(s) publicada(s). Os funcionários verão em Minha rota.”
+
+Missões **Gravar região** publicadas antes continuam no campo: o card chama **Gravar região** e mostra **Você foi designado para {nome} · raio N km** + mini-mapa com o círculo. Play, **Adicionar ponto** e **Finalizar por completo** são iguais à missão Gravar cliente. Na navegação, a área fora do raio fica escurecida e a borda laranja aparece no mapa; **Ver região** mostra o círculo inteiro; **Centralizar** volta a acompanhar o GPS. Fora do raio o HUD mostra seta e km até a borda; ainda dá para gravar o ponto. Clientes já cadastrados no círculo no planejador não entram como paradas.
 
 ---
 

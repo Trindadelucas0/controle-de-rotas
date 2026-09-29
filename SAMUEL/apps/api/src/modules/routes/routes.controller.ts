@@ -26,7 +26,9 @@ import {
   DispatchRegionMissionDto,
   ListRoutesQueryDto,
   PreviewCustomersRouteDto,
+  PreviewRegionCustomersDto,
   PreviewRouteDto,
+  RegionCustomersQueryDto,
   RerouteRouteDto,
   StartRouteDto,
   UpdateRouteDto,
@@ -76,10 +78,28 @@ export class RoutesController {
     return this.routesService.dispatchRegionMission(user, dto);
   }
 
+  @Post('preview-region-customers')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
+  previewRegionCustomers(@CurrentUser() user: AuthUser, @Body() dto: PreviewRegionCustomersDto) {
+    return this.routesService.previewRegionCustomers(user, dto);
+  }
+
+  @Post('dispatch-region-customers')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER)
+  dispatchRegionCustomers(@CurrentUser() user: AuthUser, @Body() dto: PreviewRegionCustomersDto) {
+    return this.routesService.dispatchRegionCustomers(user, dto);
+  }
+
   @Get()
   @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
   list(@CurrentUser() user: AuthUser, @Query() query: ListRoutesQueryDto) {
     return this.routesService.list(user, query);
+  }
+
+  @Get('region-customers')
+  @Roles(UserRole.ADMIN, UserRole.MANAGER, UserRole.SUPERVISOR)
+  listRegionCustomers(@CurrentUser() user: AuthUser, @Query() query: RegionCustomersQueryDto) {
+    return this.routesService.listRegionCustomers(user, query.customerRegionId);
   }
 
   @Post()

@@ -1,5 +1,5 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { CustomerStatus, Prisma } from '@prisma/client';
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { httpError } from '../../common/errors/http-error';
 import { AuthUser } from '../auth/decorators/auth.decorators';
@@ -31,6 +31,11 @@ export type CustomerRegionPublic = {
   radiusMeters: number;
 };
 
+export type CustomerRegionListItem = CustomerRegionPublic & {
+  /** Clientes ACTIVE vinculados (sem placeholder de gravação). */
+  customerCount: number;
+};
+
 export type CustomerRegionLinkResult = {
   /** `undefined` = não mexer no vínculo. */
   customerRegionId: string | null | undefined;
@@ -41,24 +46,36 @@ export type CustomerRegionLinkResult = {
 export class CustomerRegionsService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async list(user: AuthUser): Promise<{ regions: CustomerRegionPublic[] }> {
-    const regions = await this.prisma.customerRegion.findMany({
+  async list(user: AuthUser): Promise<{ regions: CustomerRegionListItem[] }> {
+    const rows = await this.prisma.customerRegion.findMany({
       where: { companyId: user.companyId },
-      select: regionPublicSelect,
+      select: {
+        ...regionPublicSelect,
+        _count: {
+          select: {
+            customers: { where: { status: CustomerStatus.ACTIVE, recordSessionShell: false } },
+          },
+        },
+      },
       orderBy: { name: 'asc' },
     });
+    const regions = rows.map(({ _count, ...region }) => ({
+      ...region,
+      customerCount: _count.customers,
+    }));
     return { regions };
   }
 
   async create(user: AuthUser, dto: CreateCustomerRegionDto) {
-    const region = await this.prisma.$transaction((tx) =>
-      this.insertRegion(tx, user.companyId, dto),
-    );
-    return { region };
+    return this.prisma.$transaction(async (tx) => {
+      const region = await this.insertRegion(tx, user.companyId, dto);
+      const linkedCount = await this.linkCustomersInCircle(tx, user.companyId, region);
+      return { region, linkedCount };
+    });
   }
 
   async update(user: AuthUser, id: string, dto: UpdateCustomerRegionDto) {
-    const region = await this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx) => {
       const current = await tx.customerRegion.findFirst({
         where: { id, companyId: user.companyId },
       });
@@ -100,8 +117,9 @@ export class CustomerRegionsService {
         radiusMeters: requested,
       });
 
+      let region: CustomerRegionPublic;
       try {
-        return await tx.customerRegion.update({
+        region = await tx.customerRegion.update({
           where: { id },
           data: { name, latitude, longitude, radiusMeters },
           select: regionPublicSelect,
@@ -109,8 +127,9 @@ export class CustomerRegionsService {
       } catch (err) {
         this.rethrowDuplicate(err);
       }
+      const linkedCount = await this.linkCustomersInCircle(tx, user.companyId, region);
+      return { region, linkedCount };
     });
-    return { region };
   }
 
   async remove(user: AuthUser, id: string) {
@@ -311,6 +330,30 @@ export class CustomerRegionsService {
       );
     }
     return radius;
+  }
+
+  /** Cliente que já tem outra região mantém a dele. */
+  private async linkCustomersInCircle(
+    tx: Prisma.TransactionClient,
+    companyId: string,
+    region: CustomerRegionPublic,
+  ): Promise<number> {
+    // $executeRaw não passa pelo @updatedAt do Prisma.
+    return tx.$executeRaw`
+      UPDATE customers
+      SET customer_region_id = ${region.id}::uuid,
+          updated_at = now()
+      WHERE company_id = ${companyId}::uuid
+        AND customer_region_id IS NULL
+        AND status = 'ACTIVE'
+        AND record_session_shell = false
+        AND location IS NOT NULL
+        AND ST_DWithin(
+          location::geography,
+          ST_SetSRID(ST_MakePoint(${region.longitude}, ${region.latitude}), 4326)::geography,
+          ${region.radiusMeters}
+        )
+    `;
   }
 
   private rethrowDuplicate(err: unknown): never {
